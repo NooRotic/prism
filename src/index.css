@@ -1,29 +1,43 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Satoshi:wght@300;400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
 
 :root {
-  --bg: #0a0a0a;
-  --bg-card: #111111;
-  --bg-card-hover: #1a1a1a;
-  --bg-sidebar: #0f0f0f;
-  --border: #222222;
-  --border-accent: #333333;
+  /* Backgrounds — layered, not flat */
+  --bg: #050507;
+  --bg-gradient: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(145, 70, 255, 0.08), transparent),
+                 radial-gradient(ellipse 60% 40% at 80% 100%, rgba(57, 255, 20, 0.04), transparent),
+                 #050507;
+  --bg-card: #0c0c10;
+  --bg-card-hover: #12121a;
+  --bg-sidebar: #08080c;
+  --border: #1a1a24;
+  --border-accent: #2a2a3a;
 
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  /* Text — high contrast extremes */
+  --text-primary: #eeeef0;
+  --text-secondary: #8888a0;
+  --text-muted: #55556a;
 
+  /* Accents — bold dominant + sharp */
   --accent-green: #39FF14;
+  --accent-green-glow: rgba(57, 255, 20, 0.3);
   --accent-twitch: #9146FF;
+  --accent-twitch-glow: rgba(145, 70, 255, 0.25);
   --accent-youtube: #FF0000;
   --accent-hls: #3B82F6;
   --accent-gold: #ffc832;
   --accent-orange: #ff6b35;
   --accent-red: #ff4444;
 
-  --font-heading: 'Orbitron', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --font-body: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, Consolas, monospace;
+  /* Typography — distinctive choices, extreme weights */
+  --font-heading: 'Orbitron', sans-serif;
+  --font-body: 'Satoshi', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Spacing rhythm */
+  --space-unit: 0.5rem;
 }
 
 * {
@@ -33,12 +47,155 @@
 body {
   margin: 0;
   font-family: var(--font-body);
-  background: var(--bg);
+  font-weight: 300;
+  background: var(--bg-gradient);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.01em;
 }
 
 #root {
   min-height: 100vh;
+  position: relative;
+}
+
+/* Atmospheric noise overlay — subtle texture */
+#root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Staggered reveal animation system ─── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    text-shadow:
+      0 0 20px var(--accent-green-glow),
+      0 0 40px rgba(57, 255, 20, 0.1);
+  }
+  50% {
+    text-shadow:
+      0 0 30px var(--accent-green-glow),
+      0 0 60px rgba(57, 255, 20, 0.15),
+      0 0 80px rgba(57, 255, 20, 0.05);
+  }
+}
+
+@keyframes borderGlow {
+  0%, 100% {
+    border-color: var(--border);
+    box-shadow: 0 0 0 transparent;
+  }
+  50% {
+    border-color: var(--border-accent);
+    box-shadow: 0 0 15px rgba(145, 70, 255, 0.06);
+  }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.animate-reveal {
+  animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-reveal-1 { animation-delay: 0ms; }
+.animate-reveal-2 { animation-delay: 120ms; }
+.animate-reveal-3 { animation-delay: 240ms; }
+.animate-reveal-4 { animation-delay: 360ms; }
+.animate-reveal-5 { animation-delay: 480ms; }
+
+.animate-glow {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+.animate-border-glow {
+  animation: borderGlow 4s ease-in-out infinite;
+}
+
+/* ─── Typography utilities ─── */
+.font-heading {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.text-display {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  line-height: 1;
+  font-weight: 900;
+}
+
+.text-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ─── Card hover lift ─── */
+.card-hover {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s ease,
+              border-color 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-color: var(--border-accent);
+}
+
+/* ─── Scrollbar styling ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-accent);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ─── Selection color ─── */
+::selection {
+  background: rgba(57, 255, 20, 0.2);
+  color: var(--text-primary);
 }

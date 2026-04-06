@@ -9,36 +9,64 @@ import VODGrid from '../channel/VODGrid'
 
 function IdleView() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-4 text-center">
+    <div className="flex flex-col items-center justify-center min-h-[65vh] gap-8 px-4 text-center relative">
+      {/* Ambient glow behind hero */}
       <div
-        className="p-4 rounded-full"
-        style={{ backgroundColor: 'rgba(57, 255, 20, 0.1)' }}
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse 50% 40% at 50% 40%, rgba(57, 255, 20, 0.06), transparent 70%)',
+        }}
+      />
+
+      <div
+        className="animate-reveal animate-reveal-1 p-5 rounded-full relative"
+        style={{ backgroundColor: 'rgba(57, 255, 20, 0.06)', border: '1px solid rgba(57, 255, 20, 0.1)' }}
       >
-        <Tv size={48} style={{ color: 'var(--accent-green)' }} />
+        <Tv size={44} style={{ color: 'var(--accent-green)' }} strokeWidth={1.5} />
       </div>
-      <h1
-        className="text-4xl md:text-5xl font-bold tracking-tight"
-        style={{ fontFamily: 'var(--font-heading)', color: 'var(--text-primary)' }}
+
+      <h1 className="animate-reveal animate-reveal-2 text-display font-heading animate-glow"
+        style={{ color: 'var(--accent-green)' }}
       >
         GLAZE ME
       </h1>
+
       <p
-        className="text-lg max-w-md"
-        style={{ color: 'var(--text-secondary)' }}
+        className="animate-reveal animate-reveal-3 max-w-lg leading-relaxed"
+        style={{ color: 'var(--text-secondary)', fontSize: 'clamp(1rem, 2vw, 1.2rem)', fontWeight: 300 }}
       >
-        Enter a Twitch channel name above to get the full breakdown — clips, VODs,
-        stats, emotes, and more.
+        The boldest way to explore a Twitch channel. Clips, VODs, stats, emotes, and
+        everything that makes a streamer who they are.
       </p>
+
       <div
-        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm"
+        className="animate-reveal animate-reveal-4 flex items-center gap-3 px-5 py-2.5 rounded-lg animate-border-glow"
         style={{
           backgroundColor: 'var(--bg-card)',
           border: '1px solid var(--border)',
-          color: 'var(--text-muted)',
         }}
       >
-        <Search size={14} />
-        <span>Try searching for a streamer...</span>
+        <Search size={14} style={{ color: 'var(--accent-twitch)' }} />
+        <span className="text-label" style={{ color: 'var(--text-muted)' }}>
+          Search a channel to get started
+        </span>
+      </div>
+
+      {/* Subtle feature hints */}
+      <div className="animate-reveal animate-reveal-5 flex gap-6 mt-4">
+        {['Clips', 'VODs', 'Stats', 'Emotes', 'Badges'].map((label, i) => (
+          <span
+            key={label}
+            className="text-label"
+            style={{
+              color: 'var(--text-muted)',
+              opacity: 0.5,
+              animationDelay: `${600 + i * 80}ms`,
+            }}
+          >
+            {label}
+          </span>
+        ))}
       </div>
     </div>
   )

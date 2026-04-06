@@ -6,10 +6,17 @@ export function Header() {
   const { isAuthenticated, login, logout } = useTwitchAuth()
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]">
+    <header
+      className="flex items-center justify-between px-6 py-3 relative z-10"
+      style={{
+        borderBottom: '1px solid var(--border)',
+        background: 'linear-gradient(180deg, var(--bg-sidebar), rgba(8, 8, 12, 0.8))',
+        backdropFilter: 'blur(12px)',
+      }}
+    >
       <h1
-        className="text-xl font-bold tracking-wider select-none"
-        style={{ fontFamily: 'var(--font-heading)', color: 'var(--accent-green)' }}
+        className="font-heading text-lg select-none"
+        style={{ color: 'var(--accent-green)', letterSpacing: '0.15em' }}
       >
         GLAZE ME
       </h1>
@@ -21,19 +28,36 @@ export function Header() {
           <button
             type="button"
             onClick={logout}
-            className="flex items-center gap-1.5 bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] text-sm px-3 py-1.5 rounded hover:border-[var(--accent-red)] hover:text-[var(--accent-red)] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-200 hover:scale-[1.02]"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.75rem',
+              letterSpacing: '0.05em',
+            }}
           >
-            <LogOut size={14} />
-            Logout
+            <LogOut size={13} />
+            logout
           </button>
         ) : (
           <button
             type="button"
             onClick={login}
-            className="flex items-center gap-1.5 bg-[var(--accent-twitch)] text-white text-sm px-4 py-1.5 rounded hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 px-4 py-1.5 rounded-md transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+            style={{
+              background: 'linear-gradient(135deg, var(--accent-twitch), #7b2ff2)',
+              color: '#fff',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              letterSpacing: '0.05em',
+              boxShadow: '0 0 20px var(--accent-twitch-glow)',
+            }}
           >
-            <LogIn size={14} />
-            Login with Twitch
+            <LogIn size={13} />
+            connect twitch
           </button>
         )}
       </div>
