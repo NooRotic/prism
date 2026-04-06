@@ -59,7 +59,7 @@ function loadTwitchScript(): Promise<void> {
 }
 
 export default function TwitchEmbedPlayer({
-  url: _url,
+  url: _url, // eslint-disable-line @typescript-eslint/no-unused-vars
   detection,
   onReady,
   onError,
@@ -69,7 +69,7 @@ export default function TwitchEmbedPlayer({
   const containerRef = useRef<HTMLDivElement>(null)
   const embedRef = useRef<TwitchEmbedInstance | null>(null)
   const mountedRef = useRef(true)
-  const embedIdRef = useRef(`twitch-embed-${Date.now()}`)
+  const embedIdRef = useRef('')
 
   const handleError = useCallback(
     (msg: string) => {
@@ -83,6 +83,9 @@ export default function TwitchEmbedPlayer({
     const container = containerRef.current
     if (!container) return
 
+    if (!embedIdRef.current) {
+      embedIdRef.current = `twitch-embed-${Date.now()}`
+    }
     const embedId = embedIdRef.current
     // Ensure the container has the required id
     container.id = embedId

@@ -5,12 +5,11 @@ import { buildTwitchEmbedUrl } from '../../lib/urlDetection'
 const LOAD_TIMEOUT_MS = 5000
 
 export default function TwitchIframePlayer({
-  url: _url,
+  // url is used indirectly via detection
   detection,
   onReady,
   onError,
   onPlay,
-  onPause: _onPause,
 }: PlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const mountedRef = useRef(true)

@@ -1,11 +1,25 @@
-const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID
+const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || ''
 const SCOPES = ['user:read:follows']
 
+/**
+ * Get the OAuth redirect URI.
+ * For dev: http://localhost:5173/twitch-glaze-me/
+ * For prod: https://<user>.github.io/twitch-glaze-me/
+ *
+ * Must exactly match what's registered in Twitch Developer Console.
+ */
 function getRedirectUri(): string {
-  return window.location.origin + window.location.pathname
+  // Use the base URL (origin + vite base path)
+  const base = import.meta.env.BASE_URL || '/'
+  return window.location.origin + base
 }
 
 export function loginWithTwitch() {
+  if (!CLIENT_ID) {
+    console.error('VITE_TWITCH_CLIENT_ID is not set. Create a .env file from .env.example.')
+    return
+  }
+
   const state = Math.random().toString(36).substring(2)
   sessionStorage.setItem('twitch_oauth_state', state)
 
@@ -30,14 +44,14 @@ export function handleTwitchRedirect(): string | null {
   // Validate state to prevent CSRF
   const savedState = sessionStorage.getItem('twitch_oauth_state')
   if (state && savedState && state !== savedState) {
-    console.warn('OAuth state mismatch')
+    console.warn('OAuth state mismatch — possible CSRF attempt')
     return null
   }
 
   if (accessToken) {
     localStorage.setItem('twitch_access_token', accessToken)
     sessionStorage.removeItem('twitch_oauth_state')
-    // Clean the URL hash
+    // Clean the URL hash without losing the path
     window.history.replaceState(null, '', window.location.pathname + window.location.search)
     return accessToken
   }

@@ -77,11 +77,11 @@ interface UseDerivedStatsInput {
 export function useDerivedStats({
   clips,
   videos,
-  channelInfo,
   games,
 }: UseDerivedStatsInput): DerivedStats {
   return useMemo(() => {
     // ===== Growth Indicators =====
+    // eslint-disable-next-line react-hooks/purity -- timestamp for filtering recent data
     const now = Date.now()
     const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
 
@@ -217,5 +217,5 @@ export function useDerivedStats({
     }
 
     return { growth, diversity, clipEngagement, vodStats }
-  }, [clips, videos, channelInfo, games])
+  }, [clips, videos, games])
 }

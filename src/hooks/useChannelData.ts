@@ -107,7 +107,7 @@ export function useChannelData(
         setLoading(false)
       }
     },
-    [dispatch, options?.handleAuthError],
+    [dispatch, options],
   )
 
   const refetch = useCallback(() => {
@@ -119,6 +119,7 @@ export function useChannelData(
   useEffect(() => {
     if (!channelName) return
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching sets state asynchronously via callbacks
     fetchData(channelName)
 
     return () => {

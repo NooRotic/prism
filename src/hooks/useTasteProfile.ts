@@ -49,7 +49,7 @@ export function useTasteProfile(
     } finally {
       setLoading(false)
     }
-  }, [userId, isAuthenticated, options?.handleAuthError])
+  }, [userId, isAuthenticated, options])
 
   useEffect(() => {
     if (!userId || !isAuthenticated) {

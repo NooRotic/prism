@@ -3,7 +3,6 @@ import type { PlayerProps } from '../../types/player'
 
 export default function YouTubePlayer({
   url,
-  detection: _detection,
   onReady,
   onError,
   onPlay,

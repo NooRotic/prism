@@ -23,6 +23,7 @@ export function useTwitchAuth() {
     // Check for OAuth redirect on mount
     const redirectToken = handleTwitchRedirect()
     if (redirectToken) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing external OAuth redirect state on mount
       setToken(redirectToken)
       setIsAuthenticated(true)
       dispatch({ type: 'LOGIN', token: redirectToken })

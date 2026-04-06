@@ -14,7 +14,7 @@ import { SearchSuggestions } from './SearchSuggestions'
 import { QuickLinks } from './QuickLinks'
 
 function hasUrlChars(text: string): boolean {
-  return /[.:\/]/.test(text)
+  return /[.:/]/.test(text)
 }
 
 export function SmartUrlInput() {

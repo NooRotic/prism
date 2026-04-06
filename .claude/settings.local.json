@@ -5,7 +5,10 @@
       "Bash(git init:*)",
       "Bash(npm create:*)",
       "Bash(cp:*)",
-      "Bash(rtk git:*)"
+      "Bash(rtk git:*)",
+      "Bash(rtk npx:*)",
+      "Bash(rtk proxy:*)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

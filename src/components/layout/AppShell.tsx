@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Loader2, X, Tv, Search } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import PlayerHost from '../player/PlayerHost'
@@ -67,6 +67,19 @@ function IdleView() {
             {label}
           </span>
         ))}
+      </div>
+
+      {/* Unauth capabilities note */}
+      <div
+        className="animate-reveal animate-reveal-5 mt-2 max-w-md"
+        style={{ animationDelay: '700ms' }}
+      >
+        <p className="text-sm" style={{ color: 'var(--text-muted)', fontWeight: 300 }}>
+          Paste any <span style={{ color: 'var(--accent-twitch)' }}>Twitch</span>,{' '}
+          <span style={{ color: 'var(--accent-youtube)' }}>YouTube</span>, or{' '}
+          <span style={{ color: 'var(--accent-hls)' }}>HLS/DASH</span> URL to play instantly.
+          Connect Twitch for full channel exploration.
+        </p>
       </div>
     </div>
   )
@@ -174,14 +187,11 @@ function ChannelLayout() {
 
 export default function AppShell() {
   const { state, dispatch } = useApp()
-  const [showError, setShowError] = useState(false)
 
-  useEffect(() => {
-    if (state.error) setShowError(true)
-  }, [state.error])
+  // Derive error visibility from state directly (no effect needed)
+  const showError = !!state.error
 
   const dismissError = () => {
-    setShowError(false)
     dispatch({ type: 'CLEAR_ERROR' })
   }
 

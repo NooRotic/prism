@@ -65,6 +65,7 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
   // Reset fallback state when URL or detection changes
   useEffect(() => {
     const engine = getRecommendedEngine(detection)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting state on prop change
     setFallbackStep(0)
     setActiveEngine(engine)
     setErrorReason(null)
