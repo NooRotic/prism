@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a0a;
+  --bg-card: #111111;
+  --bg-card-hover: #1a1a1a;
+  --bg-sidebar: #0f0f0f;
+  --border: #222222;
+  --border-accent: #333333;
+
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+
+  --accent-green: #39FF14;
+  --accent-twitch: #9146FF;
+  --accent-youtube: #FF0000;
+  --accent-hls: #3B82F6;
+  --accent-gold: #ffc832;
+  --accent-orange: #ff6b35;
+  --accent-red: #ff4444;
+
+  --font-heading: 'Orbitron', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-body: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, Consolas, monospace;
+}
+
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap');
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
