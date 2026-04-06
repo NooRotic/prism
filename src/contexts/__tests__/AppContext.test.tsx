@@ -1,0 +1,207 @@
+import { render, screen, renderHook, act } from '@testing-library/react'
+import { AppProvider, useApp } from '../AppContext'
+import type { ReactNode } from 'react'
+
+function wrapper({ children }: { children: ReactNode }) {
+  return <AppProvider>{children}</AppProvider>
+}
+
+describe('AppContext', () => {
+  describe('AppProvider', () => {
+    it('renders children', () => {
+      render(
+        <AppProvider>
+          <div data-testid="child">hello</div>
+        </AppProvider>,
+      )
+      expect(screen.getByTestId('child')).toHaveTextContent('hello')
+    })
+  })
+
+  describe('useApp', () => {
+    it('throws outside provider', () => {
+      // Suppress console.error for expected error
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      expect(() => renderHook(() => useApp())).toThrow(
+        'useApp must be used within AppProvider',
+      )
+      spy.mockRestore()
+    })
+
+    it('provides initial state', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      expect(result.current.state.auth.isAuthenticated).toBe(false)
+      expect(result.current.state.auth.token).toBeNull()
+      expect(result.current.state.loading).toBe(false)
+      expect(result.current.state.error).toBeNull()
+      expect(result.current.state.displayMode).toBe('idle')
+    })
+  })
+
+  describe('reducer actions', () => {
+    it('LOGIN sets auth state', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      act(() => {
+        result.current.dispatch({ type: 'LOGIN', token: 'abc123' })
+      })
+
+      expect(result.current.state.auth.isAuthenticated).toBe(true)
+      expect(result.current.state.auth.token).toBe('abc123')
+    })
+
+    it('LOGOUT clears auth state', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      act(() => {
+        result.current.dispatch({ type: 'LOGIN', token: 'abc123' })
+      })
+      act(() => {
+        result.current.dispatch({ type: 'LOGOUT' })
+      })
+
+      expect(result.current.state.auth.isAuthenticated).toBe(false)
+      expect(result.current.state.auth.token).toBeNull()
+    })
+
+    it('PLAY_URL updates player state', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      const detection = {
+        type: 'twitch' as const,
+        platform: 'twitch-clip' as const,
+        originalUrl: 'https://clips.twitch.tv/TestClip',
+        playableUrl: 'https://clips.twitch.tv/TestClip',
+      }
+
+      act(() => {
+        result.current.dispatch({
+          type: 'PLAY_URL',
+          url: 'https://clips.twitch.tv/TestClip',
+          detection,
+        })
+      })
+
+      expect(result.current.state.player.currentUrl).toBe(
+        'https://clips.twitch.tv/TestClip',
+      )
+      expect(result.current.state.player.detection).toEqual(detection)
+      expect(result.current.state.player.fallbackStep).toBe(0)
+    })
+
+    it('LOAD_CHANNEL_START sets loading true and clears error', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      // Set an error first
+      act(() => {
+        result.current.dispatch({
+          type: 'LOAD_CHANNEL_ERROR',
+          error: 'previous error',
+        })
+      })
+
+      act(() => {
+        result.current.dispatch({ type: 'LOAD_CHANNEL_START' })
+      })
+
+      expect(result.current.state.loading).toBe(true)
+      expect(result.current.state.error).toBeNull()
+    })
+
+    it('LOAD_CHANNEL_ERROR sets error and stops loading', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      act(() => {
+        result.current.dispatch({ type: 'LOAD_CHANNEL_START' })
+      })
+      act(() => {
+        result.current.dispatch({
+          type: 'LOAD_CHANNEL_ERROR',
+          error: 'Channel not found',
+        })
+      })
+
+      expect(result.current.state.loading).toBe(false)
+      expect(result.current.state.error).toBe('Channel not found')
+    })
+
+    it('ADD_HISTORY adds to search history and dedupes', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      act(() => {
+        result.current.dispatch({
+          type: 'ADD_HISTORY',
+          entry: { query: 'xqc', type: 'twitch', timestamp: 1000 },
+        })
+      })
+
+      expect(result.current.state.search.history).toHaveLength(1)
+      expect(result.current.state.search.history[0].query).toBe('xqc')
+
+      // Add duplicate - should dedupe
+      act(() => {
+        result.current.dispatch({
+          type: 'ADD_HISTORY',
+          entry: { query: 'xqc', type: 'twitch', timestamp: 2000 },
+        })
+      })
+
+      expect(result.current.state.search.history).toHaveLength(1)
+      expect(result.current.state.search.history[0].timestamp).toBe(2000)
+    })
+
+    it('ADD_HISTORY caps at 20 entries', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      act(() => {
+        for (let i = 0; i < 25; i++) {
+          result.current.dispatch({
+            type: 'ADD_HISTORY',
+            entry: {
+              query: `channel${i}`,
+              type: 'twitch',
+              timestamp: i,
+            },
+          })
+        }
+      })
+
+      expect(result.current.state.search.history).toHaveLength(20)
+      // Most recent should be first
+      expect(result.current.state.search.history[0].query).toBe('channel24')
+    })
+
+    it('TOGGLE_DEBUG toggles player.debugMode', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      expect(result.current.state.player.debugMode).toBe(false)
+
+      act(() => {
+        result.current.dispatch({ type: 'TOGGLE_DEBUG' })
+      })
+      expect(result.current.state.player.debugMode).toBe(true)
+
+      act(() => {
+        result.current.dispatch({ type: 'TOGGLE_DEBUG' })
+      })
+      expect(result.current.state.player.debugMode).toBe(false)
+    })
+
+    it('CLEAR_ERROR clears the error', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      act(() => {
+        result.current.dispatch({
+          type: 'LOAD_CHANNEL_ERROR',
+          error: 'some error',
+        })
+      })
+      expect(result.current.state.error).toBe('some error')
+
+      act(() => {
+        result.current.dispatch({ type: 'CLEAR_ERROR' })
+      })
+      expect(result.current.state.error).toBeNull()
+    })
+  })
+})
