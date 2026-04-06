@@ -26,8 +26,6 @@ const TWITCH_EVENTS = {
   VIDEO_READY: 'video.ready',
   VIDEO_PLAY: 'video.play',
   VIDEO_PAUSE: 'pause',
-  ONLINE: 'online',
-  OFFLINE: 'offline',
 } as const
 
 let scriptLoadPromise: Promise<void> | null = null
@@ -61,6 +59,7 @@ function loadTwitchScript(): Promise<void> {
 }
 
 export default function TwitchEmbedPlayer({
+  url: _url,
   detection,
   onReady,
   onError,

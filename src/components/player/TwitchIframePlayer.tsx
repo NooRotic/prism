@@ -1,10 +1,11 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import type { PlayerProps } from '../../types/player'
 import { buildTwitchEmbedUrl } from '../../lib/urlDetection'
 
 const LOAD_TIMEOUT_MS = 5000
 
 export default function TwitchIframePlayer({
+  url: _url,
   detection,
   onReady,
   onError,
@@ -13,7 +14,7 @@ export default function TwitchIframePlayer({
 }: PlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const mountedRef = useRef(true)
-  const [loaded, setLoaded] = useState(false)
+  const loadedRef = useRef(false)
 
   const handleError = useCallback(
     (msg: string) => {
@@ -26,6 +27,7 @@ export default function TwitchIframePlayer({
 
   useEffect(() => {
     mountedRef.current = true
+    loadedRef.current = false
 
     if (!embedUrl) {
       handleError('Could not build Twitch embed URL')
@@ -34,7 +36,7 @@ export default function TwitchIframePlayer({
 
     // Timeout: if iframe hasn't loaded within 5s, treat as failure
     const timeoutId = setTimeout(() => {
-      if (mountedRef.current && !loaded) {
+      if (mountedRef.current && !loadedRef.current) {
         handleError('Twitch iframe timed out after 5s')
       }
     }, LOAD_TIMEOUT_MS)
@@ -43,11 +45,11 @@ export default function TwitchIframePlayer({
       mountedRef.current = false
       clearTimeout(timeoutId)
     }
-  }, [embedUrl, loaded, handleError])
+  }, [embedUrl, handleError])
 
   const handleLoad = useCallback(() => {
     if (!mountedRef.current) return
-    setLoaded(true)
+    loadedRef.current = true
     onReady?.()
     // Iframe player doesn't give us play/pause events natively,
     // so we fire onPlay on load since autoplay is enabled

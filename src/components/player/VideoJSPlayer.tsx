@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
 import videojs from 'video.js'
-import type Player from 'video.js/dist/types/player'
 import 'video.js/dist/video-js.css'
 import type { PlayerProps } from '../../types/player'
+
+type Player = ReturnType<typeof videojs>
 
 export default function VideoJSPlayer({
   url,

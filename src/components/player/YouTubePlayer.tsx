@@ -3,6 +3,7 @@ import type { PlayerProps } from '../../types/player'
 
 export default function YouTubePlayer({
   url,
+  detection: _detection,
   onReady,
   onError,
   onPlay,
@@ -11,7 +12,7 @@ export default function YouTubePlayer({
   return (
     <div className="w-full h-full" style={{ minHeight: 300 }}>
       <ReactPlayer
-        url={url}
+        src={url}
         playing
         controls
         width="100%"
@@ -19,15 +20,10 @@ export default function YouTubePlayer({
         onReady={() => onReady?.()}
         onPlay={() => onPlay?.()}
         onPause={() => onPause?.()}
-        onError={(err: unknown) =>
-          onError?.(
-            `YouTube player error: ${err instanceof Error ? err.message : String(err)}`,
-          )
-        }
+        onError={() => onError?.('YouTube player encountered an error')}
         config={{
-          playerVars: {
-            autoplay: 1,
-            modestbranding: 1,
+          youtube: {
+            enablejsapi: 1,
           },
         }}
       />
