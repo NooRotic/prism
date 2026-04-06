@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash \"C:\\\\Users\\\\NooRo\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.6\\\\skills\\\\brainstorming\\\\scripts\\\\start-server.sh\" --project-dir \"C:\\\\dev\\\\projects\\\\twitch-glaze-me\")",
+      "Bash(git init:*)",
+      "Bash(npm create:*)",
+      "Bash(cp:*)",
+      "Bash(rtk git:*)"
+    ]
+  }
+}

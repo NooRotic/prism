@@ -1,32 +1,54 @@
-import { AppProvider } from './contexts/AppContext'
+import { useEffect, useState } from 'react'
+import { AppProvider, useApp } from './contexts/AppContext'
 import { Header } from './components/layout/Header'
+import AppShell from './components/layout/AppShell'
+import { useChannelData } from './hooks/useChannelData'
+import { useTwitchAuth } from './hooks/useTwitchAuth'
+import { detectURLType } from './lib/urlDetection'
+
+function AppInner() {
+  const { state, dispatch } = useApp()
+  const { handleAuthError } = useTwitchAuth()
+  const [channelToLoad, setChannelToLoad] = useState<string | null>(null)
+
+  // When a Twitch channel URL is played, extract channel name and load data
+  useEffect(() => {
+    const { detection } = state.player
+    if (!detection) return
+
+    if (detection.type === 'twitch' && detection.metadata?.channelName) {
+      setChannelToLoad(detection.metadata.channelName)
+    }
+  }, [state.player.detection])
+
+  // Also handle plain text channel name submissions (from SmartUrlInput)
+  useEffect(() => {
+    const url = state.player.currentUrl
+    if (!url) return
+
+    // If the URL doesn't look like a URL, it's a plain channel name
+    if (!url.includes('.') && !url.includes('/') && !url.includes(':')) {
+      setChannelToLoad(url)
+      // Also set up the detection for the player
+      const detection = detectURLType(`https://twitch.tv/${url}`)
+      dispatch({ type: 'PLAY_URL', url, detection })
+    }
+  }, [state.player.currentUrl, dispatch])
+
+  useChannelData(channelToLoad, { handleAuthError: () => handleAuthError(null) })
+
+  return (
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)]">
+      <Header />
+      <AppShell />
+    </div>
+  )
+}
 
 function App() {
   return (
     <AppProvider>
-      <div className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)]">
-        <Header />
-
-        <main
-          className="flex items-center justify-center"
-          style={{ minHeight: 'calc(100vh - 64px)' }}
-        >
-          <div className="text-center">
-            <h2
-              className="text-4xl font-bold mb-4"
-              style={{ fontFamily: 'var(--font-heading)', color: 'var(--accent-green)' }}
-            >
-              GLAZE ME
-            </h2>
-            <p className="text-[var(--text-secondary)] text-lg mb-6">
-              Twitch Channel Streamer Highlighter
-            </p>
-            <p className="text-[var(--text-muted)] text-sm">
-              Enter a Twitch channel name above to get started
-            </p>
-          </div>
-        </main>
-      </div>
+      <AppInner />
     </AppProvider>
   )
 }
