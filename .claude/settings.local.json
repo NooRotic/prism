@@ -8,7 +8,8 @@
       "Bash(rtk git:*)",
       "Bash(rtk npx:*)",
       "Bash(rtk proxy:*)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(node:*)"
     ]
   }
 }

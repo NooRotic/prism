@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
+    "animejs": "^4.3.6",
     "dashjs": "^5.1.1",
     "lucide-react": "^1.7.0",
     "react": "^19.2.4",
