@@ -1,4 +1,12 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  lazy,
+  Suspense,
+} from 'react'
 import { Settings, WifiOff } from 'lucide-react'
 import type { URLDetectionResult, PlayerEngine } from '../../lib/urlDetection'
 import {
@@ -65,7 +73,13 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
   const { state, dispatch } = useApp()
   const { debugMode } = state.player
 
-  const chain = getFallbackChain(detection)
+  // Memoize chain so its reference stays stable across renders that don't
+  // change the detection. This is load-bearing for preventing the Twitch
+  // embed from being torn down and rebuilt on every unrelated state change:
+  // chain is transitively a dependency of handleError, which is a useEffect
+  // dep in TwitchEmbedPlayer. Unstable here = embed rebuilds every render =
+  // Twitch's embed.js spams its own Sentry project with init errors = 429.
+  const chain = useMemo(() => getFallbackChain(detection), [detection])
   const initialEngine = getRecommendedEngine(detection)
 
   const [fallbackStep, setFallbackStep] = useState(0)
@@ -75,6 +89,15 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
   const [lastTransitionAt, setLastTransitionAt] = useState<number>(() =>
     Date.now(),
   )
+
+  // Ref mirror of fallbackStep so advanceFallback can read the latest value
+  // without closing over it. Without this, advanceFallback would have
+  // fallbackStep in its deps and become a new function on every advance,
+  // defeating the memoization chain above.
+  const fallbackStepRef = useRef(fallbackStep)
+  useEffect(() => {
+    fallbackStepRef.current = fallbackStep
+  }, [fallbackStep])
 
   useEffect(() => {
     const engine = getRecommendedEngine(detection)
@@ -89,7 +112,8 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
 
   const advanceFallback = useCallback(
     (error: string) => {
-      const nextStep = fallbackStep + 1
+      const currentStep = fallbackStepRef.current
+      const nextStep = currentStep + 1
       setLastTransitionAt(Date.now())
       if (nextStep < chain.length) {
         const nextEngine = chain[nextStep]
@@ -111,7 +135,7 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
         })
       }
     },
-    [fallbackStep, chain, dispatch],
+    [chain, dispatch],
   )
 
   const resetChain = useCallback(() => {
