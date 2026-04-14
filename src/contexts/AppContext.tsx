@@ -69,6 +69,7 @@ type Action =
   | { type: 'TOGGLE_DEBUG' }
   | { type: 'SET_DISPLAY_MODE'; mode: 'idle' | 'streamer' | 'chatter' }
   | { type: 'CLEAR_ERROR' }
+  | { type: 'GO_HOME' }
 
 const initialState: AppState = {
   auth: { token: null, isAuthenticated: false },
@@ -155,6 +156,35 @@ function appReducer(state: AppState, action: Action): AppState {
       return { ...state, displayMode: action.mode }
     case 'CLEAR_ERROR':
       return { ...state, error: null }
+    case 'GO_HOME':
+      // Reset the app to the idle/landing state without touching auth or
+      // search history. Preserves the user's debug toggle since that's a
+      // developer affordance, not a per-channel piece of state.
+      return {
+        ...state,
+        player: {
+          currentUrl: '',
+          detection: null,
+          activeEngine: 'twitch-sdk',
+          fallbackStep: 0,
+          debugMode: state.player.debugMode,
+        },
+        channel: {
+          profile: null,
+          channelInfo: null,
+          stream: null,
+          clips: [],
+          videos: [],
+          emotes: [],
+          badges: [],
+          games: new Map(),
+          isLive: false,
+        },
+        search: { ...state.search, query: '' },
+        displayMode: 'idle',
+        loading: false,
+        error: null,
+      }
     default:
       return state
   }

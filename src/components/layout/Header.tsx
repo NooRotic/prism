@@ -1,9 +1,13 @@
 import { LogIn, LogOut } from 'lucide-react'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import { useApp } from '../../contexts/AppContext'
 import { SmartUrlInput } from '../search/SmartUrlInput'
 
 export function Header() {
   const { isAuthenticated, login, logout } = useTwitchAuth()
+  const { dispatch } = useApp()
+
+  const goHome = () => dispatch({ type: 'GO_HOME' })
 
   return (
     <header
@@ -14,12 +18,19 @@ export function Header() {
         backdropFilter: 'blur(12px)',
       }}
     >
-      <h1
-        className="font-heading text-lg select-none"
-        style={{ color: 'var(--accent-green)', letterSpacing: '0.15em' }}
+      <button
+        type="button"
+        onClick={goHome}
+        aria-label="Return to home"
+        className="cursor-pointer transition-opacity hover:opacity-80"
       >
-        GLAZE ME
-      </h1>
+        <h1
+          className="font-heading text-lg select-none"
+          style={{ color: 'var(--accent-green)', letterSpacing: '0.15em' }}
+        >
+          GLAZE ME
+        </h1>
+      </button>
 
       <div className="flex items-center gap-3">
         <SmartUrlInput />
