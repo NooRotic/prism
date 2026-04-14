@@ -17,8 +17,28 @@ export interface SearchEntry {
   timestamp: number
 }
 
+export type NavPanelId = 'following'
+
+export type FollowingSort = 'live-first' | 'alpha' | 'viewers'
+
+const FOLLOWING_SORT_STORAGE_KEY = 'glaze_following_sort'
+
+function loadFollowingSort(): FollowingSort {
+  if (typeof localStorage === 'undefined') return 'live-first'
+  const stored = localStorage.getItem(FOLLOWING_SORT_STORAGE_KEY)
+  if (stored === 'live-first' || stored === 'alpha' || stored === 'viewers') {
+    return stored
+  }
+  return 'live-first'
+}
+
 export interface AppState {
-  auth: { token: string | null; isAuthenticated: boolean }
+  auth: {
+    token: string | null
+    isAuthenticated: boolean
+    /** The authenticated user's own profile, populated after login. */
+    user: TwitchUser | null
+  }
   search: { query: string; history: SearchEntry[] }
   channel: {
     profile: TwitchUser | null
@@ -38,6 +58,11 @@ export interface AppState {
     fallbackStep: number
     debugMode: boolean
   }
+  /** Controls the header nav slide-down panel (following, etc.). */
+  navPanel: {
+    open: NavPanelId | null
+    followingSort: FollowingSort
+  }
   displayMode: 'idle' | 'streamer' | 'chatter'
   loading: boolean
   error: string | null
@@ -45,6 +70,7 @@ export interface AppState {
 
 type Action =
   | { type: 'LOGIN'; token: string }
+  | { type: 'LOGIN_USER_LOADED'; user: TwitchUser }
   | { type: 'LOGOUT' }
   | { type: 'TOKEN_EXPIRED' }
   | { type: 'SET_QUERY'; query: string }
@@ -70,9 +96,13 @@ type Action =
   | { type: 'SET_DISPLAY_MODE'; mode: 'idle' | 'streamer' | 'chatter' }
   | { type: 'CLEAR_ERROR' }
   | { type: 'GO_HOME' }
+  | { type: 'OPEN_NAV_PANEL'; panel: NavPanelId }
+  | { type: 'CLOSE_NAV_PANEL' }
+  | { type: 'TOGGLE_NAV_PANEL'; panel: NavPanelId }
+  | { type: 'SET_FOLLOWING_SORT'; sort: FollowingSort }
 
 const initialState: AppState = {
-  auth: { token: null, isAuthenticated: false },
+  auth: { token: null, isAuthenticated: false, user: null },
   search: { query: '', history: [] },
   channel: {
     profile: null,
@@ -92,6 +122,10 @@ const initialState: AppState = {
     fallbackStep: 0,
     debugMode: false,
   },
+  navPanel: {
+    open: null,
+    followingSort: loadFollowingSort(),
+  },
   displayMode: 'idle',
   loading: false,
   error: null,
@@ -100,10 +134,20 @@ const initialState: AppState = {
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'LOGIN':
-      return { ...state, auth: { token: action.token, isAuthenticated: true } }
+      return {
+        ...state,
+        auth: { ...state.auth, token: action.token, isAuthenticated: true },
+      }
+    case 'LOGIN_USER_LOADED':
+      return { ...state, auth: { ...state.auth, user: action.user } }
     case 'LOGOUT':
     case 'TOKEN_EXPIRED':
-      return { ...state, auth: { token: null, isAuthenticated: false } }
+      return {
+        ...state,
+        auth: { token: null, isAuthenticated: false, user: null },
+        // Close any open nav panel since it requires auth
+        navPanel: { ...state.navPanel, open: null },
+      }
     case 'SET_QUERY':
       return { ...state, search: { ...state.search, query: action.query } }
     case 'ADD_HISTORY': {
@@ -181,9 +225,31 @@ function appReducer(state: AppState, action: Action): AppState {
           isLive: false,
         },
         search: { ...state.search, query: '' },
+        // Close any open nav panel on home navigation
+        navPanel: { ...state.navPanel, open: null },
         displayMode: 'idle',
         loading: false,
         error: null,
+      }
+    case 'OPEN_NAV_PANEL':
+      return { ...state, navPanel: { ...state.navPanel, open: action.panel } }
+    case 'CLOSE_NAV_PANEL':
+      return { ...state, navPanel: { ...state.navPanel, open: null } }
+    case 'TOGGLE_NAV_PANEL':
+      return {
+        ...state,
+        navPanel: {
+          ...state.navPanel,
+          open: state.navPanel.open === action.panel ? null : action.panel,
+        },
+      }
+    case 'SET_FOLLOWING_SORT':
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(FOLLOWING_SORT_STORAGE_KEY, action.sort)
+      }
+      return {
+        ...state,
+        navPanel: { ...state.navPanel, followingSort: action.sort },
       }
     default:
       return state

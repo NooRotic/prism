@@ -203,5 +203,113 @@ describe('AppContext', () => {
       })
       expect(result.current.state.error).toBeNull()
     })
+
+    it('LOGIN_USER_LOADED populates auth.user without touching token', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      act(() => {
+        result.current.dispatch({ type: 'LOGIN', token: 'tok123' })
+      })
+      expect(result.current.state.auth.user).toBeNull()
+
+      const mockUser = {
+        id: '42',
+        login: 'tester',
+        display_name: 'Tester',
+        type: '',
+        broadcaster_type: '' as const,
+        description: '',
+        profile_image_url: '',
+        offline_image_url: '',
+        view_count: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      }
+      act(() => {
+        result.current.dispatch({ type: 'LOGIN_USER_LOADED', user: mockUser })
+      })
+      expect(result.current.state.auth.user).toEqual(mockUser)
+      expect(result.current.state.auth.token).toBe('tok123')
+      expect(result.current.state.auth.isAuthenticated).toBe(true)
+    })
+
+    it('LOGOUT clears auth.user and closes any open nav panel', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+
+      act(() => {
+        result.current.dispatch({ type: 'LOGIN', token: 'tok' })
+        result.current.dispatch({ type: 'OPEN_NAV_PANEL', panel: 'following' })
+      })
+      expect(result.current.state.navPanel.open).toBe('following')
+
+      act(() => {
+        result.current.dispatch({ type: 'LOGOUT' })
+      })
+      expect(result.current.state.auth.user).toBeNull()
+      expect(result.current.state.auth.isAuthenticated).toBe(false)
+      expect(result.current.state.navPanel.open).toBeNull()
+    })
+
+    it('OPEN_NAV_PANEL sets the open panel id', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      act(() => {
+        result.current.dispatch({ type: 'OPEN_NAV_PANEL', panel: 'following' })
+      })
+      expect(result.current.state.navPanel.open).toBe('following')
+    })
+
+    it('CLOSE_NAV_PANEL sets open back to null', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      act(() => {
+        result.current.dispatch({ type: 'OPEN_NAV_PANEL', panel: 'following' })
+      })
+      act(() => {
+        result.current.dispatch({ type: 'CLOSE_NAV_PANEL' })
+      })
+      expect(result.current.state.navPanel.open).toBeNull()
+    })
+
+    it('TOGGLE_NAV_PANEL flips between open and closed for the same id', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      act(() => {
+        result.current.dispatch({ type: 'TOGGLE_NAV_PANEL', panel: 'following' })
+      })
+      expect(result.current.state.navPanel.open).toBe('following')
+
+      act(() => {
+        result.current.dispatch({ type: 'TOGGLE_NAV_PANEL', panel: 'following' })
+      })
+      expect(result.current.state.navPanel.open).toBeNull()
+    })
+
+    it('SET_FOLLOWING_SORT updates the sort and persists to localStorage', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      // Initial value comes from the localStorage loader; default 'live-first'
+      expect(result.current.state.navPanel.followingSort).toBe('live-first')
+
+      act(() => {
+        result.current.dispatch({ type: 'SET_FOLLOWING_SORT', sort: 'viewers' })
+      })
+      expect(result.current.state.navPanel.followingSort).toBe('viewers')
+      expect(localStorage.getItem('glaze_following_sort')).toBe('viewers')
+
+      act(() => {
+        result.current.dispatch({ type: 'SET_FOLLOWING_SORT', sort: 'alpha' })
+      })
+      expect(result.current.state.navPanel.followingSort).toBe('alpha')
+      expect(localStorage.getItem('glaze_following_sort')).toBe('alpha')
+    })
+
+    it('GO_HOME closes any open nav panel', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      act(() => {
+        result.current.dispatch({ type: 'OPEN_NAV_PANEL', panel: 'following' })
+      })
+      expect(result.current.state.navPanel.open).toBe('following')
+
+      act(() => {
+        result.current.dispatch({ type: 'GO_HOME' })
+      })
+      expect(result.current.state.navPanel.open).toBeNull()
+    })
   })
 })
