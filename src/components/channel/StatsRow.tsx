@@ -40,14 +40,14 @@ function StatCard({ icon, label, value, details, trend }: StatCardProps) {
         </div>
       </div>
       <p
-        className="text-3xl font-bold"
+        className="text-4xl font-bold"
         style={{ color: 'var(--accent-green)', fontFamily: 'var(--font-heading)' }}
       >
         {value}
       </p>
       <div className="flex flex-col gap-0.5">
         {details.map((d, i) => (
-          <span key={i} className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          <span key={i} className="text-sm" style={{ color: 'var(--text-muted)' }}>
             {d}
           </span>
         ))}
