@@ -220,7 +220,7 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
               style={{ color: 'var(--text-primary)' }}
             >
               {/* Generic across players: channels, YouTube Live, HLS live streams. */}
-              {getContentId(detection) ?? 'Channel'} is offline
+              {contentId ?? 'Channel'} is offline
             </h3>
             <p
               className="text-sm mt-1"
@@ -297,7 +297,7 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
           {errorReason && (
             <div>
               <span style={{ color: 'var(--accent-red)' }}>Error: </span>
-              <span className="wrap-break-word">{errorReason}</span>
+              <span className="break-words">{errorReason}</span>
             </div>
           )}
           <div className="pt-1 border-t border-white/10">
