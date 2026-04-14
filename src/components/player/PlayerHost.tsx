@@ -33,12 +33,13 @@ const PLAYER_LOADING_FALLBACK = (
 )
 
 /** Returns the fallback chain for a given content type */
-function getFallbackChain(
-  detection: URLDetectionResult,
-): PlayerEngine[] {
+function getFallbackChain(detection: URLDetectionResult): PlayerEngine[] {
   switch (detection.type) {
     case 'twitch':
-      return ['twitch-sdk', 'twitch-iframe', 'fallback']
+      // Clips are iframe-only — skip the SDK step entirely.
+      return detection.platform === 'twitch-clip'
+        ? ['twitch-iframe', 'fallback']
+        : ['twitch-sdk', 'twitch-iframe', 'fallback']
     case 'youtube':
       return ['reactplayer', 'fallback']
     case 'hls':
