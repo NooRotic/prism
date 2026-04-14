@@ -107,7 +107,11 @@ export function useChannelData(
         setLoading(false)
       }
     },
-    [dispatch, options],
+    // Depend on the stable callback inside options, not the wrapper object —
+    // callers typically pass a new `{ handleAuthError }` object each render,
+    // which would otherwise rebuild `fetchData` every render and trigger a
+    // re-fetch storm via the effect below.
+    [dispatch, options?.handleAuthError],
   )
 
   const refetch = useCallback(() => {
