@@ -103,29 +103,47 @@ export function detectTwitchURL(url: string): URLDetectionResult {
 
 /**
  * Build a Twitch embed URL with the correct parent parameter.
- * Ported from TwitchPlayer.tsx parseTwitchInput().
+ *
+ * IMPORTANT: clips MUST use `clips.twitch.tv/embed?clip=<slug>` per Twitch docs.
+ * Streams and VODs use `player.twitch.tv/?channel=` or `?video=v<id>`.
+ * See https://dev.twitch.tv/docs/embed/video-and-clips/ for format spec.
  */
 export function buildTwitchEmbedUrl(
   detection: URLDetectionResult,
   parent?: string,
 ): string | null {
-  const hostname = parent || (typeof window !== 'undefined' ? window.location.hostname : '')
+  const hostname =
+    parent || (typeof window !== 'undefined' ? window.location.hostname : '')
   if (!hostname) return null
 
-  const base = 'https://player.twitch.tv/'
-  const params = new URLSearchParams({ parent: hostname })
-
   if (detection.platform === 'twitch-clip' && detection.metadata?.clipId) {
-    params.set('clip', detection.metadata.clipId)
-  } else if (detection.platform === 'twitch-video' && detection.metadata?.videoId) {
-    params.set('video', `v${detection.metadata.videoId}`)
-  } else if (detection.platform === 'twitch-stream' && detection.metadata?.channelName) {
-    params.set('channel', detection.metadata.channelName)
-  } else {
-    return null
+    const params = new URLSearchParams({
+      clip: detection.metadata.clipId,
+      parent: hostname,
+    })
+    return `https://clips.twitch.tv/embed?${params.toString()}`
   }
 
-  return `${base}?${params.toString()}`
+  const base = 'https://player.twitch.tv/'
+
+  if (detection.platform === 'twitch-video' && detection.metadata?.videoId) {
+    const params = new URLSearchParams({
+      video: `v${detection.metadata.videoId}`,
+      parent: hostname,
+    })
+    return `${base}?${params.toString()}`
+  } else if (
+    detection.platform === 'twitch-stream' &&
+    detection.metadata?.channelName
+  ) {
+    const params = new URLSearchParams({
+      channel: detection.metadata.channelName,
+      parent: hostname,
+    })
+    return `${base}?${params.toString()}`
+  }
+
+  return null
 }
 
 export function getURLTypeDisplayName(result: URLDetectionResult): string {
@@ -147,12 +165,18 @@ export function getURLTypeDisplayName(result: URLDetectionResult): string {
 
 export function getRecommendedEngine(result: URLDetectionResult): PlayerEngine {
   switch (result.type) {
-    case 'twitch': return 'twitch-sdk'
-    case 'youtube': return 'reactplayer'
-    case 'dash': return 'dashjs'
+    case 'twitch':
+      // Clips are iframe-only — the JS SDK does not accept `clip`.
+      return result.platform === 'twitch-clip' ? 'twitch-iframe' : 'twitch-sdk'
+    case 'youtube':
+      return 'reactplayer'
+    case 'dash':
+      return 'dashjs'
     case 'hls':
-    case 'mp4': return 'videojs'
-    default: return 'videojs'
+    case 'mp4':
+      return 'videojs'
+    default:
+      return 'videojs'
   }
 }
 

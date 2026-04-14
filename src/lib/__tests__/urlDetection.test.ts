@@ -110,7 +110,7 @@ describe('buildTwitchEmbedUrl', () => {
   it('builds correct embed URL for a clip', () => {
     const detection = detectURLType('https://clips.twitch.tv/MyClip')
     const embedUrl = buildTwitchEmbedUrl(detection, 'localhost')
-    expect(embedUrl).toContain('https://player.twitch.tv/')
+    expect(embedUrl).toContain('https://clips.twitch.tv/embed')
     expect(embedUrl).toContain('clip=MyClip')
     expect(embedUrl).toContain('parent=localhost')
   })
@@ -205,5 +205,50 @@ describe('getURLTypeDisplayName', () => {
     expect(getURLTypeDisplayName(detectURLType('https://example.com/v.mpd'))).toBe('DASH Stream')
     expect(getURLTypeDisplayName(detectURLType('https://example.com/v.mp4'))).toBe('MP4 Video')
     expect(getURLTypeDisplayName(detectURLType('random'))).toBe('Unknown')
+  })
+})
+
+describe('buildTwitchEmbedUrl - clips use clips.twitch.tv host', () => {
+  it('produces a clips.twitch.tv/embed URL for clip detections', () => {
+    const detection = detectURLType(
+      'https://clips.twitch.tv/AbcDef123SlugXyz',
+    )
+    const url = buildTwitchEmbedUrl(detection, 'example.com')
+    expect(url).toBe(
+      'https://clips.twitch.tv/embed?clip=AbcDef123SlugXyz&parent=example.com',
+    )
+  })
+
+  it('uses player.twitch.tv for VOD detections', () => {
+    const detection = detectURLType('https://twitch.tv/videos/123456789')
+    const url = buildTwitchEmbedUrl(detection, 'example.com')
+    expect(url).toBe(
+      'https://player.twitch.tv/?video=v123456789&parent=example.com',
+    )
+  })
+
+  it('uses player.twitch.tv for live stream detections', () => {
+    const detection = detectURLType('https://twitch.tv/ninja')
+    const url = buildTwitchEmbedUrl(detection, 'example.com')
+    expect(url).toBe(
+      'https://player.twitch.tv/?channel=ninja&parent=example.com',
+    )
+  })
+})
+
+describe('getRecommendedEngine - clips', () => {
+  it('recommends twitch-iframe for clip platform (SDK does not support clips)', () => {
+    const detection = detectURLType('https://clips.twitch.tv/AbcDef123')
+    expect(getRecommendedEngine(detection)).toBe('twitch-iframe')
+  })
+
+  it('recommends twitch-sdk for stream platform', () => {
+    const detection = detectURLType('https://twitch.tv/ninja')
+    expect(getRecommendedEngine(detection)).toBe('twitch-sdk')
+  })
+
+  it('recommends twitch-sdk for VOD platform', () => {
+    const detection = detectURLType('https://twitch.tv/videos/123456789')
+    expect(getRecommendedEngine(detection)).toBe('twitch-sdk')
   })
 })
