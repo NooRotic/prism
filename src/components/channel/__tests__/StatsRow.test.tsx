@@ -95,19 +95,23 @@ describe('StatsRow', () => {
         totalHoursStreamed: 320.5,
         totalVODs: 80,
         avgStreamLength: 4.0,
+        mostWatchedVOD: null,
       },
       diversity: {
         uniqueGames: 12,
         diversityLabel: 'Variety',
         totalVODsAnalyzed: 50,
+        gameDistribution: [],
       },
       clipEngagement: {
         clipsPerStreamHour: 2.3,
         avgViewsPerClip: 3333,
+        uniqueClipperCount: 42,
       },
       growth: {
         clipCreationRate: 8,
         vodViewTrend: 1.2,
+        clipViewVelocity: 0,
       },
     })
 

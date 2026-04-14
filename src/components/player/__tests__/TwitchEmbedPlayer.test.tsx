@@ -87,12 +87,13 @@ function installMockTwitch() {
     VIDEO_PLAY: 'video.play',
   })
 
-  window.Twitch = { Embed: EmbedCtor as unknown as typeof window.Twitch.Embed }
+  window.Twitch = {
+    Embed: EmbedCtor as unknown as NonNullable<typeof window.Twitch>['Embed'],
+  }
 }
 
 function uninstallMockTwitch() {
   embedInstances.length = 0
-  // @ts-expect-error - intentionally clearing
   delete window.Twitch
   document
     .querySelectorAll('script[src="https://embed.twitch.tv/embed/v1.js"]')
