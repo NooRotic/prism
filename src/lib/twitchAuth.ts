@@ -1,15 +1,25 @@
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || ''
+const REDIRECT_URI_OVERRIDE = import.meta.env.VITE_TWITCH_REDIRECT_URI || ''
 const SCOPES = ['user:read:follows']
 
 /**
  * Get the OAuth redirect URI.
- * For dev: http://localhost:5173/twitch-glaze-me/
- * For prod: https://<user>.github.io/twitch-glaze-me/
+ *
+ * Precedence:
+ *   1. VITE_TWITCH_REDIRECT_URI env var (exact string — set this in .env when
+ *      the auto-computed value doesn't byte-match the Twitch app registration,
+ *      e.g. trailing-slash differences, non-default dev ports, or staging URLs).
+ *      When left blank, Twitch falls back to the FIRST URL registered in the
+ *      Twitch Developer Console — which is usually the production URL, not
+ *      localhost — so the override is required for dev.
+ *   2. `window.location.origin + import.meta.env.BASE_URL` as a fallback.
+ *      For dev with port 5000: http://localhost:5000/twitch-glaze-me/
+ *      For prod: https://<user>.github.io/twitch-glaze-me/
  *
  * Must exactly match what's registered in Twitch Developer Console.
  */
 function getRedirectUri(): string {
-  // Use the base URL (origin + vite base path)
+  if (REDIRECT_URI_OVERRIDE) return REDIRECT_URI_OVERRIDE
   const base = import.meta.env.BASE_URL || '/'
   return window.location.origin + base
 }
