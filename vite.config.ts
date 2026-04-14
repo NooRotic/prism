@@ -1,4 +1,7 @@
-import { defineConfig } from 'vite'
+// Import defineConfig from vitest/config (not vite) so tsc recognizes the
+// `test` property. vitest/config re-exports Vite's defineConfig with the
+// Vitest UserConfig extensions merged in.
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
