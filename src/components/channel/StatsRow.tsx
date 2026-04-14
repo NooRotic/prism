@@ -22,29 +22,32 @@ function StatCard({ icon, label, value, details, trend }: StatCardProps) {
       }}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[11px] uppercase tracking-wider font-bold" style={{ color: 'var(--accent-twitch)' }}>
+        {/* Label uses accent-green to match the rest of the app's primary
+            accent rather than Twitch purple — purple is now reserved for the
+            affiliate badge in ProfileSidebar. */}
+        <span className="text-xs uppercase tracking-wider font-bold" style={{ color: 'var(--accent-green)' }}>
           {label}
         </span>
         <div className="flex items-center gap-1">
           {trend !== undefined && trend !== 0 && (
             trend > 1 ? (
-              <ArrowUp size={12} style={{ color: 'var(--accent-gold)' }} />
+              <ArrowUp size={14} style={{ color: 'var(--accent-gold)' }} />
             ) : (
-              <ArrowDown size={12} style={{ color: 'var(--accent-gold)' }} />
+              <ArrowDown size={14} style={{ color: 'var(--accent-gold)' }} />
             )
           )}
           {icon}
         </div>
       </div>
       <p
-        className="text-2xl font-bold"
+        className="text-3xl font-bold"
         style={{ color: 'var(--accent-green)', fontFamily: 'var(--font-heading)' }}
       >
         {value}
       </p>
       <div className="flex flex-col gap-0.5">
         {details.map((d, i) => (
-          <span key={i} className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <span key={i} className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {d}
           </span>
         ))}

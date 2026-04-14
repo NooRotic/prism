@@ -87,7 +87,7 @@ export default function VideoCard({ video }: VideoCardProps) {
 
         {/* Duration badge */}
         <span
-          className="absolute bottom-1.5 right-1.5 text-[11px] font-medium px-1.5 py-0.5 rounded"
+          className="absolute bottom-1.5 right-1.5 text-xs font-medium px-1.5 py-0.5 rounded"
           style={{
             backgroundColor: 'rgba(0, 0, 0, 0.8)',
             color: 'var(--text-primary)',
@@ -98,27 +98,27 @@ export default function VideoCard({ video }: VideoCardProps) {
       </div>
 
       {/* Info */}
-      <div className="p-2.5 flex flex-col gap-1 min-w-0">
+      <div className="p-3 flex flex-col gap-1 min-w-0">
         <p
-          className="text-sm font-medium truncate"
+          className="text-base font-medium truncate"
           style={{ color: 'var(--text-primary)' }}
           title={video.title}
         >
           {video.title}
         </p>
-        <div className="flex items-center justify-between text-[11px]">
+        <div className="flex items-center justify-between text-xs">
           <span
             className="flex items-center gap-1"
             style={{ color: 'var(--text-secondary)' }}
           >
-            <Eye size={10} />
+            <Eye size={12} />
             {video.view_count.toLocaleString()}
           </span>
           <span
             className="flex items-center gap-1"
             style={{ color: 'var(--text-muted)' }}
           >
-            <Calendar size={10} />
+            <Calendar size={12} />
             {formatDate(video.created_at)}
           </span>
         </div>
