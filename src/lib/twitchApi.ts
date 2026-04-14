@@ -66,6 +66,16 @@ export async function getUserInfo(username: string): Promise<TwitchUser> {
   return data.data[0]
 }
 
+/**
+ * Fetch the authenticated user's own profile. Helix `/users` with no
+ * params returns the user that owns the access token.
+ */
+export async function getAuthenticatedUser(): Promise<TwitchUser> {
+  const data = await twitchApiFetch<{ data: TwitchUser[] }>('users')
+  if (!data.data?.[0]) throw new Error('Authenticated user not found')
+  return data.data[0]
+}
+
 export async function getChannelInfo(broadcasterId: string): Promise<TwitchChannel> {
   const data = await twitchApiFetch<{ data: TwitchChannel[] }>('channels', {
     broadcaster_id: broadcasterId,
@@ -79,6 +89,34 @@ export async function getChannelInfo(broadcasterId: string): Promise<TwitchChann
 export async function getStreams(userId: string): Promise<TwitchStream | null> {
   const data = await twitchApiFetch<{ data: TwitchStream[] }>('streams', { user_id: userId })
   return data.data?.[0] ?? null
+}
+
+/**
+ * Batch-fetch live stream data for multiple user_ids in a single request.
+ * Helix accepts up to 100 user_id params per /streams call. Channels not
+ * currently live are simply omitted from the response, so the result is
+ * always a subset of the requested IDs.
+ */
+export async function getStreamsByUserIds(
+  userIds: string[],
+): Promise<TwitchStream[]> {
+  if (userIds.length === 0) return []
+  // Helix supports up to 100 user_id params per request
+  const url = new URL(`${TWITCH_API_BASE}/streams`)
+  userIds.slice(0, 100).forEach((id) => url.searchParams.append('user_id', id))
+
+  const token = getAccessToken()
+  const headers: Record<string, string> = { 'Client-ID': CLIENT_ID }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(url.toString(), { headers })
+  if (res.status === 401) {
+    localStorage.removeItem('twitch_access_token')
+    throw new SessionExpiredError()
+  }
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.data ?? []
 }
 
 // --- Clips ---
