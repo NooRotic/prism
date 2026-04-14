@@ -1,4 +1,4 @@
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PlayerHost from '../PlayerHost'
@@ -79,5 +79,81 @@ describe('PlayerHost', () => {
     renderHost(clipDetection)
     expect(await screen.findByTestId('mock-twitch-iframe')).toBeInTheDocument()
     expect(screen.queryByTestId('mock-twitch-sdk')).not.toBeInTheDocument()
+  })
+
+  it('shows offline overlay when the SDK player reports onOffline', async () => {
+    renderHost(streamDetection)
+    await screen.findByTestId('mock-twitch-sdk')
+    const props = sdkProps[sdkProps.length - 1]
+    expect(props.onOffline).toBeDefined()
+    act(() => { props.onOffline!() })
+    expect(await screen.findByText(/is offline/i)).toBeInTheDocument()
+    expect(screen.getByText(/ninja/i)).toBeInTheDocument()
+    // SDK stays mounted underneath so ONLINE can re-trigger it
+    expect(screen.getByTestId('mock-twitch-sdk')).toBeInTheDocument()
+  })
+
+  it('clears offline overlay when SDK player reports onOnline', async () => {
+    renderHost(streamDetection)
+    await screen.findByTestId('mock-twitch-sdk')
+    const props = sdkProps[sdkProps.length - 1]
+    act(() => { props.onOffline!() })
+    expect(await screen.findByText(/is offline/i)).toBeInTheDocument()
+    act(() => { props.onOnline!() })
+    expect(screen.queryByText(/is offline/i)).not.toBeInTheDocument()
+  })
+
+  it('does NOT advance the fallback chain on offline (iframe not mounted)', async () => {
+    renderHost(streamDetection)
+    await screen.findByTestId('mock-twitch-sdk')
+    const props = sdkProps[sdkProps.length - 1]
+    act(() => { props.onOffline!() })
+    expect(screen.queryByTestId('mock-twitch-iframe')).not.toBeInTheDocument()
+  })
+
+  it('shows Content ID and Parent rows in debug overlay', async () => {
+    const user = userEvent.setup()
+    renderHost(streamDetection)
+    await screen.findByTestId('mock-twitch-sdk')
+    await user.click(screen.getByLabelText('Toggle debug overlay'))
+    const contentRow = screen.getByText(/Content ID:/i).parentElement
+    expect(contentRow?.textContent).toMatch(/ninja/)
+    expect(screen.getByText(/Parent:/i)).toBeInTheDocument()
+  })
+
+  it('force-advance button advances from SDK to iframe', async () => {
+    const user = userEvent.setup()
+    renderHost(streamDetection)
+    await screen.findByTestId('mock-twitch-sdk')
+    await user.click(screen.getByLabelText('Toggle debug overlay'))
+    await user.click(screen.getByLabelText('Force advance fallback chain'))
+    expect(await screen.findByTestId('mock-twitch-iframe')).toBeInTheDocument()
+  })
+
+  it('retry-from-start resets to the recommended engine', async () => {
+    const user = userEvent.setup()
+    renderHost(streamDetection)
+    await screen.findByTestId('mock-twitch-sdk')
+    await user.click(screen.getByLabelText('Toggle debug overlay'))
+    await user.click(screen.getByLabelText('Force advance fallback chain'))
+    await user.click(screen.getByLabelText('Force advance fallback chain'))
+    await user.click(
+      screen.getByLabelText('Retry from start of fallback chain'),
+    )
+    expect(await screen.findByTestId('mock-twitch-sdk')).toBeInTheDocument()
+  })
+
+  it('retry-from-start also clears the offline overlay', async () => {
+    const user = userEvent.setup()
+    renderHost(streamDetection)
+    await screen.findByTestId('mock-twitch-sdk')
+    const props = sdkProps[sdkProps.length - 1]
+    act(() => { props.onOffline!() })
+    expect(await screen.findByText(/is offline/i)).toBeInTheDocument()
+    await user.click(screen.getByLabelText('Toggle debug overlay'))
+    await user.click(
+      screen.getByLabelText('Retry from start of fallback chain'),
+    )
+    expect(screen.queryByText(/is offline/i)).not.toBeInTheDocument()
   })
 })
