@@ -8,7 +8,7 @@
 
 ## Conventions
 - Use `var(--accent-green)` (#39FF14) for primary accent, `var(--accent-twitch)` (#9146FF) for Twitch
-- Player components expose `{ onReady, onError, onPlay, onPause }` interface
+- Player components expose `{ onReady, onError, onPlay, onPause, onOffline, onOnline, onEnded, onPlaybackBlocked }` interface (all optional)
 - All Twitch API calls go through `lib/twitchApi.ts`
 - Auth state managed by `useTwitchAuth` hook
 - Env vars prefixed with `VITE_` (not NEXT_PUBLIC_)
