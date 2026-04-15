@@ -17,7 +17,7 @@ export interface SearchEntry {
   timestamp: number
 }
 
-export type NavPanelId = 'following'
+export type NavPanelId = 'following' | 'your-stats'
 
 export type FollowingSort = 'live-first' | 'alpha' | 'viewers'
 
