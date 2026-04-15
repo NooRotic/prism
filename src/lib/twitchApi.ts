@@ -8,6 +8,13 @@ import type {
   TwitchEmote,
   TwitchBadge,
   TwitchFollowedChannel,
+  TwitchBroadcasterSubscriptionsResponse,
+  TwitchGoal,
+  TwitchVIP,
+  TwitchHypeTrainEvent,
+  TwitchPoll,
+  TwitchPrediction,
+  TwitchBitsLeader,
 } from '../types/twitch'
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID
@@ -205,6 +212,123 @@ export async function getFollowedChannels(
   const data = await twitchApiFetch<{ data: TwitchFollowedChannel[]; total: number }>(
     'channels/followed',
     { user_id: userId, first: String(first) },
+  )
+  return data.data ?? []
+}
+
+// ─── Streamer stats (phase 2.3) ──────────────────────────────────────
+// Each wrapper is a thin layer over twitchApiFetch that handles the
+// shape differences between Helix endpoints (some return { data, total,
+// points }, some just { data }, etc.). All require the authenticated
+// user to be the broadcaster (ownership check on Twitch's side) plus
+// the relevant scope from SCOPES in twitchAuth.ts.
+
+/**
+ * Returns the first page of a broadcaster's subscribers along with the
+ * total count and `points` — the tier-weighted subscription points
+ * Twitch uses for emote slot rewards (T1=1, T2=2, T3=6).
+ */
+export async function getBroadcasterSubscriptions(
+  broadcasterId: string,
+  first: number = 100,
+): Promise<TwitchBroadcasterSubscriptionsResponse> {
+  const data =
+    await twitchApiFetch<TwitchBroadcasterSubscriptionsResponse>(
+      'subscriptions',
+      { broadcaster_id: broadcasterId, first: String(first) },
+    )
+  return {
+    data: data.data ?? [],
+    total: data.total ?? 0,
+    points: data.points ?? 0,
+    pagination: data.pagination,
+  }
+}
+
+/** Active broadcast goals (follower/subscription targets). */
+export async function getBroadcasterGoals(
+  broadcasterId: string,
+): Promise<TwitchGoal[]> {
+  const data = await twitchApiFetch<{ data: TwitchGoal[] }>('goals', {
+    broadcaster_id: broadcasterId,
+  })
+  return data.data ?? []
+}
+
+/** VIP list for the broadcaster. Paginated; this returns the first page. */
+export async function getBroadcasterVIPs(
+  broadcasterId: string,
+  first: number = 100,
+): Promise<TwitchVIP[]> {
+  const data = await twitchApiFetch<{ data: TwitchVIP[] }>('channels/vips', {
+    broadcaster_id: broadcasterId,
+    first: String(first),
+  })
+  return data.data ?? []
+}
+
+/**
+ * Total follower count of the authenticated broadcaster's own channel.
+ * Requires moderator:read:followers scope even though we only read the
+ * `total` field — Helix still gates the endpoint because the full
+ * response includes individual follower IDs.
+ */
+export async function getBroadcasterFollowerCount(
+  broadcasterId: string,
+): Promise<number> {
+  const data = await twitchApiFetch<{ total: number }>('channels/followers', {
+    broadcaster_id: broadcasterId,
+    first: '1',
+  })
+  return data.total ?? 0
+}
+
+/** Recent hype train events (up to `first`, most recent first). */
+export async function getHypeTrainEvents(
+  broadcasterId: string,
+  first: number = 10,
+): Promise<TwitchHypeTrainEvent[]> {
+  const data = await twitchApiFetch<{ data: TwitchHypeTrainEvent[] }>(
+    'hypetrain/events',
+    { broadcaster_id: broadcasterId, first: String(first) },
+  )
+  return data.data ?? []
+}
+
+/** Poll history (completed + active), newest first. */
+export async function getBroadcasterPolls(
+  broadcasterId: string,
+  first: number = 20,
+): Promise<TwitchPoll[]> {
+  const data = await twitchApiFetch<{ data: TwitchPoll[] }>('polls', {
+    broadcaster_id: broadcasterId,
+    first: String(first),
+  })
+  return data.data ?? []
+}
+
+/** Prediction history (completed + active), newest first. */
+export async function getBroadcasterPredictions(
+  broadcasterId: string,
+  first: number = 25,
+): Promise<TwitchPrediction[]> {
+  const data = await twitchApiFetch<{ data: TwitchPrediction[] }>(
+    'predictions',
+    { broadcaster_id: broadcasterId, first: String(first) },
+  )
+  return data.data ?? []
+}
+
+/**
+ * Top bits contributors for the authenticated broadcaster. No
+ * broadcaster_id param — Twitch infers it from the user's token.
+ */
+export async function getBitsLeaderboard(
+  count: number = 10,
+): Promise<TwitchBitsLeader[]> {
+  const data = await twitchApiFetch<{ data: TwitchBitsLeader[] }>(
+    'bits/leaderboard',
+    { count: String(count) },
   )
   return data.data ?? []
 }
