@@ -9,7 +9,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'following', label: 'Following' },
-  // Future items land here — e.g. { id: 'your-stats', label: 'Your Stats' }
+  { id: 'your-stats', label: 'Your Stats' },
 ]
 
 /**

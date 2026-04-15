@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './contexts/AppContext'
 import { Header } from './components/layout/Header'
 import AppShell from './components/layout/AppShell'
 import FollowingPanel from './components/layout/FollowingPanel'
+import YourStatsPanel from './components/layout/YourStatsPanel'
 import ShaderBackground from './components/ui/ShaderBackground'
 import { ChannelIntro } from './components/intro/ChannelIntro'
 import { OnboardingIntro } from './components/intro/OnboardingIntro'
@@ -126,9 +127,11 @@ function AppInner() {
 
       <Header />
 
-      {/* Slide-down panel sits fixed below the header. z-9 < header z-10 so
-          the header visually covers the top edge as it translates. */}
+      {/* Slide-down panels sit fixed below the header. z-9 < header z-10
+          so the header visually covers the top edge as they translate.
+          Only one is ever open at a time — controlled by navPanel.open. */}
       <FollowingPanel />
+      <YourStatsPanel />
 
       {/* No z-index here: Header's z-10 must win over AppShell in the sibling
           stacking comparison so the SmartUrlInput dropdown paints above main
