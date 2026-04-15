@@ -7,6 +7,7 @@ import StatsRow from '../channel/StatsRow'
 import ClipGrid from '../channel/ClipGrid'
 import VODGrid from '../channel/VODGrid'
 import { SmartUrlInput } from '../search/SmartUrlInput'
+import DebugPanel from './DebugPanel'
 
 function IdleView() {
   return (
@@ -179,6 +180,11 @@ function ChannelLayout() {
 
       {/* Stats row */}
       <StatsRow />
+
+      {/* Debug panel — only visible when debugMode is toggled on via
+          the Settings icon in PlayerHost. Sits above the clips/VODs
+          grids so it's adjacent to the player but doesn't eat viewport. */}
+      <DebugPanel />
 
       {/* Bottom row: Clips + VODs */}
       <div className="flex flex-col lg:flex-row gap-4 w-full">
