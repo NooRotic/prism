@@ -1,6 +1,35 @@
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || ''
 const REDIRECT_URI_OVERRIDE = import.meta.env.VITE_TWITCH_REDIRECT_URI || ''
-const SCOPES = ['user:read:follows']
+
+/**
+ * Twitch OAuth scopes. Expanded in phase 2 to unlock streamer stats for
+ * affiliate/partner channels. Tokens minted before this expansion still
+ * work for their original scopes but will 401 on the new endpoints —
+ * SessionExpiredError handling cascades that into a logout, forcing a
+ * one-time re-auth the next time the user hits a streamer-stats API.
+ *
+ * Scope rationale:
+ * - user:read:follows — Following panel (existing)
+ * - moderator:read:followers — streamer's own follower total
+ * - channel:read:subscriptions — streamer's subscriber list + tier points
+ * - channel:read:goals — active broadcast goals
+ * - channel:read:hype_train — recent hype train events
+ * - channel:read:vips — VIP list
+ * - channel:read:polls — poll history
+ * - channel:read:predictions — prediction history
+ * - bits:read — bits leaderboard
+ */
+const SCOPES = [
+  'user:read:follows',
+  'moderator:read:followers',
+  'channel:read:subscriptions',
+  'channel:read:goals',
+  'channel:read:hype_train',
+  'channel:read:vips',
+  'channel:read:polls',
+  'channel:read:predictions',
+  'bits:read',
+]
 
 /**
  * Get the OAuth redirect URI.
