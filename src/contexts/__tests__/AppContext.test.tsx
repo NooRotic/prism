@@ -281,6 +281,33 @@ describe('AppContext', () => {
       expect(result.current.state.navPanel.open).toBeNull()
     })
 
+    it('TOGGLE_NAV_PANEL swaps to a different panel id without closing', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      act(() => {
+        result.current.dispatch({ type: 'OPEN_NAV_PANEL', panel: 'following' })
+      })
+      expect(result.current.state.navPanel.open).toBe('following')
+
+      // Toggling a DIFFERENT panel id replaces the open panel (not close
+      // + open). This lets the user switch between panels without an
+      // intermediate null state.
+      act(() => {
+        result.current.dispatch({
+          type: 'TOGGLE_NAV_PANEL',
+          panel: 'your-stats',
+        })
+      })
+      expect(result.current.state.navPanel.open).toBe('your-stats')
+    })
+
+    it('OPEN_NAV_PANEL accepts the your-stats id', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      act(() => {
+        result.current.dispatch({ type: 'OPEN_NAV_PANEL', panel: 'your-stats' })
+      })
+      expect(result.current.state.navPanel.open).toBe('your-stats')
+    })
+
     it('SET_FOLLOWING_SORT updates the sort and persists to localStorage', () => {
       const { result } = renderHook(() => useApp(), { wrapper })
       // Initial value comes from the localStorage loader; default 'live-first'
