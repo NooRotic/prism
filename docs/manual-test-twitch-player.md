@@ -19,20 +19,22 @@ brew install cloudflared
 Run before each manual test session (two terminals):
 
 ```bash
-# Terminal 1 — start Vite
+# Terminal 1 — start Vite (dev server pinned to port 5000)
 cd C:/Dev/projects/twitch-glaze-me
 npm run dev
 
 # Terminal 2 — tunnel Vite to an https URL
-cloudflared tunnel --url http://localhost:5173
+cloudflared tunnel --url http://localhost:5000
 ```
 
 Cloudflared prints an `https://<random>.trycloudflare.com` URL. Open THAT URL
-in your browser, not `localhost:5173`. Embeds will now receive a matching
+in your browser, not `localhost:5000`. Embeds will now receive a matching
 `parent=<random>.trycloudflare.com` and load correctly.
 
 > Alternative: push the branch and test against the GitHub Pages deploy
-> (`https://nooROtic.github.io/twitch-glaze-me/`). Slower iteration.
+> (`https://noorotic.github.io/twitch-glaze-me/`). Slower iteration. Note
+> the lowercase `noorotic` — GitHub Pages normalizes usernames regardless
+> of how they're capitalized in the account.
 
 ---
 
@@ -72,3 +74,78 @@ Replace the placeholder URLs with currently-valid ones before testing.
 - SDK and iframe both use `window.location.hostname` as `parent=`. If the SDK fails due to parent mismatch, the iframe fallback will fail the same way. Not independent failure modes.
 - The iframe player can't detect a broken-embed scenario where the iframe loads but Twitch renders an error message inside it. The 5s timeout is our only signal.
 - Clips don't fire offline/online events (they're static), so Test 1 will never exercise the offline overlay.
+
+---
+
+# Non-Twitch Players — Manual Test Matrix
+
+The non-Twitch players (Video.js for HLS/MP4, DASH.js for DASH, ReactPlayer
+for YouTube) don't need the cloudflared tunnel — they have no `parent=`
+restriction. You can test them on plain `localhost:5000`.
+
+## HLS (Video.js)
+
+Paste any of these URLs into the SmartUrlInput:
+
+| Source         | URL                                                                     |
+|----------------|-------------------------------------------------------------------------|
+| Mux test stream (fast) | `https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8` |
+| Big Buck Bunny | `https://test-streams.mux.dev/pts_shift/master.m3u8`                    |
+| Apple sample   | `https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8` |
+
+Expected: debug overlay shows `engine: videojs`, playback starts muted
+within 1-2 seconds. The Video.js control bar appears at the bottom with
+quality / volume / fullscreen controls.
+
+## DASH (DASH.js)
+
+| Source         | URL                                                                     |
+|----------------|-------------------------------------------------------------------------|
+| DASH-IF sample | `https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd`             |
+| Envivio H.264  | `https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd`          |
+
+Expected: debug overlay shows `engine: dashjs`, playback starts muted after
+the manifest loads. Native `<video>` controls (not Video.js).
+
+## YouTube (ReactPlayer)
+
+| URL form         | Example                                      |
+|------------------|----------------------------------------------|
+| `youtube.com/watch?v=` | `https://www.youtube.com/watch?v=dQw4w9WgXcQ` |
+| `youtu.be/`      | `https://youtu.be/dQw4w9WgXcQ`               |
+| `youtube.com/live/` | `https://www.youtube.com/live/<channel>`  |
+
+Expected: debug overlay shows `engine: reactplayer`, YouTube's own iframe
+embed mounts and plays muted.
+
+## Cross-player checklist
+
+For each of HLS / DASH / YouTube:
+
+- [ ] Debug overlay (Settings icon in player bottom-right) shows the
+      correct engine name
+- [ ] `Content ID: (none)` row is acceptable — these engines don't have
+      a concept of content id like Twitch does
+- [ ] **Debug Panel** below the stats row is visible when debugMode is on;
+      shows `engine: videojs` (or dashjs / reactplayer) in the top-right pill
+- [ ] The placeholder body "Playback metrics will appear here when a
+      player reports them" is visible inside the Debug Panel
+- [ ] No console errors
+- [ ] Pause + resume works (manual check via player controls)
+- [ ] Close the tab or navigate home via GLAZE ME — no orphaned network
+      requests or memory leaks (inspect DevTools Network + Memory)
+
+## Fallback chain verification
+
+Each non-Twitch engine has a 2-step chain: `<engine> → fallback`. To test
+the fallback:
+
+- **HLS**: paste an invalid `.m3u8` URL like `https://example.com/nonexistent.m3u8`.
+  Video.js fails to load → fallback advances to the FallbackCard with
+  "Unable to Play" + the error message.
+- **DASH**: same, but with an invalid `.mpd`.
+- **YouTube**: an invalid video id like `https://www.youtube.com/watch?v=_____invalid_____`.
+  react-player's onError fires → fallback.
+
+In each case the debug overlay should show `step 1 / 1` (the max step
+in a 2-step chain).
