@@ -90,14 +90,15 @@ export default function FollowingPanel() {
       aria-hidden={!isOpen}
       aria-label="Following panel"
       role="region"
-      className="fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
+      className="brushed-metal fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
       style={{
         top: 'var(--header-height, 56px)',
         maxHeight: 'calc(100vh - var(--header-height, 56px))',
         // z-9 sits below the header (z-10) so the header visually
         // "covers" the top edge as the panel slides out from under it.
         zIndex: 9,
-        backgroundColor: 'var(--bg)',
+        // No backgroundColor inline — the brushed-metal class provides
+        // the base color + SVG turbulence background-image.
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
         transform: isOpen ? 'translateY(0)' : 'translateY(-100%)',

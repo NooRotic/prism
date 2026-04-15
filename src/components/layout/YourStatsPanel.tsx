@@ -12,6 +12,7 @@ import {
   Sparkles,
   Coins,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useYourStats } from '../../hooks/useYourStats'
@@ -534,7 +535,7 @@ export default function YourStatsPanel() {
     [handleAuthErrorCallback],
   )
 
-  const { stats, sessionError } = useYourStats(
+  const { stats, loading, sessionError, refetch } = useYourStats(
     broadcasterId,
     isStreamer,
     fetchOptions,
@@ -591,12 +592,12 @@ export default function YourStatsPanel() {
       aria-hidden={!isOpen}
       aria-label="Your Stats panel"
       role="region"
-      className="fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
+      className="brushed-metal fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
       style={{
         top: 'var(--header-height, 56px)',
         maxHeight: 'calc(100vh - var(--header-height, 56px))',
         zIndex: 9,
-        backgroundColor: 'var(--bg)',
+        // No backgroundColor inline — brushed-metal class provides it.
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
         transform: isOpen ? 'translateY(0)' : 'translateY(-100%)',
@@ -605,7 +606,10 @@ export default function YourStatsPanel() {
     >
       <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-4">
         {/* Header row */}
-        <div className="flex items-start justify-between gap-4 mb-4">
+        {/* flex-wrap lets the refresh/close buttons wrap below the
+            user profile block on narrow screens instead of cramping
+            into the remaining horizontal space. */}
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 min-w-0">
             {authUser?.profile_image_url && (
               <img
@@ -648,22 +652,44 @@ export default function YourStatsPanel() {
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Close Your Stats panel"
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors hover:bg-white/10"
-            style={{
-              border: '1px solid var(--border)',
-              color: 'var(--text-secondary)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.75rem',
-              letterSpacing: '0.05em',
-            }}
-          >
-            <X size={14} />
-            close
-          </button>
+          <div className="shrink-0 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={refetch}
+              disabled={loading || broadcasterId === null}
+              aria-label="Refresh Your Stats"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                border: '1px solid var(--border)',
+                color: 'var(--text-secondary)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.75rem',
+                letterSpacing: '0.05em',
+              }}
+            >
+              <RefreshCw
+                size={14}
+                className={loading ? 'animate-spin' : ''}
+              />
+              refresh
+            </button>
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Close Your Stats panel"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors hover:bg-white/10"
+              style={{
+                border: '1px solid var(--border)',
+                color: 'var(--text-secondary)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.75rem',
+                letterSpacing: '0.05em',
+              }}
+            >
+              <X size={14} />
+              close
+            </button>
+          </div>
         </div>
 
         {/* Session-wide error banner (e.g. token missing new scopes) */}
