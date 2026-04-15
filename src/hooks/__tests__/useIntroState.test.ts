@@ -47,15 +47,18 @@ describe('useIntroState', () => {
     expect(stored['shroud']).toBeDefined()
   })
 
-  it('does not show intro on return visit (already seen)', () => {
-    // Pre-populate localStorage as if the user already saw the intro
+  it('shows intro on return visit but marks hasSeenIntro true', () => {
+    // Pre-populate localStorage as if the user already saw the intro.
+    // The new behavior (remix-on-select) plays the intro every time
+    // the user navigates to a channel — even repeat visits — but we
+    // still track the seen state so the template can differ from last.
     localStorage.setItem(
       'glaze_intros_seen',
       JSON.stringify({ shroud: 'cinematic' }),
     )
 
     const { result } = renderHook(() => useIntroState('shroud'))
-    expect(result.current.showIntro).toBe(false)
+    expect(result.current.showIntro).toBe(true)
     expect(result.current.hasSeenIntro).toBe(true)
   })
 
@@ -95,14 +98,17 @@ describe('useIntroState', () => {
     expect(stored['ninja']).toBeDefined()
   })
 
-  it('treats channel names case-insensitively', () => {
+  it('treats channel names case-insensitively for seen-state lookup', () => {
     localStorage.setItem(
       'glaze_intros_seen',
       JSON.stringify({ shroud: 'cinematic' }),
     )
 
+    // 'Shroud' (capital S) should match the lowercase 'shroud' key
+    // when checking seen state. The intro still plays (new behavior)
+    // but hasSeenIntro reports true because the normalized key matches.
     const { result } = renderHook(() => useIntroState('Shroud'))
-    expect(result.current.showIntro).toBe(false)
     expect(result.current.hasSeenIntro).toBe(true)
+    expect(result.current.showIntro).toBe(true)
   })
 })

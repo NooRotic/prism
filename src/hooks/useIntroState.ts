@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { getRandomTemplate, type IntroTemplateName } from '../lib/introTemplates'
 
 const STORAGE_KEY = 'glaze_intros_seen'
@@ -43,7 +43,7 @@ export function useIntroState(channelLogin: string | null): IntroState {
 
   const [showIntro, setShowIntro] = useState<boolean>(() => {
     if (!channelKey) return false
-    return !hasSeenBefore
+    return true
   })
 
   const [currentTemplate, setCurrentTemplate] = useState<IntroTemplateName>(() => {
@@ -53,6 +53,29 @@ export function useIntroState(channelLogin: string | null): IntroState {
     }
     return getRandomTemplate()
   })
+
+  // Reset intro state whenever the user navigates to a different channel.
+  // useState initializers run once on mount, so without this effect switching
+  // channels mid-session would leave stale showIntro/currentTemplate values.
+  // We track the last-seen channelKey in a ref so we only reset on a real
+  // transition (not on the very first mount, which the useState initializers
+  // already handle).
+  const lastChannelKeyRef = useRef(channelKey)
+  useEffect(() => {
+    if (lastChannelKeyRef.current === channelKey) return
+    lastChannelKeyRef.current = channelKey
+    if (!channelKey) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing on channel unload
+      setShowIntro(false)
+      return
+    }
+    // New channel: pick a fresh template (different from last if we have one
+    // cached) and show the intro. This gives every channel selection the
+    // remix animation the user expects.
+    const nextTemplate = getRandomTemplate(previousTemplate)
+    setCurrentTemplate(nextTemplate)
+    setShowIntro(true)
+  }, [channelKey, previousTemplate])
 
   const markSeen = useCallback(
     (template: IntroTemplateName) => {
