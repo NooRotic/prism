@@ -221,9 +221,13 @@ export function SmartUrlInput() {
         )}
       </div>
 
-      {/* Dropdown */}
+      {/* Dropdown — brushed-metal surface (Law 9 distinctive material).
+          The class adds an inline-SVG turbulence background over the
+          base bg-card color so the dropdown reads as a solid textured
+          panel instead of a translucent card with content bleeding
+          through from underneath. */}
       {showDropdown && (
-        <div className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-card)] shadow-lg shadow-black/40">
+        <div className="brushed-metal absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-lg border border-[var(--border)] shadow-lg shadow-black/40">
           {/* Quick links only when input is empty */}
           {!inputValue.trim() && (
             <QuickLinks onSelect={handleQuickLinkSelect} />
