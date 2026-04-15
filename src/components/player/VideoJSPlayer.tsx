@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import videojs from 'video.js'
 import 'video.js/dist/video-js.css'
 import type { PlayerProps } from '../../types/player'
+import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 
 type Player = ReturnType<typeof videojs>
 
@@ -27,22 +28,17 @@ export default function VideoJSPlayer({
   const playerRef = useRef<Player | null>(null)
   const mountedRef = useRef(true)
 
-  // Callback refs — updated every render so event handlers see the
-  // latest values without the init effect re-running.
-  const onReadyRef = useRef(onReady)
-  const onErrorRef = useRef(onError)
-  const onPlayRef = useRef(onPlay)
-  const onPauseRef = useRef(onPause)
-  const onEndedRef = useRef(onEnded)
-  const onPlaybackBlockedRef = useRef(onPlaybackBlocked)
-  useEffect(() => {
-    onReadyRef.current = onReady
-    onErrorRef.current = onError
-    onPlayRef.current = onPlay
-    onPauseRef.current = onPause
-    onEndedRef.current = onEnded
-    onPlaybackBlockedRef.current = onPlaybackBlocked
-  }, [onReady, onError, onPlay, onPause, onEnded, onPlaybackBlocked])
+  // Callback refs via the shared useCallbackRefs helper — event
+  // handlers read from cb.current so the init effect doesn't need
+  // the callbacks in its dep array.
+  const cb = useCallbackRefs({
+    onReady,
+    onError,
+    onPlay,
+    onPause,
+    onEnded,
+    onPlaybackBlocked,
+  })
 
   useEffect(() => {
     mountedRef.current = true
@@ -85,19 +81,19 @@ export default function VideoJSPlayer({
       playerRef.current = player
 
       player.on('ready', () => {
-        if (mountedRef.current) onReadyRef.current?.()
+        if (mountedRef.current) cb.current.onReady?.()
       })
 
       player.on('play', () => {
-        if (mountedRef.current) onPlayRef.current?.()
+        if (mountedRef.current) cb.current.onPlay?.()
       })
 
       player.on('pause', () => {
-        if (mountedRef.current) onPauseRef.current?.()
+        if (mountedRef.current) cb.current.onPause?.()
       })
 
       player.on('ended', () => {
-        if (mountedRef.current) onEndedRef.current?.()
+        if (mountedRef.current) cb.current.onEnded?.()
       })
 
       player.on('error', () => {
@@ -107,16 +103,18 @@ export default function VideoJSPlayer({
         // what autoplay-blocked manifests as in some browsers. Forward
         // as PLAYBACK_BLOCKED so PlayerHost can advance the chain.
         if (err?.code === 4) {
-          onPlaybackBlockedRef.current?.()
-          onErrorRef.current?.('Playback blocked: source not supported or autoplay denied')
+          cb.current.onPlaybackBlocked?.()
+          cb.current.onError?.(
+            'Playback blocked: source not supported or autoplay denied',
+          )
           return
         }
-        onErrorRef.current?.(
+        cb.current.onError?.(
           err?.message || `Video.js error code ${err?.code ?? 'unknown'}`,
         )
       })
     } catch (err) {
-      onErrorRef.current?.(
+      cb.current.onError?.(
         `Video.js initialization failed: ${
           err instanceof Error ? err.message : String(err)
         }`,
@@ -131,10 +129,10 @@ export default function VideoJSPlayer({
       }
       playerRef.current = null
     }
-    // Depend only on the URL + detection identity — callback refs are
-    // updated out-of-band in the effect above, so they're intentionally
-    // excluded from this dep array.
-  }, [url, detection.type, detection.playableUrl])
+    // Depend only on the URL + detection identity. `cb` is a ref
+    // object with stable identity (useCallbackRefs), so including it
+    // is a no-op while still satisfying react-hooks/exhaustive-deps.
+  }, [url, detection.type, detection.playableUrl, cb])
 
   return (
     <div data-vjs-player className="w-full h-full" style={{ minHeight: 300 }}>

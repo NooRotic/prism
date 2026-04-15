@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   getGameByName,
   getStreamsByGameId,
@@ -6,6 +6,7 @@ import {
   SessionExpiredError,
 } from '../lib/twitchApi'
 import type { TwitchStream, TwitchGame } from '../types/twitch'
+import { useCallbackRefs } from './useCallbackRefs'
 
 /** Enriched stream = raw /streams row + a flag for whether the viewing user follows this broadcaster. */
 export interface EnrichedCategoryStream {
@@ -71,11 +72,8 @@ export function useCategoryStreams(
   const [error, setError] = useState<string | null>(null)
 
   // Ref for options so fetchData doesn't need to re-memoize on every
-  // render (same pattern as useYourStats).
-  const optionsRef = useRef(options)
-  useEffect(() => {
-    optionsRef.current = options
-  }, [options])
+  // render. Uses the shared useCallbackRefs helper.
+  const cb = useCallbackRefs({ options })
 
   const fetchData = useCallback(
     async (name: string, uid: string | null) => {
@@ -120,7 +118,7 @@ export function useCategoryStreams(
         setLoading(false)
       } catch (err) {
         if (err instanceof SessionExpiredError) {
-          optionsRef.current?.handleAuthError?.()
+          cb.current.options?.handleAuthError?.()
           setError(err.message)
         } else {
           setError(
@@ -132,7 +130,8 @@ export function useCategoryStreams(
         setLoading(false)
       }
     },
-    [],
+    // `cb` has stable identity via useCallbackRefs.
+    [cb],
   )
 
   useEffect(() => {

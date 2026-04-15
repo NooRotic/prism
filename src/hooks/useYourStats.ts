@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   getBroadcasterSubscriptions,
   getBroadcasterGoals,
@@ -10,6 +10,7 @@ import {
   getBitsLeaderboard,
   SessionExpiredError,
 } from '../lib/twitchApi'
+import { useCallbackRefs } from './useCallbackRefs'
 import type {
   TwitchBroadcasterSubscription,
   TwitchGoal,
@@ -123,19 +124,15 @@ export function useYourStats(
 ): UseYourStatsReturn {
   const [stats, setStats] = useState<YourStatsData>(() => initialData())
 
-  // Hold options in a ref so fetchAll doesn't need to re-memoize whenever
-  // the caller passes a fresh options object (a new literal every render
-  // would otherwise rebuild fetchAll → re-fire the effect → loop forever).
-  // Reading through the ref means the latest callback value is used
-  // without participating in the callback's dependency array.
-  const optionsRef = useRef(options)
-  useEffect(() => {
-    optionsRef.current = options
-  }, [options])
+  // Hold options in a ref via the shared useCallbackRefs helper so
+  // fetchAll doesn't need to re-memoize whenever the caller passes a
+  // fresh options object. Without this, a new literal every render
+  // would rebuild fetchAll → re-fire the effect → loop forever.
+  const cb = useCallbackRefs({ options })
 
   const fetchAll = useCallback(
     async (id: string) => {
-      const authError = () => optionsRef.current?.handleAuthError?.()
+      const authError = () => cb.current.options?.handleAuthError?.()
 
       // Mark everything loading in one sweep so the UI can show all
       // spinners simultaneously. We'll replace each section as its
@@ -232,7 +229,9 @@ export function useYourStats(
 
       await Promise.all(promises)
     },
-    [isStreamer],
+    // `cb` is a stable ref object from useCallbackRefs — including
+    // it satisfies exhaustive-deps without triggering rebuilds.
+    [isStreamer, cb],
   )
 
   useEffect(() => {

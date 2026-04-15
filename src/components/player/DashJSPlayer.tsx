@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PlayerProps } from '../../types/player'
+import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 
 /**
  * DASH.js player wrapping MPEG-DASH manifests. dashjs is imported
@@ -24,20 +25,14 @@ export default function DashJSPlayer({
   const playerRef = useRef<any>(null)
   const mountedRef = useRef(true)
 
-  const onReadyRef = useRef(onReady)
-  const onErrorRef = useRef(onError)
-  const onPlayRef = useRef(onPlay)
-  const onPauseRef = useRef(onPause)
-  const onEndedRef = useRef(onEnded)
-  const onPlaybackBlockedRef = useRef(onPlaybackBlocked)
-  useEffect(() => {
-    onReadyRef.current = onReady
-    onErrorRef.current = onError
-    onPlayRef.current = onPlay
-    onPauseRef.current = onPause
-    onEndedRef.current = onEnded
-    onPlaybackBlockedRef.current = onPlaybackBlocked
-  }, [onReady, onError, onPlay, onPause, onEnded, onPlaybackBlocked])
+  const cb = useCallbackRefs({
+    onReady,
+    onError,
+    onPlay,
+    onPause,
+    onEnded,
+    onPlaybackBlocked,
+  })
 
   useEffect(() => {
     mountedRef.current = true
@@ -50,13 +45,13 @@ export default function DashJSPlayer({
     // event API fires PLAYBACK_STARTED/PAUSED too, but the video
     // element's native events are more reliable for React timing.
     const handlePlay = () => {
-      if (mountedRef.current) onPlayRef.current?.()
+      if (mountedRef.current) cb.current.onPlay?.()
     }
     const handlePause = () => {
-      if (mountedRef.current) onPauseRef.current?.()
+      if (mountedRef.current) cb.current.onPause?.()
     }
     const handleEnded = () => {
-      if (mountedRef.current) onEndedRef.current?.()
+      if (mountedRef.current) cb.current.onEnded?.()
     }
 
     videoEl.addEventListener('play', handlePlay)
@@ -74,7 +69,7 @@ export default function DashJSPlayer({
         dashPlayer = dashjs.MediaPlayer().create()
 
         const onStreamInitialized = () => {
-          if (mountedRef.current) onReadyRef.current?.()
+          if (mountedRef.current) cb.current.onReady?.()
         }
         const onErrorEvent = (e: unknown) => {
           if (!mountedRef.current) return
@@ -90,9 +85,9 @@ export default function DashJSPlayer({
             errData?.error?.code === 25 ||
             msg.toLowerCase().includes('play')
           ) {
-            onPlaybackBlockedRef.current?.()
+            cb.current.onPlaybackBlocked?.()
           }
-          onErrorRef.current?.(msg)
+          cb.current.onError?.(msg)
         }
 
         dashPlayer.on('streamInitialized', onStreamInitialized)
@@ -106,7 +101,7 @@ export default function DashJSPlayer({
         playerRef.current = dashPlayer
       } catch (err) {
         if (mountedRef.current) {
-          onErrorRef.current?.(
+          cb.current.onError?.(
             `DASH.js initialization failed: ${
               err instanceof Error ? err.message : String(err)
             }`,
@@ -129,7 +124,9 @@ export default function DashJSPlayer({
       }
       playerRef.current = null
     }
-  }, [url, detection.type, detection.playableUrl])
+    // `cb` has stable identity via useCallbackRefs — including it
+    // satisfies exhaustive-deps without causing re-runs.
+  }, [url, detection.type, detection.playableUrl, cb])
 
   return (
     <div className="w-full h-full" style={{ minHeight: 300 }}>
