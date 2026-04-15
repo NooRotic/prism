@@ -4,6 +4,7 @@ import { Header } from './components/layout/Header'
 import AppShell from './components/layout/AppShell'
 import FollowingPanel from './components/layout/FollowingPanel'
 import YourStatsPanel from './components/layout/YourStatsPanel'
+import CategoryPanel from './components/layout/CategoryPanel'
 import ShaderBackground from './components/ui/ShaderBackground'
 import { ChannelIntro } from './components/intro/ChannelIntro'
 import { OnboardingIntro } from './components/intro/OnboardingIntro'
@@ -132,6 +133,7 @@ function AppInner() {
           Only one is ever open at a time — controlled by navPanel.open. */}
       <FollowingPanel />
       <YourStatsPanel />
+      <CategoryPanel />
 
       {/* No z-index here: Header's z-10 must win over AppShell in the sibling
           stacking comparison so the SmartUrlInput dropdown paints above main

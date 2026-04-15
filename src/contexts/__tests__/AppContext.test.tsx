@@ -308,6 +308,55 @@ describe('AppContext', () => {
       expect(result.current.state.navPanel.open).toBe('your-stats')
     })
 
+    it('OPEN_CATEGORY_PANEL sets open=category and stores the name', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      act(() => {
+        result.current.dispatch({
+          type: 'OPEN_CATEGORY_PANEL',
+          category: 'Just Chatting',
+        })
+      })
+      expect(result.current.state.navPanel.open).toBe('category')
+      expect(result.current.state.navPanel.category).toBe('Just Chatting')
+    })
+
+    it('OPEN_CATEGORY_PANEL updates the category on subsequent opens', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      act(() => {
+        result.current.dispatch({
+          type: 'OPEN_CATEGORY_PANEL',
+          category: 'Just Chatting',
+        })
+      })
+      act(() => {
+        result.current.dispatch({
+          type: 'OPEN_CATEGORY_PANEL',
+          category: 'Software and Game Development',
+        })
+      })
+      expect(result.current.state.navPanel.open).toBe('category')
+      expect(result.current.state.navPanel.category).toBe(
+        'Software and Game Development',
+      )
+    })
+
+    it('CLOSE_NAV_PANEL closes the category panel but preserves the name', () => {
+      const { result } = renderHook(() => useApp(), { wrapper })
+      act(() => {
+        result.current.dispatch({
+          type: 'OPEN_CATEGORY_PANEL',
+          category: 'Just Chatting',
+        })
+      })
+      act(() => {
+        result.current.dispatch({ type: 'CLOSE_NAV_PANEL' })
+      })
+      // open goes null; the category name sticks around so reopening is
+      // cheap (no re-lookup until it actually changes).
+      expect(result.current.state.navPanel.open).toBeNull()
+      expect(result.current.state.navPanel.category).toBe('Just Chatting')
+    })
+
     it('SET_FOLLOWING_SORT updates the sort and persists to localStorage', () => {
       const { result } = renderHook(() => useApp(), { wrapper })
       // Initial value comes from the localStorage loader; default 'live-first'

@@ -17,7 +17,7 @@ export interface SearchEntry {
   timestamp: number
 }
 
-export type NavPanelId = 'following' | 'your-stats'
+export type NavPanelId = 'following' | 'your-stats' | 'category'
 
 export type FollowingSort = 'live-first' | 'alpha' | 'viewers'
 
@@ -62,6 +62,12 @@ export interface AppState {
   navPanel: {
     open: NavPanelId | null
     followingSort: FollowingSort
+    /**
+     * The game/category name for the Category panel. Set when the
+     * user clicks a game name in ProfileSidebar — the panel fetches
+     * live streams for this category from Helix.
+     */
+    category: string | null
   }
   displayMode: 'idle' | 'streamer' | 'chatter'
   loading: boolean
@@ -100,6 +106,7 @@ type Action =
   | { type: 'CLOSE_NAV_PANEL' }
   | { type: 'TOGGLE_NAV_PANEL'; panel: NavPanelId }
   | { type: 'SET_FOLLOWING_SORT'; sort: FollowingSort }
+  | { type: 'OPEN_CATEGORY_PANEL'; category: string }
 
 const initialState: AppState = {
   auth: { token: null, isAuthenticated: false, user: null },
@@ -125,6 +132,7 @@ const initialState: AppState = {
   navPanel: {
     open: null,
     followingSort: loadFollowingSort(),
+    category: null,
   },
   displayMode: 'idle',
   loading: false,
@@ -250,6 +258,15 @@ function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         navPanel: { ...state.navPanel, followingSort: action.sort },
+      }
+    case 'OPEN_CATEGORY_PANEL':
+      return {
+        ...state,
+        navPanel: {
+          ...state.navPanel,
+          open: 'category',
+          category: action.category,
+        },
       }
     default:
       return state

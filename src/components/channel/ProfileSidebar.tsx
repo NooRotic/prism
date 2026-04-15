@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Eye, Calendar, Gamepad2, Smile, Shield, ExternalLink } from 'lucide-react'
+import { Eye, Calendar, Gamepad2, Smile, Shield } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 
 function formatAccountAge(createdAt: string): string {
@@ -37,7 +37,7 @@ interface CurrentItem {
 }
 
 export default function ProfileSidebar() {
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
   const {
     profile,
     channelInfo,
@@ -234,19 +234,22 @@ export default function ProfileSidebar() {
         </div>
       )}
 
-      {/* Current / Last game — clicking opens the Twitch directory for
-          that category in a new tab. Placeholder until the in-app live-
-          streams-in-category panel lands (phase 2 follow-up). */}
+      {/* Current / Last game — clicking opens the in-app Category panel
+          with live streams in that category, marking followed channels
+          with a Heart badge. Dispatches OPEN_CATEGORY_PANEL and lets
+          the CategoryPanel component handle the rest. */}
       {channelInfo?.game_name && (
-        <a
-          href={`https://www.twitch.tv/directory/category/${encodeURIComponent(
-            channelInfo.game_name,
-          )}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors hover:bg-(--border)"
+        <button
+          type="button"
+          onClick={() =>
+            dispatch({
+              type: 'OPEN_CATEGORY_PANEL',
+              category: channelInfo.game_name,
+            })
+          }
+          className="group flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors hover:bg-(--border) text-left w-full"
           style={{ backgroundColor: 'var(--bg-card-hover)' }}
-          title={`Browse ${channelInfo.game_name} on Twitch`}
+          title={`Browse live streams in ${channelInfo.game_name}`}
         >
           {gameBoxArt ? (
             <img
@@ -271,12 +274,7 @@ export default function ProfileSidebar() {
               {channelInfo.game_name}
             </p>
           </div>
-          <ExternalLink
-            size={12}
-            className="shrink-0 opacity-0 transition-opacity group-hover:opacity-60"
-            style={{ color: 'var(--text-muted)' }}
-          />
-        </a>
+        </button>
       )}
 
       {/* Emote + Badge counts — both green for visual symmetry */}
