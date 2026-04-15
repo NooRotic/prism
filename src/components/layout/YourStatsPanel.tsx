@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo } from 'react'
 import type { ReactNode } from 'react'
+import SlidedownPanel from './SlidedownPanel'
 import {
   X,
   Loader2,
@@ -515,7 +516,6 @@ function BitsBody({
 export default function YourStatsPanel() {
   const { state, dispatch } = useApp()
   const { handleAuthError } = useTwitchAuth()
-  const panelRef = useRef<HTMLDivElement>(null)
 
   const isOpen = state.navPanel.open === 'your-stats'
   const authUser = state.auth.user
@@ -545,32 +545,6 @@ export default function YourStatsPanel() {
     dispatch({ type: 'CLOSE_NAV_PANEL' })
   }, [dispatch])
 
-  // ESC key closes the panel
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close()
-    }
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
-  }, [isOpen, close])
-
-  // Click outside closes — carve out the header nav trigger so its
-  // own toggle handler can run first.
-  useEffect(() => {
-    if (!isOpen) return
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (panelRef.current && !panelRef.current.contains(target)) {
-        const headerNav = document.querySelector('[data-nav-trigger]')
-        if (headerNav && headerNav.contains(target)) return
-        close()
-      }
-    }
-    document.addEventListener('mousedown', handleMouseDown)
-    return () => document.removeEventListener('mousedown', handleMouseDown)
-  }, [isOpen, close])
-
   const accountAge = useMemo(() => {
     if (!authUser) return null
     const created = new Date(authUser.created_at)
@@ -587,24 +561,8 @@ export default function YourStatsPanel() {
   }, [authUser])
 
   return (
-    <div
-      ref={panelRef}
-      aria-hidden={!isOpen}
-      aria-label="Your Stats panel"
-      role="region"
-      className="brushed-metal fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
-      style={{
-        top: 'var(--header-height, 56px)',
-        maxHeight: 'calc(100vh - var(--header-height, 56px))',
-        zIndex: 9,
-        // No backgroundColor inline — brushed-metal class provides it.
-        borderBottom: '1px solid var(--border)',
-        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
-        transform: isOpen ? 'translateY(0)' : 'translateY(-100%)',
-        pointerEvents: isOpen ? 'auto' : 'none',
-      }}
-    >
-      <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-4">
+    <SlidedownPanel panelId="your-stats" ariaLabel="Your Stats panel">
+      <>
         {/* Header row */}
         {/* flex-wrap lets the refresh/close buttons wrap below the
             user profile block on narrow screens instead of cramping
@@ -828,7 +786,7 @@ export default function YourStatsPanel() {
             )}
           </div>
         )}
-      </div>
-    </div>
+      </>
+    </SlidedownPanel>
   )
 }
