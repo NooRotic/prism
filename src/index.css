@@ -45,6 +45,28 @@
   --header-height: 56px;
 }
 
+/* ─── Brushed metal surface ──────────────────────────────────────────
+   A distinctive, anti-slop card/panel material (Law 9: "one memorable
+   thing" — unusual surface texture).
+
+   Implementation: an inline SVG data URI with feTurbulence configured
+   for asymmetric noise (high X frequency, low Y frequency) produces
+   horizontal brushing lines. feColorMatrix tints the noise to a
+   cool-steel cast. The SVG is layered over a solid base color via
+   background-blend-mode so the brush strokes feel like surface grain
+   instead of replacing the whole background.
+
+   Apply by adding `class="brushed-metal"` to any element that should
+   take the texture. Works best on large dark surfaces (cards, panels,
+   dropdown containers). */
+.brushed-metal {
+  background-color: var(--bg-card);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='200'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.015' numOctaves='2' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 0.18  0 0 0 0 0.19  0 0 0 0 0.22  0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+  background-size: 800px 200px;
+  background-repeat: repeat;
+  background-blend-mode: overlay;
+}
+
 * {
   box-sizing: border-box;
 }
