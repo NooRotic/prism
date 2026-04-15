@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type { PlayerProps } from '../../types/player'
+import { setPlayerMetrics, makeMetrics } from '../../lib/playerMetrics'
 
 declare global {
   interface Window {
@@ -28,6 +29,25 @@ interface TwitchPlayerInstance {
   pause: () => void
   play: () => void
   addEventListener: (event: string, callback: () => void) => void
+  // Playback state getters (not documented in our base type above
+  // but present on real Twitch.Player — we cast-to-any when calling
+  // them since they're not in the SDK's typings either).
+  getCurrentTime?: () => number
+  getDuration?: () => number
+  getMuted?: () => boolean
+  getVolume?: () => number
+  getQuality?: () => string
+  getPlaybackStats?: () => {
+    backendVersion: string
+    bufferSize: number
+    codecs: string
+    displayResolution: string
+    fps: number
+    hlsLatencyBroadcaster: number
+    playbackRate: number
+    skippedFrames: number
+    videoResolution: string
+  }
 }
 
 const TWITCH_EMBED_SCRIPT = 'https://embed.twitch.tv/embed/v1.js'
@@ -105,6 +125,7 @@ export default function TwitchEmbedPlayer({
   const playerRef = useRef<TwitchPlayerInstance | null>(null)
   const mountedRef = useRef(true)
   const embedIdRef = useRef('')
+  const metricsIntervalRef = useRef<number | null>(null)
 
   const handleError = useCallback(
     (msg: string) => {
@@ -258,6 +279,38 @@ export default function TwitchEmbedPlayer({
           return
         }
 
+        // Start 1Hz metrics polling now that the player is ready.
+        // Uses the Twitch.Player API's getter methods (getCurrentTime,
+        // getDuration, getMuted, getVolume, getPlaybackStats) — these
+        // live on the Player instance, not the Embed wrapper.
+        metricsIntervalRef.current = window.setInterval(() => {
+          const p = playerRef.current
+          if (!mountedRef.current || !p) return
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const stats = (p as any).getPlaybackStats?.()
+            setPlayerMetrics(
+              makeMetrics('twitch-sdk', {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                currentTime: (p as any).getCurrentTime?.() ?? null,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                duration: (p as any).getDuration?.() ?? null,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                muted: (p as any).getMuted?.() ?? null,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                volume: (p as any).getVolume?.() ?? null,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                quality: (p as any).getQuality?.() ?? null,
+                resolution: stats?.videoResolution ?? null,
+                bufferLength: stats?.bufferSize ?? null,
+                droppedFrames: stats?.skippedFrames ?? null,
+              }),
+            )
+          } catch {
+            // Non-fatal — Twitch's Player API can be flaky mid-buffering.
+          }
+        }, 1000)
+
         onReady?.()
       }
 
@@ -298,6 +351,11 @@ export default function TwitchEmbedPlayer({
     return () => {
       mountedRef.current = false
       clearTimeoutSafe()
+      if (metricsIntervalRef.current !== null) {
+        window.clearInterval(metricsIntervalRef.current)
+        metricsIntervalRef.current = null
+      }
+      setPlayerMetrics(null)
       try {
         embedRef.current?.destroy()
       } catch {

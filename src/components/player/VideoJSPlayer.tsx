@@ -3,6 +3,7 @@ import videojs from 'video.js'
 import 'video.js/dist/video-js.css'
 import type { PlayerProps } from '../../types/player'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
+import { setPlayerMetrics, makeMetrics } from '../../lib/playerMetrics'
 
 type Player = ReturnType<typeof videojs>
 
@@ -121,8 +122,112 @@ export default function VideoJSPlayer({
       )
     }
 
+    // ─── QoE metrics emission ───────────────────────────────────
+    // Poll the player + underlying <video> element + VHS stats at
+    // 1Hz and push a snapshot into the module-level playerMetrics
+    // store. DebugPanel subscribes to read live values.
+    const metricsInterval = window.setInterval(() => {
+      const player = playerRef.current
+      if (!mountedRef.current || !player || player.isDisposed()) return
+
+      try {
+        // video.js wraps the underlying <video> element; we can
+        // query it for canonical playback state and VHS adds HLS
+        // stats under player.tech().vhs.stats.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tech = (player as any).tech?.({ IWillNotUseThisInPlugins: true })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vhs = tech?.vhs as any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const videoEl = (player as any).el?.()?.querySelector('video') as
+          | HTMLVideoElement
+          | undefined
+
+        // Buffer length ahead of current playhead (seconds).
+        let bufferLength: number | null = null
+        try {
+          const buffered = player.buffered()
+          const currentTime = player.currentTime() ?? 0
+          for (let i = 0; i < buffered.length; i++) {
+            const start = buffered.start(i)
+            const end = buffered.end(i)
+            if (currentTime >= start && currentTime <= end) {
+              bufferLength = end - currentTime
+              break
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        // Dropped frames from the native <video> element.
+        let droppedFrames: number | null = null
+        if (videoEl && 'getVideoPlaybackQuality' in videoEl) {
+          try {
+            const quality = (
+              videoEl as HTMLVideoElement & {
+                getVideoPlaybackQuality: () => {
+                  droppedVideoFrames: number
+                }
+              }
+            ).getVideoPlaybackQuality()
+            droppedFrames = quality.droppedVideoFrames
+          } catch {
+            // ignore
+          }
+        }
+
+        // Bitrate of currently-selected HLS rendition (bps).
+        let bitrate: number | null = null
+        let resolution: string | null = null
+        try {
+          const playlists = vhs?.playlists
+          const media = playlists?.media?.()
+          if (media?.attributes?.BANDWIDTH) {
+            bitrate = media.attributes.BANDWIDTH
+          }
+          if (media?.attributes?.RESOLUTION) {
+            const { width, height } = media.attributes.RESOLUTION
+            resolution = `${width}x${height}`
+          }
+        } catch {
+          // ignore
+        }
+
+        // Bytes transferred from VHS stats.
+        let bytesTransferred: number | null = null
+        try {
+          if (typeof vhs?.stats?.mediaBytesTransferred === 'number') {
+            bytesTransferred = vhs.stats.mediaBytesTransferred
+          }
+        } catch {
+          // ignore
+        }
+
+        setPlayerMetrics(
+          makeMetrics('videojs', {
+            currentTime: player.currentTime() ?? null,
+            duration: player.duration() ?? null,
+            paused: player.paused() ?? null,
+            muted: player.muted() ?? null,
+            volume: player.volume() ?? null,
+            bitrate,
+            resolution,
+            quality: resolution ?? null,
+            bufferLength,
+            droppedFrames,
+            bytesTransferred,
+          }),
+        )
+      } catch {
+        // Don't let metric polling break the player.
+      }
+    }, 1000)
+
     return () => {
       mountedRef.current = false
+      window.clearInterval(metricsInterval)
+      setPlayerMetrics(null)
       const player = playerRef.current
       if (player && !player.isDisposed()) {
         player.dispose()
