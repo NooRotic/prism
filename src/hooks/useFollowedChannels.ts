@@ -1,11 +1,20 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  getFollowedChannels,
+  getFollowedChannelsPage,
   getStreamsByUserIds,
   SessionExpiredError,
 } from '../lib/twitchApi'
 import type { TwitchFollowedChannel, TwitchStream } from '../types/twitch'
 import type { FollowingSort } from '../contexts/AppContext'
+
+/**
+ * Max total follows to fetch via pagination. 400 is enough for most
+ * users without ballooning API costs — at 100 per page that's up to
+ * 4 sequential /channels/followed calls + up to 4 batched /streams
+ * calls for live-state enrichment.
+ */
+const MAX_FOLLOWS = 400
+const PAGE_SIZE = 100
 
 /**
  * Enriched follow = the raw `/channels/followed` row joined with the
@@ -132,14 +141,43 @@ export function useFollowedChannels(
       setLoading(true)
       setError(null)
       try {
-        const follows = await getFollowedChannels(uid, 100)
-        setTotalCount(follows.length)
+        // Paginate through follows until we hit MAX_FOLLOWS or the
+        // cursor runs out. Each iteration is one Helix call.
+        const allFollows: TwitchFollowedChannel[] = []
+        let cursor: string | null = null
+        do {
+          const page = await getFollowedChannelsPage(
+            uid,
+            PAGE_SIZE,
+            cursor ?? undefined,
+          )
+          allFollows.push(...page.data)
+          cursor = page.cursor
+        } while (cursor && allFollows.length < MAX_FOLLOWS)
 
-        const ids = follows.map((f) => f.broadcaster_id)
-        const liveStreams =
-          ids.length > 0 ? await getStreamsByUserIds(ids) : []
+        setTotalCount(allFollows.length)
 
-        setRawFollows(enrichFollows(follows, liveStreams))
+        // Live-state enrichment is also batched — up to 100 user_ids
+        // per /streams call, so chunk the ids and fire in parallel.
+        const liveStreams: TwitchStream[] = []
+        if (allFollows.length > 0) {
+          const chunks: string[][] = []
+          for (let i = 0; i < allFollows.length; i += PAGE_SIZE) {
+            chunks.push(
+              allFollows
+                .slice(i, i + PAGE_SIZE)
+                .map((f) => f.broadcaster_id),
+            )
+          }
+          const chunkResults = await Promise.all(
+            chunks.map((ids) => getStreamsByUserIds(ids)),
+          )
+          for (const streams of chunkResults) {
+            liveStreams.push(...streams)
+          }
+        }
+
+        setRawFollows(enrichFollows(allFollows, liveStreams))
         setLoading(false)
       } catch (err) {
         if (err instanceof SessionExpiredError) {
