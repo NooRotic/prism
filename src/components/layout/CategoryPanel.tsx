@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo } from 'react'
 import { X, Loader2, ExternalLink, Eye, Heart, RefreshCw } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useCategoryStreams } from '../../hooks/useCategoryStreams'
 import type { EnrichedCategoryStream } from '../../hooks/useCategoryStreams'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { detectURLType } from '../../lib/urlDetection'
+import SlidedownPanel from './SlidedownPanel'
 
 function StreamCard({ stream }: { stream: EnrichedCategoryStream }) {
   const { dispatch } = useApp()
@@ -119,10 +120,9 @@ function StreamCard({ stream }: { stream: EnrichedCategoryStream }) {
 export default function CategoryPanel() {
   const { state, dispatch } = useApp()
   const { handleAuthError } = useTwitchAuth()
-  const panelRef = useRef<HTMLDivElement>(null)
 
-  const isOpen = state.navPanel.open === 'category'
-  const categoryName = isOpen ? state.navPanel.category : null
+  const categoryName =
+    state.navPanel.open === 'category' ? state.navPanel.category : null
   const viewerUserId = state.auth.user?.id ?? null
 
   const handleAuthErrorCallback = useCallback(
@@ -144,31 +144,6 @@ export default function CategoryPanel() {
     dispatch({ type: 'CLOSE_NAV_PANEL' })
   }, [dispatch])
 
-  // ESC key closes
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close()
-    }
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
-  }, [isOpen, close])
-
-  // Click outside closes — carve out the header nav trigger
-  useEffect(() => {
-    if (!isOpen) return
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (panelRef.current && !panelRef.current.contains(target)) {
-        const headerNav = document.querySelector('[data-nav-trigger]')
-        if (headerNav && headerNav.contains(target)) return
-        close()
-      }
-    }
-    document.addEventListener('mousedown', handleMouseDown)
-    return () => document.removeEventListener('mousedown', handleMouseDown)
-  }, [isOpen, close])
-
   const liveCount = streams.length
   const followedLiveCount = useMemo(
     () => streams.filter((s) => s.isFollowed).length,
@@ -185,23 +160,8 @@ export default function CategoryPanel() {
     : null
 
   return (
-    <div
-      ref={panelRef}
-      aria-hidden={!isOpen}
-      aria-label="Category panel"
-      role="region"
-      className="brushed-metal fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
-      style={{
-        top: 'var(--header-height, 56px)',
-        maxHeight: 'calc(100vh - var(--header-height, 56px))',
-        zIndex: 9,
-        borderBottom: '1px solid var(--border)',
-        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
-        transform: isOpen ? 'translateY(0)' : 'translateY(-100%)',
-        pointerEvents: isOpen ? 'auto' : 'none',
-      }}
-    >
-      <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-4">
+    <SlidedownPanel panelId="category" ariaLabel="Category panel">
+      <>
         {/* Header row */}
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -360,7 +320,7 @@ export default function CategoryPanel() {
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </>
+    </SlidedownPanel>
   )
 }
