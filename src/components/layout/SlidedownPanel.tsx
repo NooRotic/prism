@@ -52,6 +52,12 @@ export default function SlidedownPanel({
     dispatch({ type: 'CLOSE_NAV_PANEL' })
   }, [dispatch])
 
+  // Scroll to top when opening so the panel content is visible,
+  // especially on the landing page where the user may have scrolled.
+  useEffect(() => {
+    if (isOpen) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [isOpen])
+
   // ESC key closes the panel when it's open
   useEffect(() => {
     if (!isOpen) return
