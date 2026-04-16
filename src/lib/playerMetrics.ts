@@ -57,12 +57,28 @@ type Listener = (metrics: PlaybackMetrics | null) => void
 let current: PlaybackMetrics | null = null
 const listeners = new Set<Listener>()
 
+// Track tab visibility so we can skip notifying listeners (and
+// triggering React re-renders) while the tab is in the background.
+// The stored value is still updated so it's fresh on tab return.
+let tabVisible = typeof document !== 'undefined'
+  ? document.visibilityState === 'visible'
+  : true
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    tabVisible = document.visibilityState === 'visible'
+  })
+}
+
 /**
  * Replace the current metrics snapshot. Pass `null` to clear (e.g.
  * on player unmount). Notifies all subscribers synchronously.
  */
 export function setPlayerMetrics(next: PlaybackMetrics | null): void {
   current = next
+  // Skip listener notifications while the tab is hidden — saves
+  // React re-renders in DebugPanel at 1Hz for no visible benefit.
+  if (!tabVisible && next !== null) return
   for (const listener of listeners) {
     try {
       listener(next)
