@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Loader2, X, Tv } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
-import { getURLTypeDisplayName } from '../../lib/urlDetection'
+import { getURLTypeDisplayName, getSourceColor } from '../../lib/urlDetection'
 import PlayerHost from '../player/PlayerHost'
 import ProfileSidebar from '../channel/ProfileSidebar'
 import StatsRow from '../channel/StatsRow'
@@ -134,39 +134,36 @@ function VideoLayout() {
   const { player } = state
   const detection = player.detection
   const typeLabel = detection ? getURLTypeDisplayName(detection) : ''
+  const accentColor = detection ? getSourceColor(detection) : 'var(--accent-green)'
 
   return (
     <div className="flex flex-col gap-4 w-full max-w-5xl mx-auto">
-      {/* Type badge */}
-      {typeLabel && (
-        <div className="flex items-center gap-2">
-          <span
-            className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded"
-            style={{
-              backgroundColor: 'rgba(57, 255, 20, 0.08)',
-              border: '1px solid var(--border)',
-              color: 'var(--text-muted)',
-              fontFamily: 'var(--font-mono)',
-            }}
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <h2
+            className="text-lg font-bold font-heading uppercase tracking-wider"
+            style={{ color: accentColor }}
           >
-            {typeLabel}
-          </span>
-          <span
-            className="text-xs truncate"
-            style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
-            title={player.currentUrl}
-          >
-            {player.currentUrl}
-          </span>
+            {typeLabel || 'Video'} Player
+          </h2>
         </div>
-      )}
+        <span
+          className="text-xs truncate shrink min-w-0"
+          style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
+          title={player.currentUrl}
+        >
+          {player.currentUrl}
+        </span>
+      </div>
 
       {/* Player */}
       <div
         className="w-full aspect-video rounded-lg overflow-hidden"
         style={{
           backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border)',
+          border: `2px solid ${accentColor}`,
+          boxShadow: `0 0 20px ${accentColor}22`,
         }}
       >
         {player.currentUrl && player.detection ? (
