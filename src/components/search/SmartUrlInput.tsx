@@ -84,7 +84,15 @@ export function SmartUrlInput() {
       let det = detectURLType(query)
 
       if (det.type === 'unknown' && !hasUrlChars(query)) {
-        // Treat as Twitch channel name
+        if (query.includes(' ')) {
+          // Multi-word text without URL chars = category/game name
+          // (Twitch channel names cannot contain spaces)
+          dispatch({ type: 'OPEN_CATEGORY_PANEL', category: query })
+          setIsOpen(false)
+          inputRef.current?.blur()
+          return
+        }
+        // Single word = treat as Twitch channel name
         url = `https://twitch.tv/${query}`
         det = detectURLType(url)
       } else {
