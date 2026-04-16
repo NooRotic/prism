@@ -5,8 +5,10 @@ import { getURLTypeDisplayName } from '../../lib/urlDetection'
 import {
   subscribePlayerMetrics,
   getPlayerMetrics,
+  getMetricsHistory,
   type PlaybackMetrics,
 } from '../../lib/playerMetrics'
+import Sparkline from '../player/Sparkline'
 
 /**
  * Debug panel — shown when state.player.debugMode is enabled via the
@@ -118,6 +120,57 @@ function MetricSection({
       </span>
       {children}
     </div>
+  )
+}
+
+// ─── Sparkline row ──────────────────────────────────────────────
+
+function SparklineRow({
+  label,
+  data,
+  color,
+}: {
+  label: string
+  data: (number | null)[]
+  color: string
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className="text-[10px] uppercase tracking-wider w-20 shrink-0"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        {label}
+      </span>
+      <Sparkline data={data} color={color} width={160} height={20} />
+    </div>
+  )
+}
+
+function SparklineSection() {
+  const history = getMetricsHistory()
+  if (history.length < 2) return null
+
+  return (
+    <MetricSection title="60s History">
+      <div className="flex flex-col gap-2">
+        <SparklineRow
+          label="Bitrate"
+          data={history.map((s) => s.bitrate)}
+          color="var(--accent-green)"
+        />
+        <SparklineRow
+          label="Buffer"
+          data={history.map((s) => s.bufferLength)}
+          color="var(--accent-hls)"
+        />
+        <SparklineRow
+          label="Drops/s"
+          data={history.map((s) => s.droppedFramesDelta)}
+          color="var(--accent-red, #ef4444)"
+        />
+      </div>
+    </MetricSection>
   )
 }
 
@@ -261,6 +314,9 @@ export default function DebugPanel() {
           </MetricSection>
         </div>
       )}
+
+      {/* Sparkline charts — 60-second rolling window */}
+      {hasMetrics && <SparklineSection />}
     </div>
   )
 }
