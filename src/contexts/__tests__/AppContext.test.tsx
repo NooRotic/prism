@@ -126,8 +126,8 @@ describe('AppContext', () => {
         })
       })
 
-      // Should stay 'idle' — displayMode is set later by LOAD_CHANNEL_SUCCESS
-      expect(result.current.state.displayMode).toBe('idle')
+      // From idle, jumps to 'streamer' so ChannelLayout renders immediately
+      expect(result.current.state.displayMode).toBe('streamer')
     })
 
     it('LOAD_CHANNEL_START sets loading true and clears error', () => {

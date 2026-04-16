@@ -190,8 +190,16 @@ function appReducer(state: AppState, action: Action): AppState {
       const det = action.detection
       const isTwitchWithChannel =
         det.type === 'twitch' && !!det.metadata?.channelName
-      const nextDisplayMode =
-        isTwitchWithChannel ? state.displayMode : 'video'
+      let nextDisplayMode: AppState['displayMode']
+      if (isTwitchWithChannel) {
+        // Preserve streamer/chatter when switching content within a
+        // channel. But if we're idle, jump to streamer so ChannelLayout
+        // renders immediately (loading overlay covers the data fetch).
+        nextDisplayMode =
+          state.displayMode === 'idle' ? 'streamer' : state.displayMode
+      } else {
+        nextDisplayMode = 'video'
+      }
       return {
         ...state,
         displayMode: nextDisplayMode,
