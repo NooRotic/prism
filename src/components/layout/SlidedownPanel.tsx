@@ -91,9 +91,9 @@ export default function SlidedownPanel({
       aria-hidden={!isOpen}
       aria-label={ariaLabel}
       role="region"
-      className="brushed-metal fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
+      className="brushed-metal absolute left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
       style={{
-        top: 'var(--header-height, 56px)',
+        top: '100%',
         minHeight: '40vh',
         maxHeight: 'calc(100vh - var(--header-height, 56px))',
         // z-9 sits below the header (z-10) so the header visually
