@@ -705,16 +705,6 @@ export default function YourStatsPanel() {
                 </StatCard>
 
                 <StatCard
-                  title="Active Goals"
-                  icon={<Target size={14} />}
-                  section={stats.goals}
-                  emptyMessage="No active goals"
-                  wide
-                >
-                  {(goals) => <GoalsBody goals={goals} />}
-                </StatCard>
-
-                <StatCard
                   title="VIPs"
                   icon={<Crown size={14} />}
                   section={stats.vips}
@@ -760,6 +750,16 @@ export default function YourStatsPanel() {
                   wide
                 >
                   {(leaders) => <BitsBody leaders={leaders} />}
+                </StatCard>
+
+                <StatCard
+                  title="Active Goals"
+                  icon={<Target size={14} />}
+                  section={stats.goals}
+                  emptyMessage="No active goals"
+                  wide
+                >
+                  {(goals) => <GoalsBody goals={goals} />}
                 </StatCard>
               </>
             )}
