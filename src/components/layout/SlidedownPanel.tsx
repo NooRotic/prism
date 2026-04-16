@@ -94,6 +94,7 @@ export default function SlidedownPanel({
       className="brushed-metal fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
       style={{
         top: 'var(--header-height, 56px)',
+        minHeight: '40vh',
         maxHeight: 'calc(100vh - var(--header-height, 56px))',
         // z-9 sits below the header (z-10) so the header visually
         // "covers" the top edge as the panel slides out from under it.
