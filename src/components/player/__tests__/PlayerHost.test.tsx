@@ -112,7 +112,6 @@ describe('PlayerHost', () => {
   })
 
   it('shows Content ID and Parent rows in debug overlay', async () => {
-    const user = userEvent.setup()
     renderHost(streamDetection)
     await screen.findByTestId('mock-twitch-sdk')
     // Debug overlay is on by default — no need to toggle it

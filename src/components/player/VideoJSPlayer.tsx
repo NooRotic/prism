@@ -138,6 +138,7 @@ export default function VideoJSPlayer({
         let droppedFrames: number | null = null
         if (vidEl && 'getVideoPlaybackQuality' in vidEl) {
           try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             droppedFrames = (vidEl as any).getVideoPlaybackQuality().droppedVideoFrames
           } catch { /* ignore */ }
         }
