@@ -9,14 +9,15 @@ interface FallbackCardProps {
 function getWatchUrl(detection: URLDetectionResult): {
   url: string
   label: string
-} {
+} | null {
   if (detection.type === 'youtube') {
     return { url: detection.originalUrl, label: 'Watch on YouTube' }
   }
   if (detection.type === 'twitch') {
     return { url: detection.originalUrl, label: 'Watch on Twitch' }
   }
-  return { url: detection.originalUrl, label: 'Open Link' }
+  // HLS/DASH/MP4 raw stream URLs aren't useful to open directly
+  return null
 }
 
 function getThumbnailUrl(detection: URLDetectionResult): string | null {
@@ -32,7 +33,7 @@ function getThumbnailUrl(detection: URLDetectionResult): string | null {
 }
 
 export default function FallbackCard({ detection, error }: FallbackCardProps) {
-  const { url: watchUrl, label: watchLabel } = getWatchUrl(detection)
+  const watchInfo = getWatchUrl(detection)
   const thumbnail = getThumbnailUrl(detection)
 
   return (
@@ -82,20 +83,23 @@ export default function FallbackCard({ detection, error }: FallbackCardProps) {
         )}
       </div>
 
-      {/* Direct link button */}
-      <a
-        href={watchUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 hover:scale-105"
-        style={{
-          backgroundColor: 'var(--accent-green)',
-          color: 'var(--bg)',
-        }}
-      >
-        <ExternalLink size={16} />
-        {watchLabel}
-      </a>
+      {/* Direct link button — only for YouTube/Twitch where the
+          original URL is useful to open. Hidden for raw stream URLs. */}
+      {watchInfo && (
+        <a
+          href={watchInfo.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 hover:scale-105"
+          style={{
+            backgroundColor: 'var(--accent-green)',
+            color: 'var(--bg)',
+          }}
+        >
+          <ExternalLink size={16} />
+          {watchInfo.label}
+        </a>
+      )}
     </div>
   )
 }
