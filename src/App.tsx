@@ -12,6 +12,7 @@ import { RemixButton } from './components/intro/RemixButton'
 import { useChannelData } from './hooks/useChannelData'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
 import { useIntroState } from './hooks/useIntroState'
+import { useDeepLinkRead, useDeepLinkWrite } from './hooks/useDeepLink'
 import { detectURLType } from './lib/urlDetection'
 import { getAuthenticatedUser, SessionExpiredError } from './lib/twitchApi'
 
@@ -25,6 +26,10 @@ function AppInner() {
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem(ONBOARDING_SEEN_KEY)
   })
+
+  // Deep linking: read URL params on mount, write state → URL on change
+  useDeepLinkRead()
+  useDeepLinkWrite()
 
   const channelLogin = state.channel.profile?.login ?? null
   const intro = useIntroState(channelLogin)

@@ -52,6 +52,7 @@ interface PlayerHostProps {
 
 const PLAYER_LOADING_FALLBACK = (
   <div
+    id="suspense-loading"
     className="flex items-center justify-center w-full h-full"
     style={{ minHeight: 300, backgroundColor: 'var(--bg-card)' }}
   >
@@ -245,9 +246,11 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
     typeof window !== 'undefined' ? window.location.hostname : 'unknown'
 
   return (
-    <div className="relative w-full h-full">
+    <div id="player-host-outer" className="absolute inset-0">
+      <div id="player-host-inner" className="relative w-full h-full">
       <PlayerErrorBoundary
-        fallback={<FallbackCard detection={detection} error="Player crashed during engine switch — click to retry" />}
+        key={url}
+        fallback={<div id="error-boundary-fallback" style={{ background: 'red', padding: 20, color: 'white', fontSize: 24 }}>ERROR BOUNDARY CAUGHT</div>}
       >
         {renderPlayer()}
       </PlayerErrorBoundary>
@@ -397,6 +400,7 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }
