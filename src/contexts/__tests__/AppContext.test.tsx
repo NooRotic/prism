@@ -215,17 +215,17 @@ describe('AppContext', () => {
     it('TOGGLE_DEBUG toggles player.debugMode', () => {
       const { result } = renderHook(() => useApp(), { wrapper })
 
-      expect(result.current.state.player.debugMode).toBe(false)
-
-      act(() => {
-        result.current.dispatch({ type: 'TOGGLE_DEBUG' })
-      })
       expect(result.current.state.player.debugMode).toBe(true)
 
       act(() => {
         result.current.dispatch({ type: 'TOGGLE_DEBUG' })
       })
       expect(result.current.state.player.debugMode).toBe(false)
+
+      act(() => {
+        result.current.dispatch({ type: 'TOGGLE_DEBUG' })
+      })
+      expect(result.current.state.player.debugMode).toBe(true)
     })
 
     it('CLEAR_ERROR clears the error', () => {

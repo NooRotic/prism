@@ -14,7 +14,7 @@ export function Header() {
     <header
       // Height bound to --header-height so FollowingPanel can position
       // itself exactly below the header regardless of padding changes.
-      className="flex items-center justify-between px-6 py-3 relative z-1 h-(--header-height)"
+      className="flex items-center justify-between px-6 py-3 relative z-40 h-(--header-height)"
       style={{
         borderBottom: '1px solid var(--border)',
         background: 'linear-gradient(180deg, var(--bg-sidebar), rgba(8, 8, 12, 0.8))',

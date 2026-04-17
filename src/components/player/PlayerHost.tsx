@@ -6,7 +6,9 @@ import {
   useRef,
   lazy,
   Suspense,
+  Component,
 } from 'react'
+import type { ReactNode, ErrorInfo } from 'react'
 import { Settings, WifiOff } from 'lucide-react'
 import type { URLDetectionResult, PlayerEngine } from '../../lib/urlDetection'
 import {
@@ -16,6 +18,26 @@ import {
 import type { PlayerProps } from '../../types/player'
 import { useApp } from '../../contexts/AppContext'
 import FallbackCard from './FallbackCard'
+
+// Error boundary catches DOM reconciliation crashes from video.js
+// (removeChild errors during engine switches) and shows FallbackCard
+// instead of a white screen.
+class PlayerErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(_: Error, info: ErrorInfo) {
+    console.warn('[PlayerErrorBoundary] caught:', info.componentStack)
+  }
+  render() {
+    if (this.state.hasError) return this.props.fallback
+    return this.props.children
+  }
+}
 
 const TwitchEmbedPlayer = lazy(() => import('./TwitchEmbedPlayer'))
 const TwitchIframePlayer = lazy(() => import('./TwitchIframePlayer'))
@@ -197,7 +219,7 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
       case 'videojs':
         return (
           <Suspense fallback={PLAYER_LOADING_FALLBACK}>
-            <VideoJSPlayer {...playerProps} />
+            <VideoJSPlayer key={url} {...playerProps} />
           </Suspense>
         )
       case 'dashjs':
@@ -224,7 +246,11 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
 
   return (
     <div className="relative w-full h-full">
-      {renderPlayer()}
+      <PlayerErrorBoundary
+        fallback={<FallbackCard detection={detection} error="Player crashed during engine switch — click to retry" />}
+      >
+        {renderPlayer()}
+      </PlayerErrorBoundary>
 
       {isOffline && (
         <div

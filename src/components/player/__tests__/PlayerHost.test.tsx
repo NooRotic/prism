@@ -88,7 +88,7 @@ describe('PlayerHost', () => {
     expect(props.onOffline).toBeDefined()
     act(() => { props.onOffline!() })
     expect(await screen.findByText(/is offline/i)).toBeInTheDocument()
-    expect(screen.getByText(/ninja/i)).toBeInTheDocument()
+    expect(screen.getByText(/ninja is offline/i)).toBeInTheDocument()
     // SDK stays mounted underneath so ONLINE can re-trigger it
     expect(screen.getByTestId('mock-twitch-sdk')).toBeInTheDocument()
   })
@@ -115,7 +115,7 @@ describe('PlayerHost', () => {
     const user = userEvent.setup()
     renderHost(streamDetection)
     await screen.findByTestId('mock-twitch-sdk')
-    await user.click(screen.getByLabelText('Toggle debug overlay'))
+    // Debug overlay is on by default — no need to toggle it
     const contentRow = screen.getByText(/Content ID:/i).parentElement
     expect(contentRow?.textContent).toMatch(/ninja/)
     expect(screen.getByText(/Parent:/i)).toBeInTheDocument()
@@ -125,7 +125,6 @@ describe('PlayerHost', () => {
     const user = userEvent.setup()
     renderHost(streamDetection)
     await screen.findByTestId('mock-twitch-sdk')
-    await user.click(screen.getByLabelText('Toggle debug overlay'))
     await user.click(screen.getByLabelText('Force advance fallback chain'))
     expect(await screen.findByTestId('mock-twitch-iframe')).toBeInTheDocument()
   })
@@ -134,7 +133,6 @@ describe('PlayerHost', () => {
     const user = userEvent.setup()
     renderHost(streamDetection)
     await screen.findByTestId('mock-twitch-sdk')
-    await user.click(screen.getByLabelText('Toggle debug overlay'))
     await user.click(screen.getByLabelText('Force advance fallback chain'))
     await user.click(screen.getByLabelText('Force advance fallback chain'))
     await user.click(
@@ -150,7 +148,6 @@ describe('PlayerHost', () => {
     const props = sdkProps[sdkProps.length - 1]
     act(() => { props.onOffline!() })
     expect(await screen.findByText(/is offline/i)).toBeInTheDocument()
-    await user.click(screen.getByLabelText('Toggle debug overlay'))
     await user.click(
       screen.getByLabelText('Retry from start of fallback chain'),
     )

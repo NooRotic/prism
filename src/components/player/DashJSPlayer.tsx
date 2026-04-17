@@ -62,6 +62,13 @@ export default function DashJSPlayer({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let dashPlayer: any = null
 
+    let readyFired = false
+    const loadTimeout = setTimeout(() => {
+      if (!readyFired && mountedRef.current) {
+        cb.current.onError?.('DASH stream failed to load within 10 seconds')
+      }
+    }, 10_000)
+
     const init = async () => {
       try {
         const dashjs = await import('dashjs')
@@ -70,6 +77,8 @@ export default function DashJSPlayer({
         dashPlayer = dashjs.MediaPlayer().create()
 
         const onStreamInitialized = () => {
+          readyFired = true
+          clearTimeout(loadTimeout)
           if (mountedRef.current) cb.current.onReady?.()
         }
         const onErrorEvent = (e: unknown) => {
@@ -209,6 +218,7 @@ export default function DashJSPlayer({
 
     return () => {
       mountedRef.current = false
+      clearTimeout(loadTimeout)
       window.clearInterval(metricsInterval)
       setPlayerMetrics(null)
       videoEl.removeEventListener('play', handlePlay)

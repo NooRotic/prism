@@ -105,7 +105,6 @@ export default function SlidedownPanel({
       className="brushed-metal fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
       style={{
         top: 'var(--header-height, 56px)',
-        minHeight: '40vh',
         maxHeight: 'calc(100vh - var(--header-height, 56px))',
         zIndex: 30,
         // No backgroundColor inline — brushed-metal class provides it.

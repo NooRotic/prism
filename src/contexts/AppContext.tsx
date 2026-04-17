@@ -127,7 +127,7 @@ const initialState: AppState = {
     detection: null,
     activeEngine: 'twitch-sdk',
     fallbackStep: 0,
-    debugMode: false,
+    debugMode: true,
   },
   navPanel: {
     open: null,
@@ -203,6 +203,7 @@ function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         displayMode: nextDisplayMode,
+        navPanel: { ...state.navPanel, open: null },
         player: {
           ...state.player,
           currentUrl: action.url,

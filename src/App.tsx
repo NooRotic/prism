@@ -126,15 +126,14 @@ function AppInner() {
         />
       )}
 
-      {/* Sticky wrapper: header stays pinned on scroll, panels position
-          absolutely below it. Using sticky+absolute instead of fixed
-          avoids stacking context issues in some browsers. */}
-      <div className="sticky top-0 z-10">
-        <Header />
-        <FollowingPanel />
-        <YourStatsPanel />
-        <CategoryPanel />
-      </div>
+      <Header />
+
+      {/* Slide-down panels use position:fixed below the header at z-30.
+          Header sits at z-40 above them. Only one panel is ever open at
+          a time — controlled by navPanel.open. */}
+      <FollowingPanel />
+      <YourStatsPanel />
+      <CategoryPanel />
 
       {/* No z-index here: Header's z-10 must win over AppShell in the sibling
           stacking comparison so the SmartUrlInput dropdown paints above main

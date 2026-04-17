@@ -157,11 +157,11 @@ function VideoLayout() {
         </span>
       </div>
 
-      {/* Player */}
+      {/* Player — black bg covers the loading spinner once mounted */}
       <div
-        className="w-full aspect-video rounded-lg overflow-hidden"
+        className="w-full aspect-video rounded-lg overflow-hidden relative"
         style={{
-          backgroundColor: 'var(--bg-card)',
+          backgroundColor: '#000',
           border: `2px solid ${accentColor}`,
           boxShadow: `0 0 20px ${accentColor}22`,
         }}
