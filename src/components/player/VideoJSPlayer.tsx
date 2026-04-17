@@ -191,10 +191,10 @@ export default function VideoJSPlayer({
 
   return (
     <div
+      id="videojs-container"
       ref={containerRef}
       data-vjs-player
-      className="w-full h-full"
-      style={{ minHeight: 300 }}
+      className="absolute inset-0"
     />
   )
 }
