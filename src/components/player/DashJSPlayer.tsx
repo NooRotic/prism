@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { PlayerProps } from '../../types/player'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
-import { setPlayerMetrics, makeMetrics } from '../../lib/playerMetrics'
+import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
 
 /**
  * DASH.js player wrapping MPEG-DASH manifests. dashjs is imported
@@ -129,7 +129,7 @@ export default function DashJSPlayer({
     // currentTime/duration/muted/volume/paused.
     const metricsInterval = window.setInterval(() => {
       const player = playerRef.current
-      if (!mountedRef.current || !player) return
+      if (!mountedRef.current || !player || !isTabVisible()) return
 
       try {
         // Universal from <video> element

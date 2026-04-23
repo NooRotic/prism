@@ -3,7 +3,7 @@ import videojs from 'video.js'
 import 'video.js/dist/video-js.css'
 import type { PlayerProps } from '../../types/player'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
-import { setPlayerMetrics, makeMetrics } from '../../lib/playerMetrics'
+import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
 
 type Player = ReturnType<typeof videojs>
 
@@ -110,9 +110,9 @@ export default function VideoJSPlayer({
       }
     })
 
-    // QoE metrics at 1Hz
+    // QoE metrics at 1Hz — skip when tab is hidden to save CPU
     const metricsInterval = window.setInterval(() => {
-      if (!player || player.isDisposed()) return
+      if (!player || player.isDisposed() || !isTabVisible()) return
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tech = (player as any).tech?.({ IWillNotUseThisInPlugins: true })

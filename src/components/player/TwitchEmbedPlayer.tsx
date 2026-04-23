@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type { PlayerProps } from '../../types/player'
-import { setPlayerMetrics, makeMetrics } from '../../lib/playerMetrics'
+import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
 
 declare global {
   interface Window {
@@ -285,7 +285,7 @@ export default function TwitchEmbedPlayer({
         // live on the Player instance, not the Embed wrapper.
         metricsIntervalRef.current = window.setInterval(() => {
           const p = playerRef.current
-          if (!mountedRef.current || !p) return
+          if (!mountedRef.current || !p || !isTabVisible()) return
           try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const stats = (p as any).getPlaybackStats?.()

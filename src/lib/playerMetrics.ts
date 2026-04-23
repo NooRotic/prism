@@ -70,6 +70,16 @@ if (typeof document !== 'undefined') {
   })
 }
 
+/**
+ * Whether the browser tab is currently visible. Players should
+ * check this at the top of their 1Hz metric polling interval and
+ * bail early when false — avoids querying player APIs for metrics
+ * that nobody will see.
+ */
+export function isTabVisible(): boolean {
+  return tabVisible
+}
+
 // ─── Rolling history for sparkline charts ───────────────────────
 // Stores the last HISTORY_SIZE samples (60 = 60 seconds at 1Hz).
 // Each entry holds the values relevant for sparklines. Dropped
