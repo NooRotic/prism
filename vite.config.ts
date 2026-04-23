@@ -7,7 +7,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/prism/',
+  base: '/',
   server: {
     // Fixed port so the Twitch OAuth redirect URI stays stable across runs.
     // strictPort fails loudly if 5000 is taken instead of silently moving to 5001,

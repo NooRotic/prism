@@ -42,8 +42,8 @@ const SCOPES = [
  *      Twitch Developer Console — which is usually the production URL, not
  *      localhost — so the override is required for dev.
  *   2. `window.location.origin + import.meta.env.BASE_URL` as a fallback.
- *      For dev with port 5000: http://localhost:5000/prism/
- *      For prod: https://<user>.github.io/prism/
+ *      For dev with port 5000: http://localhost:5000/
+ *      For prod: https://prism.nooroticx.tv/
  *
  * Must exactly match what's registered in Twitch Developer Console.
  */

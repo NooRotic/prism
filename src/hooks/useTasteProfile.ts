@@ -52,14 +52,31 @@ export function useTasteProfile(
   }, [userId, isAuthenticated, options])
 
   useEffect(() => {
-    if (!userId || !isAuthenticated) {
-      setChannels([])
-      setHasFetched(false)
-      return
-    }
+    if (!userId || !isAuthenticated) return
 
-    fetchFollowed()
-  }, [userId, isAuthenticated, fetchFollowed])
+    let cancelled = false
+
+    getFollowedChannels(userId).then(
+      (data) => {
+        if (cancelled) return
+        setChannels(data)
+        setHasFetched(true)
+      },
+      (err) => {
+        if (cancelled) return
+        if (err instanceof SessionExpiredError) {
+          options?.handleAuthError?.()
+          setError(err.message)
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to fetch followed channels')
+        }
+      },
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId, isAuthenticated, options])
 
   const profile = useMemo<TasteProfile | null>(() => {
     if (!isAuthenticated || !hasFetched) return null
