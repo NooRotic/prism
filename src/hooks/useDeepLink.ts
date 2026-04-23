@@ -28,7 +28,7 @@ const VIEW_TO_PANEL: Record<string, NavPanelId> = {
 
 function getBasePath(): string {
   // Vite's base path — matches vite.config.ts `base`
-  return import.meta.env.BASE_URL || '/twitch-glaze-me/'
+  return import.meta.env.BASE_URL || '/prism/'
 }
 
 /**

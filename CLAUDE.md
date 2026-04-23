@@ -1,4 +1,4 @@
-# Twitch Glaze Me
+# PRISM — Player Routing & Insight for Streaming Media
 
 ## Architecture
 - **Stack**: Vite 6 + React 19 + TypeScript + Tailwind CSS v4
@@ -21,7 +21,7 @@
 - `src/components/player/PlayerHost.tsx` - Video player with fallback chain
 
 ## Design Spec
-Full spec at `docs/superpowers/specs/2026-04-06-twitch-glaze-me-design.md`
+Full spec at `docs/superpowers/specs/2026-04-06-prism-design.md`
 
 ## Windows
 - Use forward slashes in paths
