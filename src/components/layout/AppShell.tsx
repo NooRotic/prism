@@ -31,7 +31,7 @@ function IdleView() {
       <h1 className="animate-reveal animate-reveal-2 text-display font-heading animate-glow"
         style={{ color: 'var(--accent-green)' }}
       >
-        GLAZE ME
+        PRISM
       </h1>
 
       <p

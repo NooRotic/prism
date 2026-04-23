@@ -40,9 +40,9 @@ describe('Header', () => {
     })
   })
 
-  it('renders "GLAZE ME" title', () => {
+  it('renders "PRISM" title', () => {
     renderHeader()
-    expect(screen.getByText('GLAZE ME')).toBeInTheDocument()
+    expect(screen.getByText('PRISM')).toBeInTheDocument()
   })
 
   it('shows "connect twitch" button when not authenticated', () => {

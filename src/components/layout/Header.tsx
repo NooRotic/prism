@@ -32,7 +32,7 @@ export function Header() {
             className="font-heading text-lg select-none"
             style={{ color: 'var(--accent-green)', letterSpacing: '0.15em' }}
           >
-            GLAZE ME
+            PRISM
           </h1>
         </button>
         {isAuthenticated && <HeaderNav />}

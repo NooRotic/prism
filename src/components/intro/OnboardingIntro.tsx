@@ -78,7 +78,7 @@ export function OnboardingIntro({ onComplete, onSkip, onConnectTwitch }: Onboard
       background: 'radial-gradient(ellipse 50% 40% at 50% 40%, rgba(57, 255, 20, 0.08), transparent 70%)',
     }))
 
-    // "GLAZE ME" heading — letter spans for glitch-type effect
+    // "PRISM" heading — letter spans for glitch-type effect
     const headingContainer = add(el('div', {
       position: 'absolute', top: '28%', left: '50%',
       transform: 'translateX(-50%)', whiteSpace: 'nowrap',
@@ -88,7 +88,7 @@ export function OnboardingIntro({ onComplete, onSkip, onConnectTwitch }: Onboard
     }))
 
     const letters: HTMLSpanElement[] = []
-    for (const char of 'GLAZE ME') {
+    for (const char of 'PRISM') {
       const span = document.createElement('span')
       span.textContent = char === ' ' ? '\u00A0' : char
       Object.assign(span.style, {
