@@ -166,7 +166,9 @@ export default function ShaderBackground({
   // Store mutable values in refs so the render loop always sees latest props
   // without needing to restart the animation.
   const propsRef = useRef({ intensity, primaryColor, secondaryColor, speed });
-  propsRef.current = { intensity, primaryColor, secondaryColor, speed };
+  useEffect(() => {
+    propsRef.current = { intensity, primaryColor, secondaryColor, speed };
+  }, [intensity, primaryColor, secondaryColor, speed]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
