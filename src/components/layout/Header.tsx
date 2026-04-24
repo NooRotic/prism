@@ -1,19 +1,21 @@
 import { LogIn, LogOut } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
-import { useApp } from '../../contexts/AppContext'
 import { SmartUrlInput } from '../search/SmartUrlInput'
 import HeaderNav from './HeaderNav'
 
 export function Header() {
   const { isAuthenticated, login, logout } = useTwitchAuth()
-  const { dispatch } = useApp()
+  const location = useLocation()
 
-  const goHome = () => dispatch({ type: 'GO_HOME' })
+  // Only show SmartUrlInput in header when on the hub page
+  // (protocol pages have it in the sidebar)
+  const isHub = location.pathname === '/'
+  const isProtocolListing = ['/twitch', '/youtube', '/hls-dash'].includes(location.pathname)
+  const showHeaderInput = !isHub && !isProtocolListing
 
   return (
     <header
-      // Height bound to --header-height so FollowingPanel can position
-      // itself exactly below the header regardless of padding changes.
       className="flex items-center justify-between px-6 py-3 relative z-40 h-(--header-height)"
       style={{
         borderBottom: '1px solid var(--border)',
@@ -22,11 +24,10 @@ export function Header() {
       }}
     >
       <div className="flex items-center">
-        <button
-          type="button"
-          onClick={goHome}
+        <Link
+          to="/"
           aria-label="Return to home"
-          className="cursor-pointer transition-opacity hover:opacity-80"
+          className="transition-opacity hover:opacity-80"
         >
           <h1
             className="font-heading text-lg select-none"
@@ -34,12 +35,12 @@ export function Header() {
           >
             PRISM
           </h1>
-        </button>
+        </Link>
         {isAuthenticated && <HeaderNav />}
       </div>
 
       <div className="flex items-center gap-3">
-        <SmartUrlInput />
+        {showHeaderInput && <SmartUrlInput />}
 
         {isAuthenticated ? (
           <button

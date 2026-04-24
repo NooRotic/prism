@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search, X } from 'lucide-react'
 import { useApp, type SearchEntry } from '../../contexts/AppContext'
 import {
@@ -17,7 +18,14 @@ function hasUrlChars(text: string): boolean {
   return /[.:/]/.test(text)
 }
 
+/** Extract a YouTube video ID from a URL for routing */
+function extractYoutubeId(url: string): string | null {
+  const m = url.match(/(?:youtu\.be\/|[?&]v=)([a-zA-Z0-9_-]{11})/)
+  return m ? m[1] : null
+}
+
 export function SmartUrlInput() {
+  const navigate = useNavigate()
   const { state, dispatch } = useApp()
   const [inputValue, setInputValue] = useState(state.search.query)
   const [isOpen, setIsOpen] = useState(false)
@@ -80,42 +88,52 @@ export function SmartUrlInput() {
       const query = (value ?? inputValue).trim()
       if (!query) return
 
-      let url: string
-      let det = detectURLType(query)
+      const det = detectURLType(query)
 
       if (det.type === 'unknown' && !hasUrlChars(query)) {
         if (query.includes(' ')) {
           // Multi-word text without URL chars = category/game name
-          // (Twitch channel names cannot contain spaces)
           dispatch({ type: 'OPEN_CATEGORY_PANEL', category: query })
           setIsOpen(false)
           inputRef.current?.blur()
           return
         }
-        // Single word = treat as Twitch channel name
-        url = `https://twitch.tv/${query}`
-        det = detectURLType(url)
-      } else {
-        url = query
+        // Single word = treat as Twitch channel name → route to /twitch/:channel
+        const entry: SearchEntry = { query, type: 'twitch', timestamp: Date.now() }
+        saveSearchEntry(entry)
+        dispatch({ type: 'ADD_HISTORY', entry })
+        dispatch({ type: 'SET_QUERY', query })
+        navigate(`/twitch/${query}`)
+        setIsOpen(false)
+        setSelectedIndex(-1)
+        inputRef.current?.blur()
+        return
       }
 
-      const entry: SearchEntry = {
-        query,
-        type: det.type,
-        timestamp: Date.now(),
-      }
-
-      // Persist to localStorage and app state
+      const url = query
+      const entry: SearchEntry = { query, type: det.type, timestamp: Date.now() }
       saveSearchEntry(entry)
       dispatch({ type: 'ADD_HISTORY', entry })
       dispatch({ type: 'SET_QUERY', query })
-      dispatch({ type: 'PLAY_URL', url, detection: det })
+
+      // Route to the correct protocol page
+      if (det.type === 'twitch' && det.metadata?.channelName) {
+        navigate(`/twitch/${det.metadata.channelName}`)
+      } else if (det.type === 'youtube') {
+        const ytId = extractYoutubeId(url)
+        navigate(ytId ? `/youtube/${ytId}` : `/youtube/${encodeURIComponent(url)}`)
+      } else if (det.type === 'hls' || det.type === 'dash') {
+        navigate(`/hls-dash?url=${encodeURIComponent(url)}`)
+      } else {
+        // Fallback: dispatch PLAY_URL for unknown types (keeps existing behavior)
+        dispatch({ type: 'PLAY_URL', url, detection: det })
+      }
 
       setIsOpen(false)
       setSelectedIndex(-1)
       inputRef.current?.blur()
     },
-    [inputValue, dispatch],
+    [inputValue, dispatch, navigate],
   )
 
   const handleSelectSuggestion = useCallback(

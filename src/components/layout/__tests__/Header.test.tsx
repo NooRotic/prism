@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { AppProvider } from '../../../contexts/AppContext'
 import { Header } from '../Header'
 import { useTwitchAuth } from '../../../hooks/useTwitchAuth'
@@ -22,9 +23,11 @@ const mockedUseTwitchAuth = vi.mocked(useTwitchAuth)
 
 function renderHeader() {
   return render(
-    <AppProvider>
-      <Header />
-    </AppProvider>,
+    <MemoryRouter>
+      <AppProvider>
+        <Header />
+      </AppProvider>
+    </MemoryRouter>,
   )
 }
 
