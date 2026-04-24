@@ -36,7 +36,7 @@ export default function FollowingPanel() {
   // Only run the fetch when the panel is actually opened AND the auth user
   // is loaded. Keeps the API call lazy until the user expresses interest.
   const fetchUserId = isOpen ? authUserId : null
-  const { data, totalCount, liveCount, loading, error } = useFollowedChannels(
+  const { data, totalCount, loadedCount, liveCount, loading, loadingMore, error, cursor, loadMore } = useFollowedChannels(
     fetchUserId,
     fetchOptions,
   )
@@ -86,6 +86,9 @@ export default function FollowingPanel() {
                 {totalCount}
               </span>{' '}
               channels
+              {cursor && (
+                <span style={{ color: 'var(--text-muted)' }}> (showing {loadedCount})</span>
+              )}
               {' · '}
               <span
                 style={{
@@ -232,14 +235,35 @@ export default function FollowingPanel() {
       )}
 
       {!loading && !error && sortedData.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pb-4">
-          {sortedData.map((follow) => (
-            <FollowedChannelCard
-              key={follow.broadcaster_id}
-              follow={follow}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pb-2">
+            {sortedData.map((follow) => (
+              <FollowedChannelCard
+                key={follow.broadcaster_id}
+                follow={follow}
+              />
+            ))}
+          </div>
+          {cursor && (
+            <div className="flex justify-center pb-4">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-colors hover:bg-white/5 disabled:opacity-50"
+                style={{
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                {loadingMore ? (
+                  <Loader2 size={14} className="animate-spin" style={{ color: 'var(--accent-green)' }} />
+                ) : null}
+                {loadingMore ? 'Loading…' : 'Load more channels'}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </SlidedownPanel>
   )

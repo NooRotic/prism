@@ -8,12 +8,10 @@ import type { TwitchFollowedChannel, TwitchStream } from '../types/twitch'
 import type { FollowingSort } from '../contexts/AppContext'
 
 /**
- * Max total follows to fetch via pagination. 400 is enough for most
- * users without ballooning API costs — at 100 per page that's up to
- * 4 sequential /channels/followed calls + up to 4 batched /streams
- * calls for live-state enrichment.
+ * Number of pages to fetch on initial load. 4 pages × 100 per page = 400
+ * follows — same as before, but now we keep the cursor for load-more.
  */
-const MAX_FOLLOWS = 400
+const INITIAL_PAGES = 4
 const PAGE_SIZE = 100
 
 /**
@@ -43,11 +41,16 @@ interface UseFollowedChannelsReturn {
   data: EnrichedFollow[]
   /** Total raw follow count from the API `total` field (not the enriched length). */
   totalCount: number
+  /** Number of follows currently loaded in `data` (may be less than totalCount). */
+  loadedCount: number
   /** Count of currently-live follows in `data`. */
   liveCount: number
   loading: boolean
+  loadingMore: boolean
   error: string | null
+  cursor: string | null
   refetch: () => void
+  loadMore: () => Promise<void>
 }
 
 function enrichFollows(
@@ -146,27 +149,32 @@ export function useFollowedChannels(
   const [rawFollows, setRawFollows] = useState<EnrichedFollow[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [cursor, setCursor] = useState<string | null>(null)
 
   const fetchData = useCallback(
     async (uid: string) => {
       setLoading(true)
       setError(null)
       try {
-        // Paginate through follows until we hit MAX_FOLLOWS or the
-        // cursor runs out. Each iteration is one Helix call.
+        // Paginate through follows for INITIAL_PAGES pages (up to 400 follows).
+        // We keep the cursor so the user can load more later.
         const allFollows: TwitchFollowedChannel[] = []
-        let cursor: string | null = null
+        let pageCursor: string | null = null
+        let pages = 0
         do {
           const page = await getFollowedChannelsPage(
             uid,
             PAGE_SIZE,
-            cursor ?? undefined,
+            pageCursor ?? undefined,
           )
           allFollows.push(...page.data)
-          cursor = page.cursor
-        } while (cursor && allFollows.length < MAX_FOLLOWS)
+          pageCursor = page.cursor
+          pages++
+        } while (pageCursor && pages < INITIAL_PAGES)
 
+        setCursor(pageCursor)
         setTotalCount(allFollows.length)
 
         // Live-state enrichment is also batched — up to 100 user_ids
@@ -213,6 +221,7 @@ export function useFollowedChannels(
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing state on userId transition to null (logout / panel close)
       setRawFollows([])
       setTotalCount(0)
+      setCursor(null)
       return
     }
     fetchData(userId)
@@ -227,12 +236,38 @@ export function useFollowedChannels(
     if (userId) fetchData(userId)
   }, [userId, fetchData])
 
+  const loadMore = useCallback(async () => {
+    if (!userId || !cursor) return
+    setLoadingMore(true)
+    try {
+      const page = await getFollowedChannelsPage(userId, PAGE_SIZE, cursor)
+      setCursor(page.cursor)
+
+      const newIds = page.data.map((f) => f.broadcaster_id)
+      const newStreams = newIds.length > 0 ? await getStreamsByUserIds(newIds) : []
+      const enriched = enrichFollows(page.data, newStreams)
+
+      setRawFollows((prev) => [...prev, ...enriched])
+      setTotalCount((prev) => prev + page.data.length)
+      setLoadingMore(false)
+    } catch (err) {
+      if (err instanceof SessionExpiredError) {
+        options?.handleAuthError?.()
+      }
+      setLoadingMore(false)
+    }
+  }, [userId, cursor, options])
+
   return {
     data: rawFollows,
     totalCount,
+    loadedCount: rawFollows.length,
     liveCount,
     loading,
+    loadingMore,
     error,
+    cursor,
     refetch,
+    loadMore,
   }
 }
