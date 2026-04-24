@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './contexts/AppContext'
 import { Header } from './components/layout/Header'
 import FollowingPanel from './components/layout/FollowingPanel'
 import YourStatsPanel from './components/layout/YourStatsPanel'
 import CategoryPanel from './components/layout/CategoryPanel'
-import ShaderBackground from './components/ui/ShaderBackground'
+import MatrixRainBackground from './components/ui/MatrixRainBackground'
 import { OnboardingIntro } from './components/intro/OnboardingIntro'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
 import { getAuthenticatedUser, SessionExpiredError } from './lib/twitchApi'
@@ -77,9 +77,16 @@ function AppLayout() {
     login()
   }, [login])
 
+  // Per-page matrix rain tuning (Section 3 of design spec)
+  const location = useLocation()
+  const isPlayerPage = /^\/(twitch|youtube|hls-dash)\//.test(location.pathname)
+  const isProtocolPage = ['/twitch', '/youtube', '/hls-dash'].includes(location.pathname)
+  const rainOpacity = isPlayerPage ? 0.03 : isProtocolPage ? 0.08 : 0.07
+  const rainSpeed = isPlayerPage ? 0.5 : 1
+
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)]">
-      <ShaderBackground intensity={0.12} speed={0.25} />
+      <MatrixRainBackground opacity={rainOpacity} speed={rainSpeed} />
 
       {showOnboarding && !isAuthenticated && (
         <OnboardingIntro
