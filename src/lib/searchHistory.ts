@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'glaze_search_history'
+const STORAGE_KEY = 'prism_search_history'
 const MAX_ENTRIES = 20
 
 export interface SearchHistoryEntry {

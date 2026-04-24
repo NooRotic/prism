@@ -288,11 +288,17 @@ export async function getFollowedChannelsPage(
 export async function getBroadcasterSubscriptions(
   broadcasterId: string,
   first: number = 100,
+  after?: string,
 ): Promise<TwitchBroadcasterSubscriptionsResponse> {
+  const params: Record<string, string> = {
+    broadcaster_id: broadcasterId,
+    first: String(first),
+  }
+  if (after) params.after = after
   const data =
     await twitchApiFetch<TwitchBroadcasterSubscriptionsResponse>(
       'subscriptions',
-      { broadcaster_id: broadcasterId, first: String(first) },
+      params,
     )
   return {
     data: data.data ?? [],
@@ -312,16 +318,25 @@ export async function getBroadcasterGoals(
   return data.data ?? []
 }
 
-/** VIP list for the broadcaster. Paginated; this returns the first page. */
+/** VIP list for the broadcaster. Accepts optional cursor for pagination. */
 export async function getBroadcasterVIPs(
   broadcasterId: string,
   first: number = 100,
-): Promise<TwitchVIP[]> {
-  const data = await twitchApiFetch<{ data: TwitchVIP[] }>('channels/vips', {
+  after?: string,
+): Promise<{ data: TwitchVIP[]; cursor: string | null }> {
+  const params: Record<string, string> = {
     broadcaster_id: broadcasterId,
     first: String(first),
-  })
-  return data.data ?? []
+  }
+  if (after) params.after = after
+  const response = await twitchApiFetch<{
+    data: TwitchVIP[]
+    pagination?: { cursor?: string }
+  }>('channels/vips', params)
+  return {
+    data: response.data ?? [],
+    cursor: response.pagination?.cursor ?? null,
+  }
 }
 
 /**
@@ -352,28 +367,46 @@ export async function getHypeTrainEvents(
   return data.data ?? []
 }
 
-/** Poll history (completed + active), newest first. */
+/** Poll history (completed + active), newest first. Accepts optional cursor for pagination. */
 export async function getBroadcasterPolls(
   broadcasterId: string,
   first: number = 20,
-): Promise<TwitchPoll[]> {
-  const data = await twitchApiFetch<{ data: TwitchPoll[] }>('polls', {
+  after?: string,
+): Promise<{ data: TwitchPoll[]; cursor: string | null }> {
+  const params: Record<string, string> = {
     broadcaster_id: broadcasterId,
     first: String(first),
-  })
-  return data.data ?? []
+  }
+  if (after) params.after = after
+  const response = await twitchApiFetch<{
+    data: TwitchPoll[]
+    pagination?: { cursor?: string }
+  }>('polls', params)
+  return {
+    data: response.data ?? [],
+    cursor: response.pagination?.cursor ?? null,
+  }
 }
 
-/** Prediction history (completed + active), newest first. */
+/** Prediction history (completed + active), newest first. Accepts optional cursor for pagination. */
 export async function getBroadcasterPredictions(
   broadcasterId: string,
   first: number = 25,
-): Promise<TwitchPrediction[]> {
-  const data = await twitchApiFetch<{ data: TwitchPrediction[] }>(
-    'predictions',
-    { broadcaster_id: broadcasterId, first: String(first) },
-  )
-  return data.data ?? []
+  after?: string,
+): Promise<{ data: TwitchPrediction[]; cursor: string | null }> {
+  const params: Record<string, string> = {
+    broadcaster_id: broadcasterId,
+    first: String(first),
+  }
+  if (after) params.after = after
+  const response = await twitchApiFetch<{
+    data: TwitchPrediction[]
+    pagination?: { cursor?: string }
+  }>('predictions', params)
+  return {
+    data: response.data ?? [],
+    cursor: response.pagination?.cursor ?? null,
+  }
 }
 
 /**

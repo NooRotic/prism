@@ -16,7 +16,27 @@ import { useDeepLinkRead, useDeepLinkWrite } from './hooks/useDeepLink'
 import { detectURLType } from './lib/urlDetection'
 import { getAuthenticatedUser, SessionExpiredError } from './lib/twitchApi'
 
-const ONBOARDING_SEEN_KEY = 'glaze_onboarding_seen'
+const ONBOARDING_SEEN_KEY = 'prism_onboarding_seen'
+
+function migrateLocalStorageKeys() {
+  if (localStorage.getItem('prism_migrated')) return
+  const keys: [string, string][] = [
+    ['glaze_onboarding_seen', 'prism_onboarding_seen'],
+    ['glaze_following_sort', 'prism_following_sort'],
+    ['glaze_intros_seen', 'prism_intros_seen'],
+    ['glaze_search_history', 'prism_search_history'],
+  ]
+  for (const [oldKey, newKey] of keys) {
+    const value = localStorage.getItem(oldKey)
+    if (value !== null && localStorage.getItem(newKey) === null) {
+      localStorage.setItem(newKey, value)
+      localStorage.removeItem(oldKey)
+    }
+  }
+  localStorage.setItem('prism_migrated', '1')
+}
+
+migrateLocalStorageKeys()
 
 function AppInner() {
   const { state, dispatch } = useApp()

@@ -21,7 +21,7 @@ export type NavPanelId = 'following' | 'your-stats' | 'category'
 
 export type FollowingSort = 'live-first' | 'alpha' | 'viewers'
 
-const FOLLOWING_SORT_STORAGE_KEY = 'glaze_following_sort'
+const FOLLOWING_SORT_STORAGE_KEY = 'prism_following_sort'
 
 function loadFollowingSort(): FollowingSort {
   if (typeof localStorage === 'undefined') return 'live-first'

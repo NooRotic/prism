@@ -57,9 +57,9 @@ describe('searchHistory', () => {
     expect(getSearchHistory()).toEqual([])
   })
 
-  it('persists via localStorage key glaze_search_history', () => {
+  it('persists via localStorage key prism_search_history', () => {
     saveSearchEntry({ query: 'test', type: 'channel', timestamp: 1000 })
-    const raw = localStorage.getItem('glaze_search_history')
+    const raw = localStorage.getItem('prism_search_history')
     expect(raw).not.toBeNull()
     const parsed = JSON.parse(raw!)
     expect(parsed).toHaveLength(1)

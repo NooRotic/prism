@@ -43,7 +43,7 @@ describe('useIntroState', () => {
     expect(result.current.showIntro).toBe(false)
 
     // Check localStorage was updated
-    const stored = JSON.parse(localStorage.getItem('glaze_intros_seen')!)
+    const stored = JSON.parse(localStorage.getItem('prism_intros_seen')!)
     expect(stored['shroud']).toBeDefined()
   })
 
@@ -53,7 +53,7 @@ describe('useIntroState', () => {
     // the user navigates to a channel — even repeat visits — but we
     // still track the seen state so the template can differ from last.
     localStorage.setItem(
-      'glaze_intros_seen',
+      'prism_intros_seen',
       JSON.stringify({ shroud: 'cinematic' }),
     )
 
@@ -94,13 +94,13 @@ describe('useIntroState', () => {
 
     expect(result.current.showIntro).toBe(false)
 
-    const stored = JSON.parse(localStorage.getItem('glaze_intros_seen')!)
+    const stored = JSON.parse(localStorage.getItem('prism_intros_seen')!)
     expect(stored['ninja']).toBeDefined()
   })
 
   it('treats channel names case-insensitively for seen-state lookup', () => {
     localStorage.setItem(
-      'glaze_intros_seen',
+      'prism_intros_seen',
       JSON.stringify({ shroud: 'cinematic' }),
     )
 

@@ -407,13 +407,13 @@ describe('AppContext', () => {
         result.current.dispatch({ type: 'SET_FOLLOWING_SORT', sort: 'viewers' })
       })
       expect(result.current.state.navPanel.followingSort).toBe('viewers')
-      expect(localStorage.getItem('glaze_following_sort')).toBe('viewers')
+      expect(localStorage.getItem('prism_following_sort')).toBe('viewers')
 
       act(() => {
         result.current.dispatch({ type: 'SET_FOLLOWING_SORT', sort: 'alpha' })
       })
       expect(result.current.state.navPanel.followingSort).toBe('alpha')
-      expect(localStorage.getItem('glaze_following_sort')).toBe('alpha')
+      expect(localStorage.getItem('prism_following_sort')).toBe('alpha')
     })
 
     it('GO_HOME closes any open nav panel', () => {
