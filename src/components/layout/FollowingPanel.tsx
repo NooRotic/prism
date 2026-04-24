@@ -5,7 +5,7 @@ import {
   useFollowedChannels,
   sortFollows,
 } from '../../hooks/useFollowedChannels'
-import type { FollowingSort, FollowingSortMode } from '../../contexts/AppContext'
+import type { FollowingSortMode } from '../../contexts/AppContext'
 import FollowedChannelCard from './FollowedChannelCard'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import SlidedownPanel from './SlidedownPanel'

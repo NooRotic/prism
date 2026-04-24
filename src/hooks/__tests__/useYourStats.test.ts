@@ -67,10 +67,10 @@ function installSuccessMocks() {
     points: 150,
   })
   mockedGoals.mockResolvedValue([])
-  mockedVIPs.mockResolvedValue([])
+  mockedVIPs.mockResolvedValue({ data: [], cursor: null })
   mockedHype.mockResolvedValue([])
-  mockedPolls.mockResolvedValue([])
-  mockedPreds.mockResolvedValue([])
+  mockedPolls.mockResolvedValue({ data: [], cursor: null })
+  mockedPreds.mockResolvedValue({ data: [], cursor: null })
   mockedBits.mockResolvedValue([])
 }
 
