@@ -49,12 +49,10 @@ export default function HubPage() {
         </div>
       </div>
 
-      {/* Protocol card grid — Twitch gets 1.2fr (Law 3: asymmetric) */}
+      {/* Protocol card grid — Twitch gets 1.2fr on desktop (Law 3: asymmetric).
+          Stacks to single column on mobile, 2-col on tablet. */}
       <div
-        className="w-full max-w-4xl grid gap-4 relative z-10"
-        style={{
-          gridTemplateColumns: '1.2fr 1fr 1fr',
-        }}
+        className="w-full max-w-4xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[1.2fr_1fr_1fr] gap-4 relative z-10"
       >
         <ProtocolCard protocol="twitch" count={twitchCount} />
         <ProtocolCard protocol="youtube" count={youtubeCount} />
@@ -67,7 +65,7 @@ export default function HubPage() {
       </div>
 
       {/* Subtle hints */}
-      <div className="flex gap-6 mt-2">
+      <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-2">
         {['Clips', 'VODs', 'Stats', 'Emotes', 'Badges'].map((label) => (
           <span
             key={label}

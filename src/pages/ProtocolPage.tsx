@@ -11,7 +11,10 @@ interface ProtocolPageProps {
 }
 
 function ProtocolSidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+  // Collapsed by default on mobile (< md breakpoint)
+  const [collapsed, setCollapsed] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768,
+  )
   const { isAuthenticated, login } = useTwitchAuth()
   const location = useLocation()
 
@@ -166,10 +169,38 @@ export default function ProtocolPage({ protocol }: ProtocolPageProps) {
     protocol === 'hls-dash' ? getHlsDashDemo() : getDemoByProtocol(protocol as 'twitch' | 'youtube')
 
   return (
-    <div className="flex min-h-[calc(100vh-var(--header-height))]">
-      <ProtocolSidebar />
+    <div className="flex flex-col md:flex-row min-h-[calc(100vh-var(--header-height))]">
+      {/* Mobile protocol nav — horizontal tabs visible only on small screens */}
+      <div className="flex md:hidden overflow-x-auto gap-2 px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
+        {([
+          { label: 'Twitch', path: '/twitch', color: PROTOCOL_META.twitch.color },
+          { label: 'YouTube', path: '/youtube', color: PROTOCOL_META.youtube.color },
+          { label: 'HLS/DASH', path: '/hls-dash', color: PROTOCOL_META['hls-dash'].color },
+        ] as const).map((item) => {
+          const isActive = `/${protocol}` === item.path || (protocol === 'hls-dash' && item.path === '/hls-dash')
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className="shrink-0 px-3 py-1.5 rounded text-xs font-mono transition-colors"
+              style={{
+                color: isActive ? '#000' : item.color,
+                backgroundColor: isActive ? item.color : 'transparent',
+                border: `1px solid ${isActive ? item.color : 'var(--border)'}`,
+              }}
+            >
+              {item.label}
+            </Link>
+          )
+        })}
+      </div>
 
-      <div className="flex-1 p-6">
+      {/* Desktop sidebar — hidden on mobile */}
+      <div className="hidden md:block">
+        <ProtocolSidebar />
+      </div>
+
+      <div className="flex-1 p-4 md:p-6">
         {/* Page header */}
         <div className="flex items-center gap-3 mb-6">
           <div

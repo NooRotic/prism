@@ -10,20 +10,16 @@ interface DemoGridProps {
 export function DemoGrid({ entries, columns = 3 }: DemoGridProps) {
   if (entries.length === 0) return null
 
+  // Responsive: 1 col mobile, 2 col tablet, `columns` on desktop
+  const colClass =
+    columns === 2
+      ? 'grid-cols-1 sm:grid-cols-2'
+      : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+
   return (
-    <div
-      className="grid gap-4"
-      style={{
-        gridTemplateColumns: `repeat(${Math.min(columns, entries.length)}, minmax(0, 1fr))`,
-      }}
-    >
+    <div className={`grid gap-4 ${colClass}`}>
       {entries.map((entry) => (
-        <div
-          key={entry.id}
-          style={entry.featured ? { gridColumn: 'span 1' } : undefined}
-        >
-          <DemoCard entry={entry} />
-        </div>
+        <DemoCard key={entry.id} entry={entry} />
       ))}
     </div>
   )
