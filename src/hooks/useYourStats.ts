@@ -31,6 +31,8 @@ export interface SectionState<T> {
   data: T | null
   loading: boolean
   error: string | null
+  cursor: string | null
+  loadingMore: boolean
 }
 
 export interface YourStatsData {
@@ -49,7 +51,7 @@ export interface YourStatsData {
 }
 
 function emptySection<T>(): SectionState<T> {
-  return { data: null, loading: false, error: null }
+  return { data: null, loading: false, error: null, cursor: null, loadingMore: false }
 }
 
 function initialData(): YourStatsData {
@@ -76,6 +78,10 @@ interface UseYourStatsReturn {
   /** True if ALL sections errored (likely a session-wide issue). */
   sessionError: boolean
   refetch: () => void
+  loadMoreSubs: () => Promise<void>
+  loadMoreVIPs: () => Promise<void>
+  loadMorePolls: () => Promise<void>
+  loadMorePredictions: () => Promise<void>
 }
 
 /**
@@ -87,14 +93,15 @@ interface UseYourStatsReturn {
 async function runSection<T>(
   fetcher: () => Promise<T>,
   onSessionExpired: () => void,
+  cursor: string | null = null,
 ): Promise<SectionState<T>> {
   try {
     const data = await fetcher()
-    return { data, loading: false, error: null }
+    return { data, loading: false, error: null, cursor, loadingMore: false }
   } catch (err) {
     if (err instanceof SessionExpiredError) {
       onSessionExpired()
-      return { data: null, loading: false, error: err.message }
+      return { data: null, loading: false, error: err.message, cursor: null, loadingMore: false }
     }
     return {
       data: null,
@@ -103,6 +110,8 @@ async function runSection<T>(
         err instanceof Error
           ? err.message
           : 'Failed to load section',
+      cursor: null,
+      loadingMore: false,
     }
   }
 }
@@ -165,27 +174,47 @@ export function useYourStats(
       )
 
       if (isStreamer) {
+        // Subscribers — inline async block to capture pagination cursor
         promises.push(
-          runSection(
-            () => getBroadcasterSubscriptions(id, 100),
-            authError,
-          ).then((section) =>
-            setStats((prev) => ({
-              ...prev,
-              subscribers:
-                section.data === null
-                  ? { ...section, data: null }
-                  : {
-                      data: {
-                        total: section.data.total,
-                        points: section.data.points,
-                        recent: section.data.data.slice(0, 5),
-                      },
-                      loading: false,
-                      error: null,
-                    },
-            })),
-          ),
+          (async () => {
+            try {
+              const response = await getBroadcasterSubscriptions(id, 100)
+              const cursor = response.pagination?.cursor ?? null
+              setStats((prev) => ({
+                ...prev,
+                subscribers: {
+                  data: {
+                    total: response.total,
+                    points: response.points,
+                    recent: response.data.slice(0, 5),
+                  },
+                  loading: false,
+                  error: null,
+                  cursor,
+                  loadingMore: false,
+                },
+              }))
+            } catch (err) {
+              if (err instanceof SessionExpiredError) {
+                authError()
+                setStats((prev) => ({
+                  ...prev,
+                  subscribers: { data: null, loading: false, error: err.message, cursor: null, loadingMore: false },
+                }))
+              } else {
+                setStats((prev) => ({
+                  ...prev,
+                  subscribers: {
+                    data: null,
+                    loading: false,
+                    error: err instanceof Error ? err.message : 'Failed to load section',
+                    cursor: null,
+                    loadingMore: false,
+                  },
+                }))
+              }
+            }
+          })(),
         )
 
         promises.push(
@@ -194,10 +223,36 @@ export function useYourStats(
           ),
         )
 
+        // VIPs — inline async block to capture pagination cursor
         promises.push(
-          runSection(() => getBroadcasterVIPs(id, 100), authError).then(
-            (section) => setStats((prev) => ({ ...prev, vips: section })),
-          ),
+          (async () => {
+            try {
+              const response = await getBroadcasterVIPs(id, 100)
+              setStats((prev) => ({
+                ...prev,
+                vips: { data: response.data, loading: false, error: null, cursor: response.cursor, loadingMore: false },
+              }))
+            } catch (err) {
+              if (err instanceof SessionExpiredError) {
+                authError()
+                setStats((prev) => ({
+                  ...prev,
+                  vips: { data: null, loading: false, error: err.message, cursor: null, loadingMore: false },
+                }))
+              } else {
+                setStats((prev) => ({
+                  ...prev,
+                  vips: {
+                    data: null,
+                    loading: false,
+                    error: err instanceof Error ? err.message : 'Failed to load section',
+                    cursor: null,
+                    loadingMore: false,
+                  },
+                }))
+              }
+            }
+          })(),
         )
 
         promises.push(
@@ -207,17 +262,68 @@ export function useYourStats(
           ),
         )
 
+        // Polls — inline async block to capture pagination cursor
         promises.push(
-          runSection(() => getBroadcasterPolls(id, 5), authError).then(
-            (section) => setStats((prev) => ({ ...prev, polls: section })),
-          ),
+          (async () => {
+            try {
+              const response = await getBroadcasterPolls(id, 5)
+              setStats((prev) => ({
+                ...prev,
+                polls: { data: response.data, loading: false, error: null, cursor: response.cursor, loadingMore: false },
+              }))
+            } catch (err) {
+              if (err instanceof SessionExpiredError) {
+                authError()
+                setStats((prev) => ({
+                  ...prev,
+                  polls: { data: null, loading: false, error: err.message, cursor: null, loadingMore: false },
+                }))
+              } else {
+                setStats((prev) => ({
+                  ...prev,
+                  polls: {
+                    data: null,
+                    loading: false,
+                    error: err instanceof Error ? err.message : 'Failed to load section',
+                    cursor: null,
+                    loadingMore: false,
+                  },
+                }))
+              }
+            }
+          })(),
         )
 
+        // Predictions — inline async block to capture pagination cursor
         promises.push(
-          runSection(() => getBroadcasterPredictions(id, 5), authError).then(
-            (section) =>
-              setStats((prev) => ({ ...prev, predictions: section })),
-          ),
+          (async () => {
+            try {
+              const response = await getBroadcasterPredictions(id, 5)
+              setStats((prev) => ({
+                ...prev,
+                predictions: { data: response.data, loading: false, error: null, cursor: response.cursor, loadingMore: false },
+              }))
+            } catch (err) {
+              if (err instanceof SessionExpiredError) {
+                authError()
+                setStats((prev) => ({
+                  ...prev,
+                  predictions: { data: null, loading: false, error: err.message, cursor: null, loadingMore: false },
+                }))
+              } else {
+                setStats((prev) => ({
+                  ...prev,
+                  predictions: {
+                    data: null,
+                    loading: false,
+                    error: err instanceof Error ? err.message : 'Failed to load section',
+                    cursor: null,
+                    loadingMore: false,
+                  },
+                }))
+              }
+            }
+          })(),
         )
 
         promises.push(
@@ -233,6 +339,95 @@ export function useYourStats(
     // it satisfies exhaustive-deps without triggering rebuilds.
     [isStreamer, cb],
   )
+
+  const loadMoreSubs = useCallback(async () => {
+    if (!broadcasterId) return
+    const currentCursor = stats.subscribers.cursor
+    if (!currentCursor) return
+    setStats((prev) => ({ ...prev, subscribers: { ...prev.subscribers, loadingMore: true } }))
+    try {
+      const response = await getBroadcasterSubscriptions(broadcasterId, 100, currentCursor)
+      setStats((prev) => ({
+        ...prev,
+        subscribers: {
+          ...prev.subscribers,
+          data: prev.subscribers.data
+            ? {
+                ...prev.subscribers.data,
+                recent: [...prev.subscribers.data.recent, ...response.data],
+              }
+            : { total: response.total, points: response.points, recent: response.data },
+          cursor: response.pagination?.cursor ?? null,
+          loadingMore: false,
+        },
+      }))
+    } catch {
+      setStats((prev) => ({ ...prev, subscribers: { ...prev.subscribers, loadingMore: false } }))
+    }
+  }, [broadcasterId, stats.subscribers.cursor])
+
+  const loadMoreVIPs = useCallback(async () => {
+    if (!broadcasterId) return
+    const currentCursor = stats.vips.cursor
+    if (!currentCursor) return
+    setStats((prev) => ({ ...prev, vips: { ...prev.vips, loadingMore: true } }))
+    try {
+      const response = await getBroadcasterVIPs(broadcasterId, 100, currentCursor)
+      setStats((prev) => ({
+        ...prev,
+        vips: {
+          ...prev.vips,
+          data: prev.vips.data ? [...prev.vips.data, ...response.data] : response.data,
+          cursor: response.cursor ?? null,
+          loadingMore: false,
+        },
+      }))
+    } catch {
+      setStats((prev) => ({ ...prev, vips: { ...prev.vips, loadingMore: false } }))
+    }
+  }, [broadcasterId, stats.vips.cursor])
+
+  const loadMorePolls = useCallback(async () => {
+    if (!broadcasterId) return
+    const currentCursor = stats.polls.cursor
+    if (!currentCursor) return
+    setStats((prev) => ({ ...prev, polls: { ...prev.polls, loadingMore: true } }))
+    try {
+      const response = await getBroadcasterPolls(broadcasterId, 5, currentCursor)
+      setStats((prev) => ({
+        ...prev,
+        polls: {
+          ...prev.polls,
+          data: prev.polls.data ? [...prev.polls.data, ...response.data] : response.data,
+          cursor: response.cursor ?? null,
+          loadingMore: false,
+        },
+      }))
+    } catch {
+      setStats((prev) => ({ ...prev, polls: { ...prev.polls, loadingMore: false } }))
+    }
+  }, [broadcasterId, stats.polls.cursor])
+
+  const loadMorePredictions = useCallback(async () => {
+    if (!broadcasterId) return
+    const currentCursor = stats.predictions.cursor
+    if (!currentCursor) return
+    setStats((prev) => ({ ...prev, predictions: { ...prev.predictions, loadingMore: true } }))
+    try {
+      const response = await getBroadcasterPredictions(broadcasterId, 5, currentCursor)
+      setStats((prev) => ({
+        ...prev,
+        predictions: {
+          ...prev.predictions,
+          data: prev.predictions.data ? [...prev.predictions.data, ...response.data] : response.data,
+          cursor: response.cursor ?? null,
+          loadingMore: false,
+        },
+      }))
+    } catch {
+      setStats((prev) => ({ ...prev, predictions: { ...prev.predictions, loadingMore: false } }))
+    }
+  }, [broadcasterId, stats.predictions.cursor])
 
   useEffect(() => {
     if (!broadcasterId) {
@@ -266,5 +461,5 @@ export function useYourStats(
       (section) => (section as SectionState<unknown>).error !== null,
     )
 
-  return { stats, loading, sessionError, refetch }
+  return { stats, loading, sessionError, refetch, loadMoreSubs, loadMoreVIPs, loadMorePolls, loadMorePredictions }
 }
