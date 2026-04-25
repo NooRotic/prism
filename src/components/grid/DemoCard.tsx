@@ -40,13 +40,13 @@ export function DemoCard({ entry }: { entry: DemoEntry }) {
       <div
         className="w-full aspect-video rounded-t flex items-center justify-center"
         style={{
-          backgroundColor: 'rgba(255,255,255,0.03)',
+          backgroundColor: 'rgba(255,255,255,0.05)',
           borderBottom: `1px solid var(--border)`,
           borderRadius: '4px 4px 0 0',
         }}
       >
         <span
-          className="text-xs font-mono uppercase tracking-widest opacity-40 group-hover:opacity-70 transition-opacity"
+          className="text-xs font-mono uppercase tracking-widest opacity-60 group-hover:opacity-90 transition-opacity"
           style={{ color: accent }}
         >
           {entry.protocol}
@@ -62,13 +62,13 @@ export function DemoCard({ entry }: { entry: DemoEntry }) {
           {entry.label}
         </span>
         {entry.description && (
-          <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
             {entry.description}
           </span>
         )}
         <span
           className="text-[10px] font-mono uppercase tracking-wider mt-1"
-          style={{ color: accent, opacity: 0.7 }}
+          style={{ color: accent, opacity: 0.85 }}
         >
           {entry.protocol === 'hls' ? 'HLS' : entry.protocol === 'dash' ? 'DASH' : entry.protocol}
         </span>

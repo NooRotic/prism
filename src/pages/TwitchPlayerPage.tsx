@@ -52,7 +52,7 @@ export default function TwitchPlayerPage() {
       {/* Top row: Player + ProfileSidebar */}
       <div className="flex flex-col md:flex-row gap-4 w-full max-w-[1600px] mx-auto">
         <div
-          className="w-full md:w-[70%] aspect-video rounded-lg"
+          className="w-full md:w-[70%] aspect-video rounded-lg relative overflow-hidden"
           style={{
             backgroundColor: 'var(--bg-card)',
             border: '1px solid var(--border)',
