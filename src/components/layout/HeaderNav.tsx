@@ -96,7 +96,7 @@ export default function HeaderNav() {
         >
           Browse
         </button>
-        <ChannelSearchDropdown open={browseOpen} onClose={closeBrowse} />
+        {browseOpen && <ChannelSearchDropdown open onClose={closeBrowse} />}
       </div>
     </nav>
   )

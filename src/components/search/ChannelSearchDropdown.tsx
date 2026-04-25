@@ -27,13 +27,9 @@ export default function ChannelSearchDropdown({ open, onClose }: ChannelSearchDr
 
   // Focus input when opened
   useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 50)
-    } else {
-      setQuery('')
-      setResults([])
-      setSelectedIndex(-1)
-    }
+    if (!open) return
+    const id = setTimeout(() => inputRef.current?.focus(), 50)
+    return () => clearTimeout(id)
   }, [open])
 
   // Click-outside dismissal
