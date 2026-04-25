@@ -1,21 +1,20 @@
 import { useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X, Loader2, ExternalLink, Eye, Heart, RefreshCw } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useCategoryStreams } from '../../hooks/useCategoryStreams'
 import type { EnrichedCategoryStream } from '../../hooks/useCategoryStreams'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
-import { detectURLType } from '../../lib/urlDetection'
 import SlidedownPanel from './SlidedownPanel'
 
 function StreamCard({ stream }: { stream: EnrichedCategoryStream }) {
   const { dispatch } = useApp()
+  const navigate = useNavigate()
 
   const handleClick = useCallback(() => {
-    const url = `https://twitch.tv/${stream.user_login}`
-    const detection = detectURLType(url)
-    dispatch({ type: 'PLAY_URL', url, detection })
+    navigate(`/twitch/${stream.user_login}`)
     dispatch({ type: 'CLOSE_NAV_PANEL' })
-  }, [dispatch, stream.user_login])
+  }, [dispatch, navigate, stream.user_login])
 
   const thumbnailUrl = stream.thumbnail_url
     ? stream.thumbnail_url
