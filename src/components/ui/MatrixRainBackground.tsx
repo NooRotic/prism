@@ -3,6 +3,9 @@ import { useEffect, useRef } from 'react'
 // Characters used in the rain — katakana-inspired + digits + symbols
 const CHARS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789PRISM'
 
+// Number of characters in each column's visible trail
+const TRAIL_LENGTH = 12
+
 interface MatrixRainProps {
   /** Overall opacity (0-1). Default 0.07 */
   opacity?: number
@@ -12,6 +15,13 @@ interface MatrixRainProps {
   speed?: number
   /** Rain color. Default #39FF14 (PRISM accent green) */
   color?: string
+}
+
+interface ColumnState {
+  /** Current head position (in character rows) */
+  pos: number
+  /** Fixed characters for the trail so they don't flicker */
+  chars: string[]
 }
 
 export default function MatrixRainBackground({
@@ -39,8 +49,16 @@ export default function MatrixRainBackground({
     if (!ctx) return
 
     let rafId = 0
-    let columns: number[] = []
+    let columns: ColumnState[] = []
     let fontSize = 14
+
+    function randomChar(): string {
+      return CHARS[Math.floor(Math.random() * CHARS.length)]
+    }
+
+    function initTrail(): string[] {
+      return Array.from({ length: TRAIL_LENGTH }, () => randomChar())
+    }
 
     function resize() {
       if (!canvas) return
@@ -49,20 +67,22 @@ export default function MatrixRainBackground({
       canvas.height = Math.round(canvas.clientHeight * dpr)
       fontSize = 14 * dpr
 
-      // Initialize column drop positions
       const p = propsRef.current
       const gap = p.columnGap * dpr
       const numCols = Math.ceil(canvas.width / gap)
-      columns = Array.from({ length: numCols }, () =>
-        Math.random() * canvas.height / fontSize,
-      )
+      const maxRows = Math.ceil(canvas.height / fontSize)
+
+      columns = Array.from({ length: numCols }, () => ({
+        pos: Math.floor(Math.random() * maxRows),
+        chars: initTrail(),
+      }))
     }
 
     resize()
     window.addEventListener('resize', resize)
 
     let lastTime = 0
-    const interval = 50 // ms between frames (~20fps for rain feel)
+    const interval = 50 // ~20fps
 
     function frame(time: number) {
       rafId = requestAnimationFrame(frame)
@@ -75,30 +95,43 @@ export default function MatrixRainBackground({
       const p = propsRef.current
       const dpr = Math.min(window.devicePixelRatio, 2)
       const gap = p.columnGap * dpr
+      const maxRows = Math.ceil(canvas.height / fontSize)
 
-      // Fade existing content — creates the trail effect
-      ctx.fillStyle = `rgba(0, 0, 0, 0.05)`
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      // Clear fully — no accumulation
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      // Draw characters
-      ctx.fillStyle = p.color
       ctx.font = `${fontSize}px monospace`
-      ctx.globalAlpha = p.opacity
 
       for (let i = 0; i < columns.length; i++) {
-        const char = CHARS[Math.floor(Math.random() * CHARS.length)]
+        const col = columns[i]
         const x = i * gap
-        const y = columns[i] * fontSize
 
-        // Brighter leading character
-        ctx.globalAlpha = p.opacity * 2.5
-        ctx.fillText(char, x, y)
+        // Draw trail: each character fades based on distance from head
+        for (let t = 0; t < TRAIL_LENGTH; t++) {
+          const row = col.pos - t
+          if (row < 0 || row >= maxRows) continue
 
-        // Randomly reset column to top when it goes off screen
-        if (y > canvas.height && Math.random() > 0.975) {
-          columns[i] = 0
+          const y = (row + 1) * fontSize
+
+          // Head character is brightest, tail fades out
+          const fade = 1 - t / TRAIL_LENGTH
+          ctx.globalAlpha = p.opacity * fade * (t === 0 ? 2.5 : 1)
+          ctx.fillStyle = p.color
+          ctx.fillText(col.chars[t % col.chars.length], x, y)
         }
-        columns[i]++
+
+        // Advance column
+        col.pos++
+
+        // Push a new random char into the trail head
+        col.chars.pop()
+        col.chars.unshift(randomChar())
+
+        // Reset when the entire trail has scrolled off screen
+        if (col.pos - TRAIL_LENGTH > maxRows && Math.random() > 0.95) {
+          col.pos = 0
+          col.chars = initTrail()
+        }
       }
 
       ctx.globalAlpha = 1
@@ -106,7 +139,6 @@ export default function MatrixRainBackground({
 
     rafId = requestAnimationFrame(frame)
 
-    // Listen for motion preference changes
     function onMotionChange(e: MediaQueryListEvent) {
       if (e.matches) {
         cancelAnimationFrame(rafId)
