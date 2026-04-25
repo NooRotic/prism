@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
-import { detectURLType } from '../../lib/urlDetection'
 import type { EnrichedFollow } from '../../hooks/useFollowedChannels'
 
 interface FollowedChannelCardProps {
@@ -10,14 +10,14 @@ interface FollowedChannelCardProps {
 
 export default function FollowedChannelCard({ follow }: FollowedChannelCardProps) {
   const { dispatch } = useApp()
+  const navigate = useNavigate()
 
   const handleClick = useCallback(() => {
-    const url = `https://twitch.tv/${follow.broadcaster_login}`
-    const detection = detectURLType(url)
-    dispatch({ type: 'PLAY_URL', url, detection })
-    // Close the panel so the user lands on the channel view
+    // Navigate to the channel route so the entire page updates
+    // (player, sidebar, stats, clips, VODs — all driven by route param)
+    navigate(`/twitch/${follow.broadcaster_login}`)
     dispatch({ type: 'CLOSE_NAV_PANEL' })
-  }, [dispatch, follow.broadcaster_login])
+  }, [dispatch, navigate, follow.broadcaster_login])
 
   const thumbnail =
     follow.isLive && follow.thumbnailUrl
