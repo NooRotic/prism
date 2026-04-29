@@ -18,6 +18,11 @@ export interface YouTubeSearchResult {
   thumbnail: string
 }
 
+export interface YouTubePagedResult<T> {
+  videos: T[]
+  nextPageToken: string | null
+}
+
 function assertKey(): string {
   if (!API_KEY) throw new Error('VITE_YOUTUBE_API_KEY is not set')
   return API_KEY
@@ -27,7 +32,8 @@ function assertKey(): string {
 export async function getPopularVideos(
   maxResults = 12,
   regionCode = 'US',
-): Promise<YouTubeVideo[]> {
+  pageToken?: string,
+): Promise<YouTubePagedResult<YouTubeVideo>> {
   const key = assertKey()
   const params = new URLSearchParams({
     part: 'snippet,statistics',
@@ -36,17 +42,19 @@ export async function getPopularVideos(
     regionCode,
     key,
   })
+  if (pageToken) params.set('pageToken', pageToken)
   const res = await fetch(`${BASE}/videos?${params}`)
   if (!res.ok) throw new Error(`YouTube API error: ${res.status}`)
   const data = await res.json()
-  return (data.items ?? []).map(mapVideo)
+  return { videos: (data.items ?? []).map(mapVideo), nextPageToken: data.nextPageToken ?? null }
 }
 
 /** Search videos (100 quota units per call — use sparingly) */
 export async function searchYouTubeVideos(
   query: string,
   maxResults = 8,
-): Promise<YouTubeSearchResult[]> {
+  pageToken?: string,
+): Promise<YouTubePagedResult<YouTubeSearchResult>> {
   const key = assertKey()
   const params = new URLSearchParams({
     part: 'snippet',
@@ -55,10 +63,11 @@ export async function searchYouTubeVideos(
     maxResults: String(maxResults),
     key,
   })
+  if (pageToken) params.set('pageToken', pageToken)
   const res = await fetch(`${BASE}/search?${params}`)
   if (!res.ok) throw new Error(`YouTube API error: ${res.status}`)
   const data = await res.json()
-  return (data.items ?? []).map(mapSearchResult)
+  return { videos: (data.items ?? []).map(mapSearchResult), nextPageToken: data.nextPageToken ?? null }
 }
 
 /** Get details for specific video IDs (1 quota unit) */

@@ -19,11 +19,6 @@ export const DEMO_CONTENT: DemoEntry[] = [
   { id: 'kaicenat', label: 'Kai Cenat', protocol: 'twitch', url: 'kaicenat', featured: true, description: 'Entertainment & IRL' },
   { id: 'shroud', label: 'shroud', protocol: 'twitch', url: 'shroud', description: 'FPS & Competitive' },
 
-  // YouTube — hardcoded video IDs
-  { id: 'yt-1', label: 'YouTube Demo 1', protocol: 'youtube', url: 'https://youtu.be/RBuinr1g8h4', featured: true },
-  { id: 'yt-2', label: 'YouTube Demo 2', protocol: 'youtube', url: 'https://www.youtube.com/watch?v=9JykA28EoTg' },
-  { id: 'yt-3', label: 'YouTube Demo 3', protocol: 'youtube', url: 'https://www.youtube.com/watch?v=fQGbXmkSArs' },
-
   // HLS — public test streams (always available)
   { id: 'apple-basic', label: 'Apple HLS Basic', protocol: 'hls', url: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8', description: '16:9 multi-bitrate' },
   { id: 'apple-4k', label: 'Apple 4K HEVC', protocol: 'hls', url: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/main.m3u8', featured: true, description: 'Dolby Vision + Atmos' },

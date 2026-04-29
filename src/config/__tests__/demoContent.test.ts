@@ -8,10 +8,9 @@ import {
 
 describe('demoContent', () => {
   describe('DEMO_CONTENT', () => {
-    it('has entries for all four protocols', () => {
+    it('has entries for all static protocols', () => {
       const protocols = new Set(DEMO_CONTENT.map((e) => e.protocol))
       expect(protocols).toContain('twitch')
-      expect(protocols).toContain('youtube')
       expect(protocols).toContain('hls')
       expect(protocols).toContain('dash')
     })
@@ -42,10 +41,9 @@ describe('demoContent', () => {
       expect(entries.every((e) => e.protocol === 'twitch')).toBe(true)
     })
 
-    it('returns only youtube entries for youtube', () => {
+    it('returns empty array for youtube (live API replaces demo entries)', () => {
       const entries = getDemoByProtocol('youtube')
-      expect(entries.length).toBeGreaterThan(0)
-      expect(entries.every((e) => e.protocol === 'youtube')).toBe(true)
+      expect(entries.length).toBe(0)
     })
   })
 
