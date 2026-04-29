@@ -18,6 +18,23 @@ export type PlayerEngine =
   | 'reactplayer'
   | 'fallback'
 
+const YOUTUBE_ID_PATTERNS: Array<{ regex: RegExp; idGroup: number }> = [
+  { regex: /youtube\.com\/watch\?.*v=([^&]+)/, idGroup: 1 },
+  { regex: /youtu\.be\/([^?/]+)/, idGroup: 1 },
+  { regex: /youtube\.com\/live\/([^?/]+)/, idGroup: 1 },
+  { regex: /youtube\.com\/shorts\/([^?/]+)/, idGroup: 1 },
+]
+
+export function extractYouTubeVideoId(url: string): string | null {
+  for (const { regex, idGroup } of YOUTUBE_ID_PATTERNS) {
+    const match = url.match(regex)
+    if (match) {
+      return match[idGroup]
+    }
+  }
+  return null
+}
+
 export function detectURLType(url: string): URLDetectionResult {
   if (!url || typeof url !== 'string') {
     return { type: 'unknown', originalUrl: url || '' }
@@ -30,7 +47,8 @@ export function detectURLType(url: string): URLDetectionResult {
   }
 
   if (isYouTubeURL(cleanUrl)) {
-    return { type: 'youtube', originalUrl: url, playableUrl: url }
+    const videoId = extractYouTubeVideoId(url)
+    return { type: 'youtube', originalUrl: url, playableUrl: url, metadata: videoId ? { videoId } : undefined }
   }
 
   if (cleanUrl.includes('.m3u8') || cleanUrl.includes('m3u8')) {
