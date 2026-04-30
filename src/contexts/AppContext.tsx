@@ -120,7 +120,6 @@ type Action =
   | { type: 'PLAY_URL'; url: string; detection: URLDetectionResult }
   | { type: 'SET_ENGINE'; engine: PlayerEngine; fallbackStep: number }
   | { type: 'TOGGLE_DEBUG' }
-  | { type: 'SET_DISPLAY_MODE'; mode: AppState['displayMode'] }
   | { type: 'CLEAR_ERROR' }
   | { type: 'GO_HOME' }
   | { type: 'OPEN_NAV_PANEL'; panel: NavPanelId }
@@ -247,8 +246,6 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         player: { ...state.player, debugMode: !state.player.debugMode },
       }
-    case 'SET_DISPLAY_MODE':
-      return { ...state, displayMode: action.mode }
     case 'CLEAR_ERROR':
       return { ...state, error: null }
     case 'GO_HOME':

@@ -1,5 +1,4 @@
 export { useCallbackRefs } from './useCallbackRefs'
-export { useDeepLinkRead, useDeepLinkWrite } from './useDeepLink'
 export { useCategoryStreams } from './useCategoryStreams'
 export type { EnrichedCategoryStream } from './useCategoryStreams'
 export { useChannelData } from './useChannelData'
