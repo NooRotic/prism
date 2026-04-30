@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 512 512"
+   width="512"
+   height="512"
+   version="1.1"
+   id="svg7"
+   sodipodi:docname="prism-icon.svg"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.57324219"
+     inkscape:cx="129.09029"
+     inkscape:cy="849.55366"
+     inkscape:window-width="2560"
+     inkscape:window-height="1476"
+     inkscape:window-x="-12"
+     inkscape:window-y="191"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg7" />
+  <defs
+     id="defs5">
+    <filter
+       id="glow"
+       x="-0.052319808"
+       y="-0.041437928"
+       width="1.1046396"
+       height="1.0828759">
+      <feGaussianBlur
+         stdDeviation="6"
+         result="blur"
+         id="feGaussianBlur1" />
+      <feMerge
+         id="feMerge2">
+        <feMergeNode
+           in="blur"
+           id="feMergeNode1" />
+        <feMergeNode
+           in="SourceGraphic"
+           id="feMergeNode2" />
+      </feMerge>
+    </filter>
+    <linearGradient
+       id="docFill"
+       x1="0"
+       y1="0"
+       x2="0"
+       y2="1">
+      <stop
+         offset="0%"
+         stop-color="#0c0c14"
+         id="stop2" />
+      <stop
+         offset="100%"
+         stop-color="#050507"
+         id="stop3" />
+    </linearGradient>
+    <linearGradient
+       id="cornerFill"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="1">
+      <stop
+         offset="0%"
+         stop-color="#39FF14"
+         id="stop4" />
+      <stop
+         offset="100%"
+         stop-color="#28bb0e"
+         id="stop5" />
+    </linearGradient>
+  </defs>
+  <!-- Document body -->
+  <path
+     d="m 72,0 h 280 l 88,88 v 392 q 0,32 -32,32 H 104 q -32,0 -32,-32 z"
+     fill="url(#docFill)"
+     stroke="#39ff14"
+     stroke-width="3"
+     id="path5"
+     style="display:inline" />
+  <!-- Folded corner -->
+  <path
+     d="M352 0 L352 88 L440 88 Z"
+     fill="url(#cornerFill)"
+     opacity="0.9"
+     id="path6" />
+  <!--
+    Flash-style "P" — filled shape, heavy italic slant (~20 deg)
+    All corners use cubic beziers — zero sharp 90-degree points.
+    Bowl underside and top-left entry are smooth organic curves.
+    Bottom tail swoops left with the signature Flash swirl.
+  -->
+  <!-- "PRISM" text at bottom -->
+  <g
+     inkscape:groupmode="layer"
+     id="layer1"
+     inkscape:label="star">
+    <path
+       sodipodi:type="star"
+       style="display:inline;fill:#ff0000"
+       id="path8"
+       inkscape:flatsided="false"
+       sodipodi:sides="8"
+       sodipodi:cx="184.71989"
+       sodipodi:cy="114.71753"
+       sodipodi:r1="103.4289"
+       sodipodi:r2="51.714451"
+       sodipodi:arg1="1.0042958"
+       sodipodi:arg2="1.3969949"
+       inkscape:rounded="0"
+       inkscape:randomized="0"
+       d="m 240.22838,201.98921 -46.56562,-36.33633 -31.40283,50.02547 -7.23321,-58.62053 -57.578503,13.1682 36.336333,-46.56563 -50.025477,-31.402829 58.620537,-7.233202 -13.1682,-57.578507 46.56562,36.33633 31.40283,-50.025474 7.2332,58.620532 57.57851,-13.168196 -36.33633,46.565626 50.02548,31.40283 -58.62054,7.2332 z"
+       inkscape:transform-center-x="-1.2711051"
+       inkscape:transform-center-y="-4.8740472"
+       transform="matrix(0.64374927,0,0,0.61079765,51.168242,27.670556)"
+       inkscape:label="path8" />
+  </g>
+  <g
+     filter="url(#glow)"
+     transform="matrix(0.67939896,0,-0.16939318,0.67939896,104.02787,82.196955)"
+     id="g7"
+     style="display:inline;mix-blend-mode:normal">
+    <path
+       d="m 281.45149,77.716312 c 87.18792,-4.228828 102.2374,-1.664882 111.44249,4.15932 44.22514,27.981908 36.47777,101.278508 28.58295,134.383978 -19.45878,81.59673 -143.55748,50.93352 -144.71526,55.03927 l -14.03938,49.7868 c -16.45102,58.33902 -20.3069,120.44425 -98.94975,96.94258 L 152.3424,365.39025 C 285.03891,393.82755 233.27759,81.51826 281.45149,77.716312 Z m -2.97856,152.076838 c 0.0939,0.82402 11.6686,8.73011 48.39598,5.79832 74.10349,-5.91537 66.1474,-25.08948 71.90305,-70.27116 5.61282,-44.06051 -14.80058,-63.37162 -95.25069,-56.82741 -22.48343,1.82891 -11.91446,49.41815 -25.04834,121.30025 z"
+       fill="#39ff14"
+       fill-rule="evenodd"
+       id="path7"
+       sodipodi:nodetypes="cssssccccsssc"
+       style="stroke-width:1.06014" />
+  </g>
+  <text
+     x="256"
+     y="462"
+     text-anchor="middle"
+     font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+     font-weight="900"
+     font-size="72px"
+     letter-spacing="6"
+     fill="#ffffff"
+     id="text7"
+     sodipodi:insensitive="true"
+     style="display:inline;mix-blend-mode:normal"
+     inkscape:label="PRISM">PRISM</text>
+</svg>
