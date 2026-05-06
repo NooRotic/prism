@@ -33,7 +33,11 @@ export default function YoutubePlayerPage() {
       .then((vids) => {
         if (!cancelled && vids.length > 0) setVideoMeta(vids[0])
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (!cancelled) {
+          console.warn('[YoutubePlayerPage] failed to fetch video metadata:', err)
+        }
+      })
     return () => { cancelled = true }
   }, [videoId])
 

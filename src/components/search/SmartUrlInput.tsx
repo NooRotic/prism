@@ -4,6 +4,7 @@ import { Search, X } from 'lucide-react'
 import { useApp, type SearchEntry } from '../../contexts/AppContext'
 import {
   detectURLType,
+  extractYouTubeVideoId,
   getSourceColor,
   getURLTypeDisplayName,
 } from '../../lib/urlDetection'
@@ -16,12 +17,6 @@ import { QuickLinks } from './QuickLinks'
 
 function hasUrlChars(text: string): boolean {
   return /[.:/]/.test(text)
-}
-
-/** Extract a YouTube video ID from a URL for routing */
-function extractYoutubeId(url: string): string | null {
-  const m = url.match(/(?:youtu\.be\/|[?&]v=)([a-zA-Z0-9_-]{11})/)
-  return m ? m[1] : null
 }
 
 export function SmartUrlInput() {
@@ -120,7 +115,7 @@ export function SmartUrlInput() {
       if (det.type === 'twitch' && det.metadata?.channelName) {
         navigate(`/twitch/${det.metadata.channelName}`)
       } else if (det.type === 'youtube') {
-        const ytId = extractYoutubeId(url)
+        const ytId = det.metadata?.videoId ?? extractYouTubeVideoId(url)
         navigate(ytId ? `/youtube/${ytId}` : `/youtube/${encodeURIComponent(url)}`)
       } else if (det.type === 'hls' || det.type === 'dash') {
         navigate(`/hls-dash?url=${encodeURIComponent(url)}`)

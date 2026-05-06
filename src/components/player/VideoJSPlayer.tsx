@@ -83,7 +83,18 @@ export default function VideoJSPlayer({
       readyFired = true
       clearTimeout(loadTimeout)
       cb.current.onReady?.()
-      player.play()?.catch(() => {})
+      player.play()?.catch((err: Error) => {
+        // AbortError fires when play() is interrupted by another action
+        // (e.g. switching streams) — that's intentional, ignore.
+        if (err.name === 'AbortError') return
+        // NotAllowedError = browser blocked autoplay; surface so the
+        // user knows they need to interact to start playback.
+        if (err.name === 'NotAllowedError') {
+          cb.current.onPlaybackBlocked?.()
+          return
+        }
+        console.warn('[VideoJSPlayer] play() rejected:', err)
+      })
     })
 
     player.on('play', () => cb.current.onPlay?.())
