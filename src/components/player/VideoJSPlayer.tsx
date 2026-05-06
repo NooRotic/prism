@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import videojs from 'video.js'
 import 'video.js/dist/video-js.css'
 import type { PlayerProps } from '../../types/player'
+import type { VideoJsPlayerInternals } from '../../types/player-sdk'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
 import { logger } from '../../lib/logger'
@@ -126,12 +127,10 @@ export default function VideoJSPlayer({
     const metricsInterval = window.setInterval(() => {
       if (!player || player.isDisposed() || !isTabVisible()) return
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const tech = (player as any).tech?.({ IWillNotUseThisInPlugins: true })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vhs = tech?.vhs as any
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vidEl = (player as any).el?.()?.querySelector('video') as
+        const internals = player as unknown as VideoJsPlayerInternals
+        const tech = internals.tech?.({ IWillNotUseThisInPlugins: true })
+        const vhs = tech?.vhs
+        const vidEl = internals.el?.()?.querySelector('video') as
           | HTMLVideoElement
           | undefined
 
@@ -150,8 +149,7 @@ export default function VideoJSPlayer({
         let droppedFrames: number | null = null
         if (vidEl && 'getVideoPlaybackQuality' in vidEl) {
           try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            droppedFrames = (vidEl as any).getVideoPlaybackQuality().droppedVideoFrames
+            droppedFrames = vidEl.getVideoPlaybackQuality().droppedVideoFrames
           } catch { /* ignore */ }
         }
 
