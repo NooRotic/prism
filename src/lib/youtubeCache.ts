@@ -1,5 +1,6 @@
 import type { YouTubeVideo } from './youtubeApi'
 import { STORAGE_KEYS } from '../config/storageKeys'
+import { logger } from './logger'
 
 export interface CachedYouTubeResults {
   videos: YouTubeVideo[]
@@ -28,7 +29,7 @@ export function setCachedResults(categoryId: string, data: CachedYouTubeResults)
     localStorage.setItem(`${CACHE_KEY_PREFIX}${categoryId}`, JSON.stringify(data))
   } catch (err) {
     if (err instanceof DOMException && err.name === 'QuotaExceededError') {
-      console.warn('[youtubeCache] localStorage quota exceeded — skipping cache write for', categoryId)
+      logger.warn('[youtubeCache] localStorage quota exceeded — skipping cache write for', categoryId)
     }
   }
 }
@@ -49,7 +50,7 @@ export function appendCachedPage(
     localStorage.setItem(`${CACHE_KEY_PREFIX}${categoryId}`, JSON.stringify(updated))
   } catch (err) {
     if (err instanceof DOMException && err.name === 'QuotaExceededError') {
-      console.warn('[youtubeCache] localStorage quota exceeded — skipping cache append for', categoryId)
+      logger.warn('[youtubeCache] localStorage quota exceeded — skipping cache append for', categoryId)
     }
   }
 }

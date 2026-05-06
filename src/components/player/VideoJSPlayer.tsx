@@ -4,6 +4,7 @@ import 'video.js/dist/video-js.css'
 import type { PlayerProps } from '../../types/player'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
+import { logger } from '../../lib/logger'
 
 type Player = ReturnType<typeof videojs>
 
@@ -93,7 +94,7 @@ export default function VideoJSPlayer({
           cb.current.onPlaybackBlocked?.()
           return
         }
-        console.warn('[VideoJSPlayer] play() rejected:', err)
+        logger.warn('[VideoJSPlayer] play() rejected:', err)
       })
     })
 

@@ -5,6 +5,7 @@ import { useApp } from '../contexts/AppContext'
 import { detectURLType } from '../lib/urlDetection'
 import { getDemoById } from '../config/demoContent'
 import { getVideoDetails, isYouTubeApiAvailable, type YouTubeVideo } from '../lib/youtubeApi'
+import { logger } from '../lib/logger'
 import PlayerHost from '../components/player/PlayerHost'
 import DebugPanel from '../components/layout/DebugPanel'
 
@@ -35,7 +36,7 @@ export default function YoutubePlayerPage() {
       })
       .catch((err) => {
         if (!cancelled) {
-          console.warn('[YoutubePlayerPage] failed to fetch video metadata:', err)
+          logger.warn('[YoutubePlayerPage] failed to fetch video metadata:', err)
         }
       })
     return () => { cancelled = true }
