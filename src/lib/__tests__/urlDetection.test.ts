@@ -7,6 +7,7 @@ import {
   getRecommendedEngine,
   getSourceColor,
   getURLTypeDisplayName,
+  extractYouTubeVideoId,
 } from '../urlDetection'
 
 describe('detectURLType', () => {
@@ -46,6 +47,21 @@ describe('detectURLType', () => {
   it('detects a YouTube short URL (youtu.be)', () => {
     const result = detectURLType('https://youtu.be/abc123')
     expect(result.type).toBe('youtube')
+  })
+
+  it('populates metadata.videoId for youtube.com/watch URL', () => {
+    const result = detectURLType('https://youtube.com/watch?v=abc123')
+    expect(result.metadata?.videoId).toBe('abc123')
+  })
+
+  it('populates metadata.videoId for youtube.com/shorts URL', () => {
+    const result = detectURLType('https://youtube.com/shorts/xyz789')
+    expect(result.metadata?.videoId).toBe('xyz789')
+  })
+
+  it('does not populate metadata for bare youtube.com with no extractable ID', () => {
+    const result = detectURLType('https://youtube.com')
+    expect(result.metadata?.videoId).toBeUndefined()
   })
 
   it('detects an HLS URL (.m3u8)', () => {
@@ -243,5 +259,59 @@ describe('getRecommendedEngine - clips', () => {
   it('recommends twitch-sdk for VOD platform', () => {
     const detection = detectURLType('https://twitch.tv/videos/123456789')
     expect(getRecommendedEngine(detection)).toBe('twitch-sdk')
+  })
+})
+
+describe('extractYouTubeVideoId', () => {
+  it('extracts ID from youtube.com/watch?v= without protocol', () => {
+    expect(extractYouTubeVideoId('youtube.com/watch?v=ABC123xyz')).toBe('ABC123xyz')
+  })
+
+  it('extracts ID from https://youtube.com/watch?v=', () => {
+    expect(extractYouTubeVideoId('https://youtube.com/watch?v=ABC123xyz')).toBe('ABC123xyz')
+  })
+
+  it('extracts ID from youtu.be/ without protocol', () => {
+    expect(extractYouTubeVideoId('youtu.be/ABC123xyz')).toBe('ABC123xyz')
+  })
+
+  it('extracts ID from https://youtu.be/', () => {
+    expect(extractYouTubeVideoId('https://youtu.be/ABC123xyz')).toBe('ABC123xyz')
+  })
+
+  it('extracts ID from youtube.com/live/', () => {
+    expect(extractYouTubeVideoId('youtube.com/live/ABC123xyz')).toBe('ABC123xyz')
+  })
+
+  it('extracts ID from youtube.com/shorts/', () => {
+    expect(extractYouTubeVideoId('youtube.com/shorts/ABC123xyz')).toBe('ABC123xyz')
+  })
+
+  it('extracts only the v= value when extra query params are present', () => {
+    expect(extractYouTubeVideoId('youtube.com/watch?v=ABC123xyz&list=PLxyz')).toBe('ABC123xyz')
+  })
+
+  it('preserves casing of the video ID', () => {
+    expect(extractYouTubeVideoId('youtu.be/AbCdEf12345')).toBe('AbCdEf12345')
+  })
+
+  it('extracts ID from URL with trailing slash on youtu.be', () => {
+    expect(extractYouTubeVideoId('youtu.be/ABC123/')).toBe('ABC123')
+  })
+
+  it('returns null for a non-YouTube URL', () => {
+    expect(extractYouTubeVideoId('https://twitch.tv/shroud')).toBeNull()
+  })
+
+  it('returns null for an empty string', () => {
+    expect(extractYouTubeVideoId('')).toBeNull()
+  })
+
+  it('returns null for a malformed YouTube URL missing the v= param', () => {
+    expect(extractYouTubeVideoId('youtube.com/watch?u=ABC123')).toBeNull()
+  })
+
+  it('returns null for bare youtube.com with no path', () => {
+    expect(extractYouTubeVideoId('youtube.com')).toBeNull()
   })
 })
