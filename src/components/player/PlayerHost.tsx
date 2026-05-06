@@ -17,6 +17,7 @@ import {
 } from '../../lib/urlDetection'
 import type { PlayerProps } from '../../types/player'
 import { useApp } from '../../contexts/AppContext'
+import { logger } from '../../lib/logger'
 import FallbackCard from './FallbackCard'
 
 // Error boundary catches DOM reconciliation crashes from video.js
@@ -31,7 +32,7 @@ class PlayerErrorBoundary extends Component<
     return { hasError: true }
   }
   componentDidCatch(_: Error, info: ErrorInfo) {
-    console.warn('[PlayerErrorBoundary] caught:', info.componentStack)
+    logger.error('[PlayerErrorBoundary] caught:', info.componentStack)
   }
   render() {
     if (this.state.hasError) return this.props.fallback

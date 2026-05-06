@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from '../config/storageKeys'
+import { logger } from './logger'
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || ''
 const REDIRECT_URI_OVERRIDE = import.meta.env.VITE_TWITCH_REDIRECT_URI || ''
@@ -57,7 +58,7 @@ function getRedirectUri(): string {
 
 export function loginWithTwitch() {
   if (!CLIENT_ID) {
-    console.error('VITE_TWITCH_CLIENT_ID is not set. Create a .env file from .env.example.')
+    logger.error('VITE_TWITCH_CLIENT_ID is not set. Create a .env file from .env.example.')
     return
   }
 
@@ -85,7 +86,7 @@ export function handleTwitchRedirect(): string | null {
   // Validate state to prevent CSRF
   const savedState = sessionStorage.getItem(STORAGE_KEYS.SESSION_TWITCH_OAUTH_STATE)
   if (state && savedState && state !== savedState) {
-    console.warn('OAuth state mismatch — possible CSRF attempt')
+    logger.error('OAuth state mismatch — possible CSRF attempt')
     return null
   }
 
