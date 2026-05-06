@@ -1,4 +1,6 @@
-const STORAGE_KEY = 'prism_search_history'
+import { STORAGE_KEYS } from '../config/storageKeys'
+
+const STORAGE_KEY = STORAGE_KEYS.LOCAL_SEARCH_HISTORY
 const MAX_ENTRIES = 20
 
 export interface SearchHistoryEntry {

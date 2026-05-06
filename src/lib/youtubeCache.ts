@@ -1,4 +1,5 @@
 import type { YouTubeVideo } from './youtubeApi'
+import { STORAGE_KEYS } from '../config/storageKeys'
 
 export interface CachedYouTubeResults {
   videos: YouTubeVideo[]
@@ -7,7 +8,7 @@ export interface CachedYouTubeResults {
   query: string
 }
 
-const CACHE_KEY_PREFIX = 'prism_yt_cache_'
+const CACHE_KEY_PREFIX = STORAGE_KEYS.LOCAL_YOUTUBE_CACHE_PREFIX
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 export function getCachedResults(categoryId: string): CachedYouTubeResults | null {
