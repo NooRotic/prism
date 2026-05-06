@@ -16,6 +16,7 @@ import type {
   TwitchPrediction,
   TwitchBitsLeader,
 } from '../types/twitch'
+import { STORAGE_KEYS } from '../config/storageKeys'
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID
 
@@ -29,7 +30,7 @@ export class SessionExpiredError extends Error {
 }
 
 function getAccessToken(): string | null {
-  return localStorage.getItem('twitch_access_token')
+  return localStorage.getItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN)
 }
 
 async function twitchApiFetch<T>(
@@ -48,7 +49,7 @@ async function twitchApiFetch<T>(
   const res = await fetch(url.toString(), { headers })
 
   if (res.status === 401) {
-    localStorage.removeItem('twitch_access_token')
+    localStorage.removeItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN)
     throw new SessionExpiredError()
   }
 
@@ -118,7 +119,7 @@ export async function getStreamsByUserIds(
 
   const res = await fetch(url.toString(), { headers })
   if (res.status === 401) {
-    localStorage.removeItem('twitch_access_token')
+    localStorage.removeItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN)
     throw new SessionExpiredError()
   }
   if (!res.ok) return []

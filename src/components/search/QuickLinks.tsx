@@ -16,8 +16,10 @@ export function QuickLinks({ onSelect }: QuickLinksProps) {
       .then((data) => {
         if (!cancelled) setGames(data)
       })
-      .catch(() => {
-        // silently fail
+      .catch((err) => {
+        if (!cancelled) {
+          console.warn('[QuickLinks] failed to fetch top games:', err)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
