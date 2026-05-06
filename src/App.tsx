@@ -9,6 +9,7 @@ import MatrixRainBackground from './components/ui/MatrixRainBackground'
 import { OnboardingIntro } from './components/intro/OnboardingIntro'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
 import { getAuthenticatedUser, SessionExpiredError } from './lib/twitchApi'
+import { STORAGE_KEYS } from './config/storageKeys'
 
 // Pages (lazy-load for code splitting)
 import HubPage from './pages/HubPage'
@@ -17,15 +18,17 @@ import TwitchPlayerPage from './pages/TwitchPlayerPage'
 import YoutubePlayerPage from './pages/YoutubePlayerPage'
 import HlsDashPlayerPage from './pages/HlsDashPlayerPage'
 
-const ONBOARDING_SEEN_KEY = 'prism_onboarding_seen'
+const ONBOARDING_SEEN_KEY = STORAGE_KEYS.LOCAL_ONBOARDING_SEEN
 
+// Frozen historical key names for the one-time `glaze_*` → `prism_*`
+// migration. Do NOT centralize these — they are deliberately raw.
 function migrateLocalStorageKeys() {
-  if (localStorage.getItem('prism_migrated')) return
+  if (localStorage.getItem(STORAGE_KEYS.LOCAL_MIGRATED)) return
   const keys: [string, string][] = [
-    ['glaze_onboarding_seen', 'prism_onboarding_seen'],
-    ['glaze_following_sort', 'prism_following_sort'],
-    ['glaze_intros_seen', 'prism_intros_seen'],
-    ['glaze_search_history', 'prism_search_history'],
+    ['glaze_onboarding_seen', STORAGE_KEYS.LOCAL_ONBOARDING_SEEN],
+    ['glaze_following_sort', STORAGE_KEYS.LOCAL_FOLLOWING_SORT],
+    ['glaze_intros_seen', STORAGE_KEYS.LOCAL_INTROS_SEEN],
+    ['glaze_search_history', STORAGE_KEYS.LOCAL_SEARCH_HISTORY],
   ]
   for (const [oldKey, newKey] of keys) {
     const value = localStorage.getItem(oldKey)
@@ -34,7 +37,7 @@ function migrateLocalStorageKeys() {
       localStorage.removeItem(oldKey)
     }
   }
-  localStorage.setItem('prism_migrated', '1')
+  localStorage.setItem(STORAGE_KEYS.LOCAL_MIGRATED, '1')
 }
 
 migrateLocalStorageKeys()
