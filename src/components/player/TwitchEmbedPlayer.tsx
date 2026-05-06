@@ -29,9 +29,9 @@ interface TwitchPlayerInstance {
   pause: () => void
   play: () => void
   addEventListener: (event: string, callback: () => void) => void
-  // Playback state getters (not documented in our base type above
-  // but present on real Twitch.Player — we cast-to-any when calling
-  // them since they're not in the SDK's typings either).
+  // Playback state getters — present on real Twitch.Player at runtime
+  // but absent from the SDK's official type definitions, so we declare
+  // them here as optional and consume them defensively.
   getCurrentTime?: () => number
   getDuration?: () => number
   getMuted?: () => boolean
@@ -287,20 +287,14 @@ export default function TwitchEmbedPlayer({
           const p = playerRef.current
           if (!mountedRef.current || !p || !isTabVisible()) return
           try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const stats = (p as any).getPlaybackStats?.()
+            const stats = p.getPlaybackStats?.()
             setPlayerMetrics(
               makeMetrics('twitch-sdk', {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                currentTime: (p as any).getCurrentTime?.() ?? null,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                duration: (p as any).getDuration?.() ?? null,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                muted: (p as any).getMuted?.() ?? null,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                volume: (p as any).getVolume?.() ?? null,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                quality: (p as any).getQuality?.() ?? null,
+                currentTime: p.getCurrentTime?.() ?? null,
+                duration: p.getDuration?.() ?? null,
+                muted: p.getMuted?.() ?? null,
+                volume: p.getVolume?.() ?? null,
+                quality: p.getQuality?.() ?? null,
                 resolution: stats?.videoResolution ?? null,
                 bufferLength: stats?.bufferSize ?? null,
                 droppedFrames: stats?.skippedFrames ?? null,

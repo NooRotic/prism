@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
+import type { MediaPlayerClass } from 'dashjs'
 import type { PlayerProps } from '../../types/player'
+import type { DashPlayerWithTracks } from '../../types/player-sdk'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
 
@@ -22,8 +24,7 @@ export default function DashJSPlayer({
   onPlaybackBlocked,
 }: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const playerRef = useRef<any>(null)
+  const playerRef = useRef<MediaPlayerClass | null>(null)
   const mountedRef = useRef(true)
 
   const cb = useCallbackRefs({
@@ -59,8 +60,7 @@ export default function DashJSPlayer({
     videoEl.addEventListener('pause', handlePause)
     videoEl.addEventListener('ended', handleEnded)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let dashPlayer: any = null
+    let dashPlayer: MediaPlayerClass | null = null
 
     let readyFired = false
     const loadTimeout = setTimeout(() => {
@@ -178,13 +178,10 @@ export default function DashJSPlayer({
         let bitrate: number | null = null
         let resolution: string | null = null
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const bitrateInfo = (player as any).getCurrentTrackFor?.('video')
-          if (
-            bitrateInfo?.bitrateList &&
-            typeof player.getQualityFor === 'function'
-          ) {
-            const qualityIdx = player.getQualityFor('video')
+          const legacyApi = player as DashPlayerWithTracks
+          const bitrateInfo = legacyApi.getCurrentTrackFor?.('video')
+          const qualityIdx = legacyApi.getQualityFor?.('video')
+          if (bitrateInfo?.bitrateList && typeof qualityIdx === 'number') {
             const selected = bitrateInfo.bitrateList[qualityIdx]
             if (selected) {
               bitrate = selected.bandwidth ?? null
