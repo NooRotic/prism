@@ -29,3 +29,6 @@ dist-ssr
 
 # Superpowers brainstorm sessions
 .superpowers/
+
+# Loose résumé/personal text (keep out of this public repo)
+resume_clause.txt
