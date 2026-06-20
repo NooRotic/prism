@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getTopGames } from '../../lib/twitchApi'
+import { logger } from '../../lib/logger'
 import type { TwitchGame } from '../../types/twitch'
 
 interface QuickLinksProps {
@@ -16,8 +17,10 @@ export function QuickLinks({ onSelect }: QuickLinksProps) {
       .then((data) => {
         if (!cancelled) setGames(data)
       })
-      .catch(() => {
-        // silently fail
+      .catch((err) => {
+        if (!cancelled) {
+          logger.warn('[QuickLinks] failed to fetch top games:', err)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

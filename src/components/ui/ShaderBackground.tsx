@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { createShader, createProgram } from "../../lib/shaderUtils";
+import { logger } from "../../lib/logger";
 
 // ---------------------------------------------------------------------------
 // Shader sources
@@ -185,7 +186,7 @@ export default function ShaderBackground({
     });
 
     if (!gl) {
-      console.warn("[ShaderBackground] WebGL2 not available");
+      logger.warn("[ShaderBackground] WebGL2 not available");
       return;
     }
 

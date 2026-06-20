@@ -13,8 +13,9 @@ import ClipGrid from '../components/channel/ClipGrid'
 import VODGrid from '../components/channel/VODGrid'
 import DebugPanel from '../components/layout/DebugPanel'
 import { ResizableHandle } from '../components/layout/ResizableHandle'
+import { STORAGE_KEYS } from '../config/storageKeys'
 
-const PANEL_RATIO_KEY = 'prism_panel_ratio'
+const PANEL_RATIO_KEY = STORAGE_KEYS.LOCAL_PANEL_RATIO
 const DEFAULT_RATIO = 0.8 // 80% player, 20% chat
 const MIN_RATIO = 0.5
 const MAX_RATIO = 0.92

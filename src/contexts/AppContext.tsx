@@ -32,7 +32,9 @@ const SORT_DEFAULTS: Record<FollowingSortMode, FollowingSortDir> = {
   viewers: 'desc',
 }
 
-const FOLLOWING_SORT_STORAGE_KEY = 'prism_following_sort'
+import { STORAGE_KEYS } from '../config/storageKeys'
+
+const FOLLOWING_SORT_STORAGE_KEY = STORAGE_KEYS.LOCAL_FOLLOWING_SORT
 
 function loadFollowingSort(): FollowingSort {
   if (typeof localStorage === 'undefined') return { mode: 'live-first', dir: 'desc' }
