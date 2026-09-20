@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { Gauge } from 'lucide-react'
+import { Gauge, X } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { getURLTypeDisplayName } from '../../lib/urlDetection'
 import {
@@ -177,7 +177,7 @@ function SparklineSection() {
 // ─── Main component ──────────────────────────────────────────────
 
 export default function DebugPanel() {
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
   const { debugMode, activeEngine, detection } = state.player
 
   // useSyncExternalStore is the React-sanctioned way to subscribe to
@@ -228,6 +228,15 @@ export default function DebugPanel() {
         >
           {activeEngine}
         </span>
+        <button
+          onClick={() => dispatch({ type: 'TOGGLE_DEBUG' })}
+          className="p-1 rounded transition-colors hover:bg-white/10"
+          style={{ color: 'var(--text-muted)' }}
+          aria-label="Close debug panel"
+          title="Close debug panel"
+        >
+          <X size={14} />
+        </button>
       </div>
 
       {/* Subheader: current content */}

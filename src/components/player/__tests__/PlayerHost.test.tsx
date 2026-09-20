@@ -60,6 +60,12 @@ function renderHost(detection = streamDetection) {
   )
 }
 
+// The debug overlay is off by default, so tests that drive its controls
+// have to open it the way a user would.
+async function openDebugOverlay(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByLabelText('Toggle debug overlay'))
+}
+
 describe('PlayerHost', () => {
   beforeEach(() => {
     sdkProps.length = 0
@@ -112,9 +118,10 @@ describe('PlayerHost', () => {
   })
 
   it('shows Content ID and Parent rows in debug overlay', async () => {
+    const user = userEvent.setup()
     renderHost(streamDetection)
     await screen.findByTestId('mock-twitch-sdk')
-    // Debug overlay is on by default — no need to toggle it
+    await openDebugOverlay(user)
     const contentRow = screen.getByText(/Content ID:/i).parentElement
     expect(contentRow?.textContent).toMatch(/ninja/)
     expect(screen.getByText(/Parent:/i)).toBeInTheDocument()
@@ -124,6 +131,7 @@ describe('PlayerHost', () => {
     const user = userEvent.setup()
     renderHost(streamDetection)
     await screen.findByTestId('mock-twitch-sdk')
+    await openDebugOverlay(user)
     await user.click(screen.getByLabelText('Force advance fallback chain'))
     expect(await screen.findByTestId('mock-twitch-iframe')).toBeInTheDocument()
   })
@@ -132,6 +140,7 @@ describe('PlayerHost', () => {
     const user = userEvent.setup()
     renderHost(streamDetection)
     await screen.findByTestId('mock-twitch-sdk')
+    await openDebugOverlay(user)
     await user.click(screen.getByLabelText('Force advance fallback chain'))
     await user.click(screen.getByLabelText('Force advance fallback chain'))
     await user.click(
@@ -147,6 +156,7 @@ describe('PlayerHost', () => {
     const props = sdkProps[sdkProps.length - 1]
     act(() => { props.onOffline!() })
     expect(await screen.findByText(/is offline/i)).toBeInTheDocument()
+    await openDebugOverlay(user)
     await user.click(
       screen.getByLabelText('Retry from start of fallback chain'),
     )
