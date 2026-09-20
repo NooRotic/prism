@@ -35,6 +35,9 @@ describe('AppContext', () => {
       expect(result.current.state.loading).toBe(false)
       expect(result.current.state.error).toBeNull()
       expect(result.current.state.displayMode).toBe('idle')
+      // Regression guard: this defaulted to true and shipped the debug
+      // panel open on every page load.
+      expect(result.current.state.player.debugMode).toBe(false)
     })
   })
 
