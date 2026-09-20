@@ -147,7 +147,7 @@ const initialState: AppState = {
     detection: null,
     activeEngine: 'twitch-sdk',
     fallbackStep: 0,
-    debugMode: true,
+    debugMode: false,
   },
   navPanel: {
     open: null,
