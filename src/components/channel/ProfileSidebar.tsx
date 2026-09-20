@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Eye, Calendar, Gamepad2, Smile, Shield } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
+import StreamUptime from './StreamUptime'
 
 function formatAccountAge(createdAt: string): string {
   const created = new Date(createdAt)
@@ -175,6 +176,7 @@ export default function ProfileSidebar() {
               {stream.viewer_count.toLocaleString()}
             </span>
           </div>
+          <StreamUptime startedAt={stream.started_at} />
         </div>
       )}
 
