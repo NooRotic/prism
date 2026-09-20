@@ -250,7 +250,7 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
       <div id="player-host-inner" className="relative w-full h-full">
       <PlayerErrorBoundary
         key={url}
-        fallback={<div id="error-boundary-fallback" style={{ background: 'red', padding: 20, color: 'white', fontSize: 24 }}>ERROR BOUNDARY CAUGHT</div>}
+        fallback={<FallbackCard detection={detection} error={errorReason} />}
       >
         {renderPlayer()}
       </PlayerErrorBoundary>

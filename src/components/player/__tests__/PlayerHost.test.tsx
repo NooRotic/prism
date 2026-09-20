@@ -9,10 +9,14 @@ import type { PlayerProps } from '../../../types/player'
 // Capture props passed to each mocked player so tests can drive the callbacks.
 const sdkProps: PlayerProps[] = []
 const iframeProps: PlayerProps[] = []
+// Lets a single test force a render crash inside the player so the error
+// boundary path is exercised.
+const sdkBehavior = { throwOnRender: false }
 
 vi.mock('../TwitchEmbedPlayer', () => ({
   default: (props: PlayerProps) => {
     sdkProps.push(props)
+    if (sdkBehavior.throwOnRender) throw new Error('simulated player crash')
     return <div data-testid="mock-twitch-sdk" />
   },
 }))
@@ -70,6 +74,7 @@ describe('PlayerHost', () => {
   beforeEach(() => {
     sdkProps.length = 0
     iframeProps.length = 0
+    sdkBehavior.throwOnRender = false
   })
 
   afterEach(() => {
@@ -161,5 +166,18 @@ describe('PlayerHost', () => {
       screen.getByLabelText('Retry from start of fallback chain'),
     )
     expect(screen.queryByText(/is offline/i)).not.toBeInTheDocument()
+  })
+  it('shows the fallback card when a player crashes mid-render', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    sdkBehavior.throwOnRender = true
+
+    renderHost(streamDetection)
+
+    expect(await screen.findByText('Unable to Play')).toBeInTheDocument()
+    expect(screen.queryByText(/ERROR BOUNDARY CAUGHT/i)).not.toBeInTheDocument()
+
+    warn.mockRestore()
+    err.mockRestore()
   })
 })
