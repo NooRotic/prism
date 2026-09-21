@@ -1,8 +1,9 @@
-import { Film, Clock, Gamepad2, TrendingUp, ArrowUp, ArrowDown } from 'lucide-react'
+import { Film, Clock, Gamepad2, TrendingUp, ArrowUp, ArrowDown, Lock, LogIn } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { useClipStats } from '../../hooks/useClipStats'
 import { useDerivedStats } from '../../hooks/useDerivedStats'
+import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 
 interface StatCardProps {
   icon: ReactNode
@@ -56,14 +57,59 @@ function StatCard({ icon, label, value, details, trend }: StatCardProps) {
   )
 }
 
+function ConnectPrompt({ onConnect }: { onConnect: () => void }) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-3 p-6 rounded-lg text-center w-full"
+      style={{
+        backgroundColor: 'var(--bg-card)',
+        border: '1px solid var(--accent-twitch)',
+        opacity: 0.7,
+      }}
+    >
+      <Lock size={24} style={{ color: 'var(--accent-twitch)' }} />
+      <span
+        className="text-sm font-medium"
+        style={{ color: 'var(--accent-twitch)' }}
+      >
+        Channel stats
+      </span>
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        Connect Twitch to see clips, VODs and engagement for this channel
+      </p>
+      <button
+        type="button"
+        onClick={onConnect}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-all duration-200 hover:scale-[1.02] mt-1"
+        style={{
+          background: 'linear-gradient(135deg, var(--accent-twitch), #7b2ff2)',
+          color: '#fff',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '0.7rem',
+          letterSpacing: '0.05em',
+        }}
+      >
+        <LogIn size={12} />
+        connect twitch
+      </button>
+    </div>
+  )
+}
+
 export default function StatsRow() {
   const { state } = useApp()
+  const { isAuthenticated, login } = useTwitchAuth()
   const { clips, videos, channelInfo, games } = state.channel
 
   const clipStats = useClipStats(clips, games)
   const derivedStats = useDerivedStats({ clips, videos, channelInfo, games })
 
   const { vodStats, diversity, clipEngagement, growth } = derivedStats
+
+  // Helix needs a token on every endpoint, so signed out there is no data
+  // to show. Rendering the cards anyway produced "CLIPS 0 / HOURS STREAMED
+  // 0.0", which reads as a measurement rather than an absence.
+  if (!isAuthenticated) return <ConnectPrompt onConnect={login} />
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">

@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AppProvider } from '../../../contexts/AppContext'
 import StatsRow from '../StatsRow'
+import { useTwitchAuth } from '../../../hooks/useTwitchAuth'
 
 vi.mock('../../../hooks/useClipStats', () => ({
   useClipStats: vi.fn(() => ({
@@ -37,6 +39,25 @@ vi.mock('../../../hooks/useDerivedStats', () => ({
   })),
 }))
 
+// StatsRow is auth-gated: without a token Helix returns nothing, so the
+// stats would all be zero. These tests are about stat rendering, so they
+// default to authenticated; the logged-out block below covers the gate.
+vi.mock('../../../hooks/useTwitchAuth', () => ({
+  useTwitchAuth: vi.fn(),
+}))
+
+const mockedUseTwitchAuth = vi.mocked(useTwitchAuth)
+
+function setAuth(isAuthenticated: boolean) {
+  mockedUseTwitchAuth.mockReturnValue({
+    isAuthenticated,
+    login: vi.fn(),
+    logout: vi.fn(),
+    token: isAuthenticated ? 'test-token' : null,
+    handleAuthError: vi.fn(),
+  } as unknown as ReturnType<typeof useTwitchAuth>)
+}
+
 function renderStatsRow() {
   return render(
     <AppProvider>
@@ -46,6 +67,10 @@ function renderStatsRow() {
 }
 
 describe('StatsRow', () => {
+  beforeEach(() => {
+    setAuth(true)
+  })
+
   it('renders without crashing with empty channel data', () => {
     renderStatsRow()
     // The component should render four stat cards
@@ -122,5 +147,46 @@ describe('StatsRow', () => {
     expect(screen.getByText('80 VODs total')).toBeInTheDocument()
     expect(screen.getByText('12')).toBeInTheDocument()
     expect(screen.getByText('Variety')).toBeInTheDocument()
+  })
+  describe('when logged out', () => {
+    beforeEach(() => {
+      setAuth(false)
+    })
+
+    it('does not render zeroed stat cards', () => {
+      renderStatsRow()
+      expect(screen.queryByText('Clips')).not.toBeInTheDocument()
+      expect(screen.queryByText('Hours Streamed')).not.toBeInTheDocument()
+      expect(screen.queryByText('Engagement')).not.toBeInTheDocument()
+      // The specific lie: a big "0.0" that reads as a real measurement.
+      expect(screen.queryByText('0.0')).not.toBeInTheDocument()
+    })
+
+    it('renders a connect prompt instead', () => {
+      renderStatsRow()
+      expect(
+        screen.getByRole('button', { name: /connect twitch/i }),
+      ).toBeInTheDocument()
+      expect(screen.getByText(/channel stats/i)).toBeInTheDocument()
+      expect(
+        screen.getByText(/clips, VODs and engagement/i),
+      ).toBeInTheDocument()
+    })
+
+    it('calls login when the connect button is clicked', async () => {
+      const user = userEvent.setup()
+      const login = vi.fn()
+      mockedUseTwitchAuth.mockReturnValue({
+        isAuthenticated: false,
+        login,
+        logout: vi.fn(),
+        token: null,
+        handleAuthError: vi.fn(),
+      } as unknown as ReturnType<typeof useTwitchAuth>)
+
+      renderStatsRow()
+      await user.click(screen.getByRole('button', { name: /connect twitch/i }))
+      expect(login).toHaveBeenCalledOnce()
+    })
   })
 })

@@ -26,6 +26,27 @@
 - `youtubeApi.ts:88,101` - eslint-disable for YouTube API JSON mapping
 - Fix: create typed interfaces for each SDK's runtime API surface
 
+### Connect-prompt markup duplicated across four components
+`FavoritesCard.tsx`, `ProtocolPage.tsx`, `StatsRow.tsx` and `ProfileSidebar.tsx`
+each hand-roll the same Lock icon + copy + gradient "connect twitch" button.
+- Fix: extract a single `ConnectTwitchPrompt` component and use it in all four.
+- Not done during the logged-out defect fix on purpose — unrelated refactoring
+  inside a defect PR.
+
+### `useTwitchAuth` holds auth in per-instance state
+The hook keeps `token`/`isAuthenticated` in its own `useState` per caller, so
+every consumer has an independent copy. There are now six callers. They agree
+on mount (each initialises from `localStorage`), but an auth change that does
+not remount the tree — notably `logout()` — updates only the calling instance
+plus AppContext, leaving other instances stale.
+- Not resolved by reading `state.auth.isAuthenticated` instead: AppContext
+  initialises auth to `false` (`AppContext.tsx:132`) and only flips after an
+  effect dispatches `LOGIN`, which would flash the signed-out UI on every page
+  load for signed-in users.
+- Fix: initialise AppContext auth from `getStoredToken()` so context is correct
+  on first render, then have consumers read context and retire the per-instance
+  state.
+
 ### localStorage key sprawl
 8 keys + `prism_yt_cache_*` prefix scattered across files with no central registry:
 - `prism_onboarding_seen` (App.tsx)
