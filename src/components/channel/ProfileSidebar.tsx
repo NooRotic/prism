@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
-import { Eye, Calendar, Gamepad2, Smile, Shield } from 'lucide-react'
+import { Eye, Calendar, Gamepad2, Smile, Shield, Lock, LogIn } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
+import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import StreamUptime from './StreamUptime'
 
 function formatAccountAge(createdAt: string): string {
@@ -37,8 +38,66 @@ interface CurrentItem {
   meta: string[]
 }
 
+function SignedOutHeader({
+  channelName,
+  onConnect,
+}: {
+  channelName: string | null
+  onConnect: () => void
+}) {
+  return (
+    <div
+      className="flex flex-col gap-3 p-4 rounded-lg"
+      style={{
+        backgroundColor: 'var(--bg-card)',
+        border: '1px solid var(--accent-twitch)',
+        opacity: 0.7,
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="w-14 h-14 rounded-full shrink-0 flex items-center justify-center"
+          style={{ border: '2px solid var(--accent-twitch)' }}
+        >
+          <Lock size={20} style={{ color: 'var(--accent-twitch)' }} />
+        </div>
+        <div className="min-w-0">
+          <h2
+            className="text-xl font-bold truncate"
+            style={{
+              color: 'var(--text-primary)',
+              fontFamily: 'var(--font-heading)',
+            }}
+          >
+            {channelName ?? 'This channel'}
+          </h2>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Connect Twitch to see live status, viewers and stream uptime
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onConnect}
+        className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-md transition-all duration-200 hover:scale-[1.02] self-start"
+        style={{
+          background: 'linear-gradient(135deg, var(--accent-twitch), #7b2ff2)',
+          color: '#fff',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '0.7rem',
+          letterSpacing: '0.05em',
+        }}
+      >
+        <LogIn size={12} />
+        connect twitch
+      </button>
+    </div>
+  )
+}
+
 export default function ProfileSidebar() {
   const { state, dispatch } = useApp()
+  const { isAuthenticated, login } = useTwitchAuth()
   const {
     profile,
     channelInfo,
@@ -98,7 +157,21 @@ export default function ProfileSidebar() {
     return null
   }, [detection, clips, videos, games])
 
-  if (!profile) return null
+  // Signed out, useChannelData never fetches (TwitchPlayerPage gates it on
+  // auth), so profile is null. Returning null here removed the entire
+  // channel header — no name, no live dot, no viewer count, no uptime.
+  // Name the channel and say why the rest is missing instead.
+  if (!profile) {
+    if (!isAuthenticated) {
+      return (
+        <SignedOutHeader
+          channelName={detection?.metadata?.channelName ?? null}
+          onConnect={login}
+        />
+      )
+    }
+    return null
+  }
 
   const broadcasterBadge = profile.broadcaster_type
     ? profile.broadcaster_type.toUpperCase()

@@ -75,6 +75,24 @@ function Seed({ stream }: { stream: TwitchStream | null }) {
   return null
 }
 
+function SeedDetection({ channelName }: { channelName: string }) {
+  const { dispatch } = useApp()
+  useEffect(() => {
+    dispatch({
+      type: 'PLAY_URL',
+      url: `https://twitch.tv/${channelName}`,
+      detection: {
+        type: 'twitch',
+        platform: 'twitch-stream',
+        originalUrl: `https://twitch.tv/${channelName}`,
+        playableUrl: `https://twitch.tv/${channelName}`,
+        metadata: { channelName },
+      },
+    })
+  }, [dispatch, channelName])
+  return null
+}
+
 function renderSidebar(stream: TwitchStream | null) {
   return render(
     <AppProvider>
@@ -121,6 +139,42 @@ describe('ProfileSidebar live row', () => {
   it('renders no uptime when the stream payload is not type live', () => {
     renderSidebar(makeStream({ type: '' }))
 
+    expect(screen.queryByLabelText(/^Live for/)).not.toBeInTheDocument()
+  })
+})
+
+describe('ProfileSidebar when signed out', () => {
+  // Signed out, useChannelData never fetches, so profile stays null. The
+  // sidebar used to return null here, which is why the page showed no live
+  // dot, viewer count or uptime at all.
+  function renderSignedOut() {
+    return render(
+      <AppProvider>
+        <SeedDetection channelName="hasanabi" />
+        <ProfileSidebar />
+      </AppProvider>,
+    )
+  }
+
+  it('still names the channel being watched', () => {
+    renderSignedOut()
+    expect(screen.getByText(/hasanabi/i)).toBeInTheDocument()
+  })
+
+  it('explains what connecting unlocks rather than rendering nothing', () => {
+    const { container } = renderSignedOut()
+    expect(container).not.toBeEmptyDOMElement()
+    expect(
+      screen.getByRole('button', { name: /connect twitch/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/live status, viewers and stream uptime/i),
+    ).toBeInTheDocument()
+  })
+
+  it('does not fabricate a live badge or viewer count', () => {
+    renderSignedOut()
+    expect(screen.queryByText('LIVE')).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^Live for/)).not.toBeInTheDocument()
   })
 })
