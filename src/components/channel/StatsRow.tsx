@@ -1,9 +1,10 @@
-import { Film, Clock, Gamepad2, TrendingUp, ArrowUp, ArrowDown, Lock, LogIn } from 'lucide-react'
+import { Film, Clock, Gamepad2, TrendingUp, ArrowUp, ArrowDown } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { useClipStats } from '../../hooks/useClipStats'
 import { useDerivedStats } from '../../hooks/useDerivedStats'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import ConnectTwitchPrompt from '../ui/ConnectTwitchPrompt'
 
 interface StatCardProps {
   icon: ReactNode
@@ -67,31 +68,11 @@ function ConnectPrompt({ onConnect }: { onConnect: () => void }) {
         opacity: 0.7,
       }}
     >
-      <Lock size={24} style={{ color: 'var(--accent-twitch)' }} />
-      <span
-        className="text-sm font-medium"
-        style={{ color: 'var(--accent-twitch)' }}
-      >
-        Channel stats
-      </span>
-      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-        Connect Twitch to see clips, VODs and engagement for this channel
-      </p>
-      <button
-        type="button"
-        onClick={onConnect}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-all duration-200 hover:scale-[1.02] mt-1"
-        style={{
-          background: 'linear-gradient(135deg, var(--accent-twitch), #7b2ff2)',
-          color: '#fff',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '0.7rem',
-          letterSpacing: '0.05em',
-        }}
-      >
-        <LogIn size={12} />
-        connect twitch
-      </button>
+      <ConnectTwitchPrompt
+        title="Channel stats"
+        description="Connect Twitch to see clips, VODs and engagement for this channel"
+        onConnect={onConnect}
+      />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { DemoGrid } from '../components/grid/DemoGrid'
 import { YouTubeGrid } from '../components/grid/YouTubeGrid'
 import { SmartUrlInput } from '../components/search/SmartUrlInput'
+import ConnectTwitchButton from '../components/ui/ConnectTwitchButton'
 import { useTwitchAuth } from '../hooks/useTwitchAuth'
 import { getDemoByProtocol, getHlsDashDemo, PROTOCOL_META, type ProtocolKey } from '../config/demoContent'
 
@@ -145,19 +146,7 @@ function ProtocolSidebar() {
       {/* Connect Twitch CTA */}
       {!isAuthenticated && (
         <div className="px-3 mt-auto pt-4">
-          <button
-            type="button"
-            onClick={login}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs transition-all hover:scale-[1.02]"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent-twitch), #7b2ff2)',
-              color: '#fff',
-              fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.05em',
-            }}
-          >
-            Connect Twitch
-          </button>
+          <ConnectTwitchButton onClick={login} fullWidth />
         </div>
       )}
     </div>
