@@ -56,6 +56,7 @@ interface SetupOptions {
   gameId?: string | null
   recommendations?: unknown[]
   loading?: boolean
+  categoryError?: string | null
 }
 
 function setup(opts: SetupOptions = {}) {
@@ -66,6 +67,7 @@ function setup(opts: SetupOptions = {}) {
     gameId = null,
     recommendations = [],
     loading = false,
+    categoryError = null,
   } = opts
 
   mockAuth.mockReturnValue({
@@ -103,7 +105,7 @@ function setup(opts: SetupOptions = {}) {
   mockCategory.mockReturnValue({
     streams: recommendations,
     loading: false,
-    error: null,
+    error: categoryError,
   } as unknown as ReturnType<typeof useCategoryRail>)
 
   mockAvatars.mockReturnValue(new Map())
@@ -308,6 +310,19 @@ describe('ChannelRail — content and states', () => {
 
     expect(screen.queryByRole('region', { name: /following/i })).not.toBeInTheDocument()
     expect(screen.getByText('Rec1')).toBeInTheDocument()
+  })
+
+  it('keeps the follows section when the recommendations section fails', () => {
+    setup({
+      follows: [live(0), live(1)],
+      gameId: '509658',
+      recommendations: [],
+      categoryError: 'Twitch API error: 500',
+    })
+    fireEvent.focusIn(rail())
+
+    expect(screen.getByRole('region', { name: /following/i })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /category/i })).not.toBeInTheDocument()
   })
 
   it('renders nothing when signed in with no content in either section', () => {

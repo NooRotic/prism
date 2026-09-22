@@ -101,8 +101,14 @@ export default function ChannelRail() {
 
   // A failing section hides itself and leaves its siblings intact. This is
   // the invariant that makes a second platform safe to add.
-  const liveFollows = follows.error ? [] : follows.data.filter((f) => f.isLive)
-  const recommendations = category.error ? [] : category.streams
+  const liveFollows = useMemo(
+    () => (follows.error ? [] : follows.data.filter((f) => f.isLive)),
+    [follows.error, follows.data],
+  )
+  const recommendations = useMemo(
+    () => (category.error ? [] : category.streams),
+    [category.error, category.streams],
+  )
 
   const avatarIds = useMemo(
     () => [
