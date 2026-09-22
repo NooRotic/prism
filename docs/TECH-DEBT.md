@@ -6,25 +6,45 @@
 
 ## HIGH - Fix before next feature phase
 
-### Silent error swallowing
-- `src/pages/YoutubePlayerPage.tsx:36` - `.catch(() => {})` on video metadata fetch. User sees nothing on failure.
-- `src/components/search/QuickLinks.tsx:19` - `.catch(() => {})` for getTopGames. Grid shows empty with no feedback.
-- `src/components/player/VideoJSPlayer.tsx:86` - `player.play()?.catch(() => {})` suppresses autoplay failures silently.
+### OAuth state check fails open (security)
+`src/lib/twitchAuth.ts` - `handleTwitchRedirect()` guards CSRF with:
+```ts
+if (state && savedState && state !== savedState) { /* reject */ }
+```
+Both operands must be present for the check to run at all. If the callback
+omits `state`, or `sessionStorage` has no `savedState` (cleared, different tab,
+storage blocked), validation is **skipped** and the token is accepted.
+Omitting the parameter entirely is the easiest bypass.
+- Fix: reject whenever `savedState` is missing or `state !== savedState`.
+  Only accept on an explicit match. Add a test for each fail-open path —
+  nothing in the current suite covers them.
+- Found during review of PR #45 (2026-09-21). Pre-existing, not introduced there.
 
-### `twitch_access_token` key hardcoded in multiple files
-- `src/lib/twitchAuth.ts` and `src/lib/twitchApi.ts` both hardcode the string `'twitch_access_token'`.
-- Should be a shared constant to prevent key drift.
+### Silent error swallowing - user-facing half still open
+PR #45 replaced the three `.catch(() => {})` bodies with `logger.warn`, but
+`logger.warn` is dev-only (`import.meta.env.DEV`). **In production the user
+still gets no feedback** - which is what the original entry was about.
+- [x] `VideoJSPlayer.tsx` - genuinely fixed. Distinguishes `AbortError`
+      (ignore), `NotAllowedError` (fires `onPlaybackBlocked?.()`), other.
+- [ ] `src/pages/YoutubePlayerPage.tsx` - metadata fetch failure needs a
+      visible state, not just a dev log.
+- [ ] `src/components/search/QuickLinks.tsx` - grid still renders empty with
+      no explanation on `getTopGames` failure.
+- Fix: give both an error state in the UI (retry affordance or explanatory
+  empty state).
+
+### ~~`twitch_access_token` key hardcoded in multiple files~~ - RESOLVED (PR #45)
+Now `STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN` in `src/config/storageKeys.ts`.
 
 ---
 
 ## MEDIUM - Address during refactor phases
 
-### Type safety: `as any` casts on player SDKs
-- `DashJSPlayer.tsx:25,62,181-182` - cast dashjs player to any for bitrate access
-- `TwitchEmbedPlayer.tsx:290-303` - 7 `(p as any)` casts for playback stats
-- `VideoJSPlayer.tsx:117-122` - `(player as any)` and `(vidEl as any)` casts
-- `youtubeApi.ts:88,101` - eslint-disable for YouTube API JSON mapping
-- Fix: create typed interfaces for each SDK's runtime API surface
+### ~~Type safety: `as any` casts on player SDKs~~ - RESOLVED (PR #45)
+Typed interfaces now live in `src/types/player-sdk.ts` (dashjs, Twitch Embed,
+Video.js + VHS). All members are optional and consumed with `?.`, so a
+runtime-missing method degrades exactly as the old casts did.
+- Still open: `youtubeApi.ts:88,101` eslint-disable for YouTube JSON mapping.
 
 ### Connect-prompt markup duplicated across four components
 `FavoritesCard.tsx`, `ProtocolPage.tsx`, `StatsRow.tsx` and `ProfileSidebar.tsx`
@@ -47,17 +67,13 @@ plus AppContext, leaving other instances stale.
   on first render, then have consumers read context and retire the per-instance
   state.
 
-### localStorage key sprawl
-8 keys + `prism_yt_cache_*` prefix scattered across files with no central registry:
-- `prism_onboarding_seen` (App.tsx)
-- `prism_following_sort` (AppContext.tsx)
-- `prism_intros_seen` (useIntroState.ts)
-- `prism_search_history` (searchHistory.ts)
-- `prism_yt_cache_*` (youtubeCache.ts)
-- `prism_panel_ratio` (TwitchPlayerPage.tsx)
-- `prism_migrated` (App.tsx)
-- `twitch_access_token` (twitchAuth.ts, twitchApi.ts)
-- Fix: create `src/config/storageKeys.ts` with a `STORAGE_KEYS` enum
+### ~~localStorage key sprawl~~ - RESOLVED (PR #45)
+All 9 keys now registered in `src/config/storageKeys.ts` as `STORAGE_KEYS`.
+Note: the `glaze_*` source names in `App.tsx`'s one-time migration stay raw
+on purpose (frozen historical names); only the destinations are centralized.
+The comment above that block currently says "Do NOT centralize these" while
+the destinations *are* centralized - reword it to say only the `glaze_*`
+sources are frozen.
 
 ### Large components (candidates for splitting)
 | File | Lines | Split idea |
@@ -69,13 +85,16 @@ plus AppContext, leaving other instances stale.
 | AppContext.tsx | 331 | Extract reducer to separate file |
 | CategoryPanel.tsx | 325 | Extract stream fetching to hook |
 
-### Console logging in production
-9 instances of console.warn/error across:
-- `shaderUtils.ts` (4x) - WebGL shader failures
-- `youtubeCache.ts` (2x) - localStorage quota exceeded
-- `ShaderBackground.tsx` (1x) - WebGL2 not available
-- `twitchAuth.ts` (2x) - missing client ID, OAuth state mismatch
-- Fix: route through a debug logger that respects env (dev vs prod)
+### ~~Console logging in production~~ - RESOLVED (PR #45), with a caveat
+All 9 instances now route through `src/lib/logger.ts`, which is env-aware:
+`error` always fires, `warn`/`debug` are dev-only.
+
+**Caveat introduced by the fix:** two of these were useful in a production
+console when triaging a user bug report, and are now silent:
+- `[ShaderBackground] WebGL2 not available` - explains "the background is black"
+- `[youtubeCache] localStorage quota exceeded` - explains "browsing stopped caching"
+- Consider: promote these two to `logger.error`, or add a `logger.report`
+  level that survives production for diagnosable degradations.
 
 ### Hardcoded timeout values
 15+ magic number timeouts spread across player components. Named constants exist for some (`EMBED_TIMEOUT_MS`, `IFRAME_LOAD_GRACE_MS`, `LOAD_TIMEOUT_MS`) but not all. Inconsistent pattern.
