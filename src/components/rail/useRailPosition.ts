@@ -29,7 +29,11 @@ export function useRailPosition(): UseRailPositionReturn {
   const flip = useCallback(() => {
     setPositionState((prev) => {
       const next: RailPosition = prev === 'left' ? 'right' : 'left'
-      localStorage.setItem(STORAGE_KEYS.LOCAL_RAIL_POSITION, next)
+      try {
+        localStorage.setItem(STORAGE_KEYS.LOCAL_RAIL_POSITION, next)
+      } catch {
+        // storage full or unavailable — silently ignore
+      }
       return next
     })
   }, [])

@@ -1,4 +1,5 @@
 import { renderHook, act } from '@testing-library/react'
+import { vi } from 'vitest'
 import { useRailPosition } from '../useRailPosition'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
 
@@ -47,5 +48,19 @@ describe('useRailPosition', () => {
     localStorage.setItem(STORAGE_KEYS.LOCAL_RAIL_POSITION, 'sideways')
     const { result } = renderHook(() => useRailPosition())
     expect(result.current.position).toBe('right')
+  })
+
+  it('flips state even when localStorage.setItem throws (quota exceeded)', () => {
+    const { result } = renderHook(() => useRailPosition())
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('QuotaExceededError')
+    })
+
+    act(() => {
+      expect(() => result.current.flip()).not.toThrow()
+    })
+    expect(result.current.position).toBe('left')
+
+    spy.mockRestore()
   })
 })
