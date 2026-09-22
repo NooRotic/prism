@@ -57,6 +57,12 @@ interface SetupOptions {
   recommendations?: unknown[]
   loading?: boolean
   categoryError?: string | null
+  /**
+   * Defaults to a Twitch channel route so `gameId`-bearing setups keep
+   * exercising the category path without every call site having to know
+   * about route gating. Override to test route-dependent behavior itself.
+   */
+  path?: string
 }
 
 function setup(opts: SetupOptions = {}) {
@@ -68,6 +74,7 @@ function setup(opts: SetupOptions = {}) {
     recommendations = [],
     loading = false,
     categoryError = null,
+    path = '/twitch/testchannel',
   } = opts
 
   mockAuth.mockReturnValue({
@@ -110,8 +117,11 @@ function setup(opts: SetupOptions = {}) {
 
   mockAvatars.mockReturnValue(new Map())
 
+  // MemoryRouter caches its history in a ref on first mount and never
+  // re-reads `initialEntries` after that, so a route-changing test must key
+  // it by path to force a remount when it calls `rerender` with a new one.
   return render(
-    <MemoryRouter>
+    <MemoryRouter key={path} initialEntries={[path]}>
       <ChannelRail />
     </MemoryRouter>,
   )
@@ -139,19 +149,19 @@ describe('ChannelRail — layout', () => {
     expect(rail()).toHaveStyle({ zIndex: '25' })
   })
 
-  it('pins to the right edge by default', () => {
+  it('pins to the left edge by default', () => {
     setup()
-    expect(rail()).toHaveStyle({ right: '0px' })
+    expect(rail()).toHaveStyle({ left: '0px' })
   })
 
-  it('flips to the left edge and persists the choice', async () => {
+  it('flips to the right edge and persists the choice', async () => {
     const user = userEvent.setup()
     setup()
 
     await user.click(screen.getByRole('button', { name: /move rail/i }))
 
-    expect(rail()).toHaveStyle({ left: '0px' })
-    expect(localStorage.getItem('prism_rail_position')).toBe('left')
+    expect(rail()).toHaveStyle({ right: '0px' })
+    expect(localStorage.getItem('prism_rail_position')).toBe('right')
   })
 })
 
@@ -375,5 +385,87 @@ describe('ChannelRail — content and states', () => {
 
     expect(screen.getByTestId('channel-rail')).toBeInTheDocument()
     expect(screen.getAllByTestId('rail-placeholder')).toHaveLength(5)
+  })
+
+  // These two exercise a *transition*, not a static mock — the bug class
+  // the whole-branch review found (auth and route going stale under a rail
+  // that never unmounts) is invisible to a render-once test by construction.
+
+  it('reacts to a logout: hides stale follows and shows the signed-out affordance', () => {
+    const { rerender } = setup({ follows: [live(0), live(1)] })
+    fireEvent.focusIn(rail())
+    expect(screen.getByText('Chan0')).toBeInTheDocument()
+
+    // The Header's own useTwitchAuth() instance is what would call
+    // logout() in the app; that only ever touches AppContext. The rail's
+    // *own* useTwitchAuth() mock is deliberately left unchanged here —
+    // still reporting authenticated — mirroring the real per-instance hook
+    // staying frozen after another instance's logout. Only state.auth
+    // updates, same as the real LOGOUT reducer case.
+    mockApp.mockReturnValue({
+      state: {
+        auth: { isAuthenticated: false, token: null, user: null },
+        channel: { stream: null, profile: null },
+      },
+      dispatch,
+    } as unknown as ReturnType<typeof useApp>)
+
+    rerender(
+      <MemoryRouter key="/twitch/testchannel" initialEntries={['/twitch/testchannel']}>
+        <ChannelRail />
+      </MemoryRouter>,
+    )
+    fireEvent.focusIn(rail())
+
+    expect(screen.queryByText('Chan0')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /connect twitch/i })).toBeInTheDocument()
+  })
+
+  it('drops recommendations when the route leaves the Twitch channel page, keeping follows', () => {
+    const rec = {
+      id: 's1',
+      user_id: '99',
+      user_login: 'rec1',
+      user_name: 'Rec1',
+      game_name: 'Just Chatting',
+      title: 'hello',
+      viewer_count: 500,
+      started_at: '2026-09-22T00:00:00Z',
+    }
+
+    const { rerender } = setup({
+      path: '/twitch/testchannel',
+      gameId: '509658',
+      recommendations: [rec],
+    })
+    fireEvent.focusIn(rail())
+    expect(screen.getByRole('region', { name: /category/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /following/i })).toBeInTheDocument()
+
+    // From here, useCategoryRail must respond to whatever gameId
+    // ChannelRail actually computes on the next render — a static
+    // mockReturnValue can't distinguish "gated on route" from "gated on
+    // nothing". state.channel.stream is deliberately left untouched:
+    // nothing in the app ever clears it on navigation (GO_HOME is
+    // dispatched nowhere), so only the route moves, exactly like the real
+    // bug this test guards against.
+    mockCategory.mockImplementation(
+      (gameId: string | null) =>
+        ({
+          streams: gameId ? [rec] : [],
+          loading: false,
+          error: null,
+        }) as unknown as ReturnType<typeof useCategoryRail>,
+    )
+
+    rerender(
+      <MemoryRouter key="/" initialEntries={['/']}>
+        <ChannelRail />
+      </MemoryRouter>,
+    )
+    fireEvent.focusIn(rail())
+
+    expect(screen.queryByRole('region', { name: /category/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /following/i })).toBeInTheDocument()
   })
 })

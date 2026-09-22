@@ -2,7 +2,12 @@ import { useState, useCallback } from 'react'
 import { STORAGE_KEYS } from '../../config/storageKeys'
 import type { RailPosition } from './types'
 
-const DEFAULT_POSITION: RailPosition = 'right'
+// Left, not right: on the primary /twitch/:channel route chat also docks
+// right (see TwitchPlayerPage's DEFAULT_RATIO split), and at a 1280px
+// viewport the 260px expanded rail would fully cover it — more than the
+// spec's accepted cost of "occludes a narrow edge of the video." The left
+// edge is video, which is that trade. Users can still flip it.
+const DEFAULT_POSITION: RailPosition = 'left'
 
 /** Only these two have layouts. See the note on RailPosition. */
 function isImplemented(value: string | null): value is 'left' | 'right' {

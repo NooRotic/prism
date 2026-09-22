@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Heart, Compass, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
@@ -27,8 +28,20 @@ const LOADING_PLACEHOLDER_SIZE = 40
 
 export default function ChannelRail() {
   const { state, dispatch } = useApp()
-  const { isAuthenticated, login, handleAuthError } = useTwitchAuth()
+  const { login, handleAuthError } = useTwitchAuth()
+  // `useTwitchAuth`'s `isAuthenticated` is per-instance `useState` seeded at
+  // mount — fine for every previous caller, which was page-scoped and
+  // remounted on navigation. The rail mounts once in AppLayout and never
+  // unmounts, so a logout from the Header (a *different* useTwitchAuth
+  // instance) would never reach it. Read the value LOGOUT actually clears
+  // instead: AppContext. Accepted tradeoff: state.auth.isAuthenticated
+  // starts `false` and only flips `true` once useTwitchAuth's mount effect
+  // dispatches LOGIN, so a returning signed-in user sees one render of the
+  // collapsed signed-out strip. Invisible at the 56px collapsed width, but
+  // real — documented here rather than rediscovered later.
+  const isAuthenticated = state.auth.isAuthenticated
   const { position, flip } = useRailPosition()
+  const location = useLocation()
 
   const [expanded, setExpanded] = useState(false)
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -95,8 +108,17 @@ export default function ChannelRail() {
   )
   const follows = useFollowedChannels(userId, authOptions)
 
-  const gameId = isAuthenticated ? (state.channel.stream?.game_id ?? null) : null
-  const currentUserId = state.channel.stream?.user_id ?? null
+  // `state.channel.stream` is never cleared on navigation — the only
+  // action that clears it is GO_HOME, which nothing in the app dispatches
+  // — so it is not a valid proxy for "on a Twitch channel route." Derive
+  // that from the URL instead, mirroring the isPlayerPage pattern in
+  // App.tsx, so recommendations don't follow the user off the channel page.
+  const isTwitchChannelRoute = /^\/twitch\//.test(location.pathname)
+  const gameId =
+    isAuthenticated && isTwitchChannelRoute
+      ? (state.channel.stream?.game_id ?? null)
+      : null
+  const currentUserId = isAuthenticated ? (state.channel.stream?.user_id ?? null) : null
   const category = useCategoryRail(gameId, currentUserId)
 
   // A failing section hides itself and leaves its siblings intact. This is
