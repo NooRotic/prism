@@ -1,3 +1,6 @@
+import { STORAGE_KEYS } from '../config/storageKeys'
+import { logger } from './logger'
+
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || ''
 const REDIRECT_URI_OVERRIDE = import.meta.env.VITE_TWITCH_REDIRECT_URI || ''
 
@@ -55,12 +58,12 @@ function getRedirectUri(): string {
 
 export function loginWithTwitch() {
   if (!CLIENT_ID) {
-    console.error('VITE_TWITCH_CLIENT_ID is not set. Create a .env file from .env.example.')
+    logger.error('VITE_TWITCH_CLIENT_ID is not set. Create a .env file from .env.example.')
     return
   }
 
   const state = Math.random().toString(36).substring(2)
-  sessionStorage.setItem('twitch_oauth_state', state)
+  sessionStorage.setItem(STORAGE_KEYS.SESSION_TWITCH_OAUTH_STATE, state)
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -81,15 +84,15 @@ export function handleTwitchRedirect(): string | null {
   const state = params.get('state')
 
   // Validate state to prevent CSRF
-  const savedState = sessionStorage.getItem('twitch_oauth_state')
+  const savedState = sessionStorage.getItem(STORAGE_KEYS.SESSION_TWITCH_OAUTH_STATE)
   if (state && savedState && state !== savedState) {
-    console.warn('OAuth state mismatch — possible CSRF attempt')
+    logger.error('OAuth state mismatch — possible CSRF attempt')
     return null
   }
 
   if (accessToken) {
-    localStorage.setItem('twitch_access_token', accessToken)
-    sessionStorage.removeItem('twitch_oauth_state')
+    localStorage.setItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN, accessToken)
+    sessionStorage.removeItem(STORAGE_KEYS.SESSION_TWITCH_OAUTH_STATE)
     // Clean the URL hash without losing the path
     window.history.replaceState(null, '', window.location.pathname + window.location.search)
     return accessToken
@@ -99,11 +102,11 @@ export function handleTwitchRedirect(): string | null {
 }
 
 export function getStoredToken(): string | null {
-  return localStorage.getItem('twitch_access_token')
+  return localStorage.getItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN)
 }
 
 export function clearToken() {
-  localStorage.removeItem('twitch_access_token')
+  localStorage.removeItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN)
 }
 
 export function isAuthenticated(): boolean {

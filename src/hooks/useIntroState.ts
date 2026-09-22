@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { getRandomTemplate, type IntroTemplateName } from '../lib/introTemplates'
+import { STORAGE_KEYS } from '../config/storageKeys'
 
-const STORAGE_KEY = 'prism_intros_seen'
+const STORAGE_KEY = STORAGE_KEYS.LOCAL_INTROS_SEEN
 
 interface IntrosSeen {
   [channelName: string]: IntroTemplateName

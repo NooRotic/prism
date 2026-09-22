@@ -1,6 +1,7 @@
 /**
  * WebGL utility functions for shader compilation and program linking.
  */
+import { logger } from './logger'
 
 /**
  * Compiles a WebGL shader from source code.
@@ -13,7 +14,7 @@ export function createShader(
 ): WebGLShader | null {
   const shader = gl.createShader(type);
   if (!shader) {
-    console.warn("[ShaderUtils] Failed to create shader object");
+    logger.warn("[ShaderUtils] Failed to create shader object");
     return null;
   }
 
@@ -22,7 +23,7 @@ export function createShader(
 
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
     const info = gl.getShaderInfoLog(shader);
-    console.warn(
+    logger.warn(
       `[ShaderUtils] Shader compilation failed:\n${info ?? "Unknown error"}`
     );
     gl.deleteShader(shader);
@@ -43,7 +44,7 @@ export function createProgram(
 ): WebGLProgram | null {
   const program = gl.createProgram();
   if (!program) {
-    console.warn("[ShaderUtils] Failed to create program object");
+    logger.warn("[ShaderUtils] Failed to create program object");
     return null;
   }
 
@@ -53,7 +54,7 @@ export function createProgram(
 
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     const info = gl.getProgramInfoLog(program);
-    console.warn(
+    logger.warn(
       `[ShaderUtils] Program linking failed:\n${info ?? "Unknown error"}`
     );
     gl.deleteProgram(program);

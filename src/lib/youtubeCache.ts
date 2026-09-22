@@ -1,4 +1,6 @@
 import type { YouTubeVideo } from './youtubeApi'
+import { STORAGE_KEYS } from '../config/storageKeys'
+import { logger } from './logger'
 
 export interface CachedYouTubeResults {
   videos: YouTubeVideo[]
@@ -7,7 +9,7 @@ export interface CachedYouTubeResults {
   query: string
 }
 
-const CACHE_KEY_PREFIX = 'prism_yt_cache_'
+const CACHE_KEY_PREFIX = STORAGE_KEYS.LOCAL_YOUTUBE_CACHE_PREFIX
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 export function getCachedResults(categoryId: string): CachedYouTubeResults | null {
@@ -27,7 +29,7 @@ export function setCachedResults(categoryId: string, data: CachedYouTubeResults)
     localStorage.setItem(`${CACHE_KEY_PREFIX}${categoryId}`, JSON.stringify(data))
   } catch (err) {
     if (err instanceof DOMException && err.name === 'QuotaExceededError') {
-      console.warn('[youtubeCache] localStorage quota exceeded — skipping cache write for', categoryId)
+      logger.warn('[youtubeCache] localStorage quota exceeded — skipping cache write for', categoryId)
     }
   }
 }
@@ -48,7 +50,7 @@ export function appendCachedPage(
     localStorage.setItem(`${CACHE_KEY_PREFIX}${categoryId}`, JSON.stringify(updated))
   } catch (err) {
     if (err instanceof DOMException && err.name === 'QuotaExceededError') {
-      console.warn('[youtubeCache] localStorage quota exceeded — skipping cache append for', categoryId)
+      logger.warn('[youtubeCache] localStorage quota exceeded — skipping cache append for', categoryId)
     }
   }
 }
