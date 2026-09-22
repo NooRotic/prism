@@ -5,6 +5,7 @@ import { Header } from './components/layout/Header'
 import FollowingPanel from './components/layout/FollowingPanel'
 import YourStatsPanel from './components/layout/YourStatsPanel'
 import CategoryPanel from './components/layout/CategoryPanel'
+import ChannelRail from './components/rail/ChannelRail'
 import MatrixRainBackground from './components/ui/MatrixRainBackground'
 import { OnboardingIntro } from './components/intro/OnboardingIntro'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
@@ -105,6 +106,11 @@ function AppLayout() {
       <FollowingPanel />
       <YourStatsPanel />
       <CategoryPanel />
+
+      {/* Channel rail — fixed overlay at z-25, above the player, below the
+          panels its +N control opens. Mounted here rather than on the Twitch
+          player page so follows are reachable on every route. */}
+      <ChannelRail />
 
       {/* Route content */}
       <Outlet />
