@@ -54,9 +54,12 @@ export default function RailSection({
         {icon}
         {expanded && (
           <span
-            className="text-xs uppercase"
+            className="text-xs font-semibold uppercase"
             style={{
-              color: 'var(--text-muted)',
+              // text-secondary, not text-muted: these are the rail's only
+              // structural labels, and muted at 12px on a translucent dark
+              // panel was too faint to scan.
+              color: 'var(--text-secondary)',
               fontFamily: 'var(--font-mono)',
               letterSpacing: '0.08em',
             }}

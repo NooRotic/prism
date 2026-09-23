@@ -85,4 +85,45 @@ describe('RailEntryCard', () => {
     expect(screen.getByText('xQc')).toBeInTheDocument()
     expect(screen.queryByText('42,315')).not.toBeInTheDocument()
   })
+
+  it('shows the stream title when expanded', () => {
+    renderCard(entry(), true)
+    expect(screen.getByTestId('rail-stream-title')).toHaveTextContent(
+      'juicer moment',
+    )
+  })
+
+  it('hides the stream title when collapsed', () => {
+    renderCard(entry(), false)
+    expect(screen.queryByTestId('rail-stream-title')).not.toBeInTheDocument()
+  })
+
+  it('clamps the stream title to two lines rather than letting it run on', () => {
+    renderCard(
+      entry({
+        streamTitle:
+          'an extremely long stream title that would otherwise wrap for many lines and push every other entry off the bottom of the rail',
+      }),
+      true,
+    )
+    // jsdom does not lay text out, so the clamp cannot be observed visually.
+    // Assert the declaration that produces it instead — if someone drops the
+    // line-clamp, a long title silently grows the row.
+    const title = screen.getByTestId('rail-stream-title')
+    expect(title).toHaveStyle({ WebkitLineClamp: '2' })
+    expect(title).toHaveStyle({ overflow: 'hidden' })
+  })
+
+  it('omits the title block entirely when the stream has no title', () => {
+    renderCard(entry({ streamTitle: null }), true)
+    expect(screen.queryByTestId('rail-stream-title')).not.toBeInTheDocument()
+    expect(screen.getByText('xQc')).toBeInTheDocument()
+  })
+
+  it('rings a live avatar in Twitch purple, not the app accent green', () => {
+    renderCard(entry(), false)
+    const style = screen.getByRole('presentation').getAttribute('style') ?? ''
+    expect(style).toContain('--accent-twitch')
+    expect(style).not.toContain('--accent-green')
+  })
 })

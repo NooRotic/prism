@@ -46,7 +46,10 @@ function RailAvatar({ entry }: { entry: RailEntry }) {
       onError={() => setFailed(true)}
       className="shrink-0 rounded-full"
       style={{
-        outline: entry.isLive ? '2px solid var(--accent-green)' : 'none',
+        // Twitch purple, not the app's accent green: the ring identifies the
+        // platform an entry came from, so a future YouTube or Kick section
+        // gets its own colour rather than every rail avatar looking alike.
+        outline: entry.isLive ? '2px solid var(--accent-twitch)' : 'none',
         outlineOffset: '1px',
       }}
     />
@@ -64,7 +67,7 @@ export default function RailEntryCard({ entry, expanded }: RailEntryCardProps) {
       to={entry.href}
       aria-label={entry.displayName}
       title={entry.streamTitle ?? entry.displayName}
-      className="flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-white/5"
+      className="flex items-start gap-3 rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-white/5"
     >
       <RailAvatar entry={entry} />
 
@@ -94,6 +97,26 @@ export default function RailEntryCard({ entry, expanded }: RailEntryCardProps) {
             )}
             {entry.startedAt && <StreamUptime startedAt={entry.startedAt} />}
           </div>
+
+          {entry.streamTitle && (
+            <span
+              data-testid="rail-stream-title"
+              className="text-xs"
+              style={{
+                color: 'var(--text-muted)',
+                // Two lines then ellipsis. Titles are unbounded user input —
+                // without the clamp one streamer's essay pushes every entry
+                // below it off the bottom of the rail.
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                lineHeight: 1.35,
+              }}
+            >
+              {entry.streamTitle}
+            </span>
+          )}
         </div>
       )}
     </Link>
