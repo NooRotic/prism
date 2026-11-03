@@ -83,22 +83,22 @@ export function handleTwitchRedirect(): string | null {
   const accessToken = params.get('access_token')
   const state = params.get('state')
 
-  // Validate state to prevent CSRF
+  // Not an OAuth callback (e.g. an in-page anchor): nothing to validate.
+  if (!accessToken) return null
+
+  // Validate state to prevent CSRF. Fail closed: a callback that omits `state`,
+  // or a session with no saved state, cannot be verified and must be rejected.
   const savedState = sessionStorage.getItem(STORAGE_KEYS.SESSION_TWITCH_OAUTH_STATE)
-  if (state && savedState && state !== savedState) {
+  if (!state || !savedState || state !== savedState) {
     logger.error('OAuth state mismatch — possible CSRF attempt')
     return null
   }
 
-  if (accessToken) {
-    localStorage.setItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN, accessToken)
-    sessionStorage.removeItem(STORAGE_KEYS.SESSION_TWITCH_OAUTH_STATE)
-    // Clean the URL hash without losing the path
-    window.history.replaceState(null, '', window.location.pathname + window.location.search)
-    return accessToken
-  }
-
-  return null
+  localStorage.setItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN, accessToken)
+  sessionStorage.removeItem(STORAGE_KEYS.SESSION_TWITCH_OAUTH_STATE)
+  // Clean the URL hash without losing the path
+  window.history.replaceState(null, '', window.location.pathname + window.location.search)
+  return accessToken
 }
 
 export function getStoredToken(): string | null {
