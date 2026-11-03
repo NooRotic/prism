@@ -256,6 +256,38 @@ describe('TwitchEmbedPlayer', () => {
     expect(onReady).not.toHaveBeenCalled()
   })
 
+  it('stays ready, with no error, when the SDK player has no addEventListener (current SDK shape)', async () => {
+    const onError = vi.fn()
+    const onReady = vi.fn()
+    render(
+      <TwitchEmbedPlayer
+        url={streamDetection.originalUrl}
+        detection={streamDetection}
+        onReady={onReady}
+        onError={onError}
+      />,
+    )
+    // Flush waitForPaint without tripping the 15s timeout.
+    await vi.advanceTimersByTimeAsync(100)
+    const embed = embedInstances[0]
+    // Observed against the live SDK on 2026-11-03: getPlayer() returns a
+    // proxy exposing getters plus play/pause, but NO addEventListener.
+    // Calling it threw, which PlayerHost treated as an engine failure and
+    // answered by demoting to the plain (unmuted) iframe ~100ms after ready.
+    embed.getPlayer = vi.fn(() => ({
+      _embedWindow: {},
+      _playerState: {},
+      play: vi.fn(),
+      pause: vi.fn(),
+      isPaused: vi.fn(() => true),
+      getMuted: vi.fn(() => true),
+      getVolume: vi.fn(() => 0.5),
+    })) as unknown as typeof embed.getPlayer
+    embed.__fire('video.ready')
+    expect(onError).not.toHaveBeenCalled()
+    expect(onReady).toHaveBeenCalledTimes(1)
+  })
+
   it('fires onOffline / onOnline for stream detection only', async () => {
     const onOffline = vi.fn()
     const onOnline = vi.fn()

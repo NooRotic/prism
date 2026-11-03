@@ -28,7 +28,8 @@ interface TwitchEmbedInstance {
 interface TwitchPlayerInstance {
   pause: () => void
   play: () => void
-  addEventListener: (event: string, callback: () => void) => void
+  // Absent on the live SDK's player proxy — see fireReady.
+  addEventListener?: (event: string, callback: () => void) => void
   // Playback state getters — present on real Twitch.Player at runtime
   // but absent from the SDK's official type definitions, so we declare
   // them here as optional and consume them defensively.
@@ -248,16 +249,29 @@ export default function TwitchEmbedPlayer({
           const player = embed.getPlayer()
           playerRef.current = player
 
-          player.addEventListener(PLAYER_EVT.PAUSE, () => {
+          // The current Twitch SDK's getPlayer() returns a proxy with getters
+          // and play/pause but NO addEventListener (observed 2026-11-03).
+          // Calling it threw into the catch below, which demoted the engine
+          // chain to the plain iframe (no muted/autoplay) ~100ms after
+          // VIDEO_READY, so streams showed a play icon. Wire player-level
+          // events only when the method exists; a missing one is not an
+          // engine failure.
+          const listen = (event: string, cb: () => void) => {
+            if (typeof player.addEventListener === 'function') {
+              player.addEventListener(event, cb)
+            }
+          }
+
+          listen(PLAYER_EVT.PAUSE, () => {
             if (mountedRef.current) onPause?.()
           })
-          player.addEventListener(PLAYER_EVT.PLAY, () => {
+          listen(PLAYER_EVT.PLAY, () => {
             if (mountedRef.current) onPlay?.()
           })
-          player.addEventListener(PLAYER_EVT.ENDED, () => {
+          listen(PLAYER_EVT.ENDED, () => {
             if (mountedRef.current) onEnded?.()
           })
-          player.addEventListener(PLAYER_EVT.PLAYBACK_BLOCKED, () => {
+          listen(PLAYER_EVT.PLAYBACK_BLOCKED, () => {
             if (mountedRef.current) {
               onPlaybackBlocked?.()
               // Autoplay was blocked by the browser. Advance the chain so
@@ -267,10 +281,10 @@ export default function TwitchEmbedPlayer({
           })
           // OFFLINE / ONLINE are only meaningful for live streams.
           if (detection.platform === 'twitch-stream') {
-            player.addEventListener(PLAYER_EVT.OFFLINE, () => {
+            listen(PLAYER_EVT.OFFLINE, () => {
               if (mountedRef.current) onOffline?.()
             })
-            player.addEventListener(PLAYER_EVT.ONLINE, () => {
+            listen(PLAYER_EVT.ONLINE, () => {
               if (mountedRef.current) onOnline?.()
             })
           }
