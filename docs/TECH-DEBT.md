@@ -6,19 +6,15 @@
 
 ## HIGH - Fix before next feature phase
 
-### OAuth state check fails open (security)
-`src/lib/twitchAuth.ts` - `handleTwitchRedirect()` guards CSRF with:
-```ts
-if (state && savedState && state !== savedState) { /* reject */ }
-```
-Both operands must be present for the check to run at all. If the callback
-omits `state`, or `sessionStorage` has no `savedState` (cleared, different tab,
-storage blocked), validation is **skipped** and the token is accepted.
-Omitting the parameter entirely is the easiest bypass.
-- Fix: reject whenever `savedState` is missing or `state !== savedState`.
-  Only accept on an explicit match. Add a test for each fail-open path —
-  nothing in the current suite covers them.
+### ~~OAuth state check fails open (security)~~ - RESOLVED
+`handleTwitchRedirect()` in `src/lib/twitchAuth.ts` now rejects a token unless
+`state` is present, a saved state exists, and the two match. It used to run the
+check only when *both* were present, so omitting `state` (or a cleared
+`sessionStorage`) skipped CSRF validation and the token was accepted. One test
+per former fail-open path lives in `src/lib/__tests__/twitchAuth.test.ts`.
 - Found during review of PR #45 (2026-09-21). Pre-existing, not introduced there.
+- Still open nearby: `loginWithTwitch()` mints `state` with `Math.random()`.
+  `crypto.getRandomValues` is the right source for a CSRF token.
 
 ### Silent error swallowing - user-facing half still open
 PR #45 replaced the three `.catch(() => {})` bodies with `logger.warn`, but
