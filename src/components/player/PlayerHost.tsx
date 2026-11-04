@@ -9,7 +9,7 @@ import {
   Component,
 } from 'react'
 import type { ReactNode, ErrorInfo } from 'react'
-import { Settings, WifiOff } from 'lucide-react'
+import { WifiOff } from 'lucide-react'
 import type { URLDetectionResult, PlayerEngine } from '../../lib/urlDetection'
 import {
   getRecommendedEngine,
@@ -191,10 +191,6 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
     setLastTransitionAt(Date.now())
   }, [])
 
-  const toggleDebug = useCallback(() => {
-    dispatch({ type: 'TOGGLE_DEBUG' })
-  }, [dispatch])
-
   const playerProps: PlayerProps = {
     url,
     detection,
@@ -286,18 +282,9 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
         </div>
       )}
 
-      <button
-        onClick={toggleDebug}
-        className="absolute bottom-2 right-2 z-20 p-1.5 rounded-md transition-colors duration-150 hover:bg-white/10"
-        style={{
-          color: debugMode ? 'var(--accent-green)' : 'var(--text-muted)',
-        }}
-        title="Toggle debug overlay"
-        aria-label="Toggle debug overlay"
-      >
-        <Settings size={16} />
-      </button>
-
+      {/* No controls over the embed: anything drawn on top of the Twitch player
+          makes its visibility check fail and disables autoplay. The debug
+          toggle lives in the header (see Header.tsx). */}
       {debugMode && (
         <div
           className="absolute bottom-10 right-2 z-20 p-3 rounded-lg text-xs space-y-1 max-w-xs"
