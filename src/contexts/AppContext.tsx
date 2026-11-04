@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, type ReactNode } from 'react'
 import type { URLDetectionResult, PlayerEngine } from '../lib/urlDetection'
+import { getStoredToken } from '../lib/twitchAuth'
 import type {
   TwitchUser,
   TwitchChannel,
@@ -339,8 +340,17 @@ const AppContext = createContext<{
   dispatch: React.Dispatch<Action>
 } | null>(null)
 
+/**
+ * Starting state for the reducer. A stored token means the user is signed in
+ * from the very first render, so nothing flashes "Connect Twitch" on a reload.
+ */
+function initAppState(base: AppState): AppState {
+  const token = getStoredToken()
+  return token ? { ...base, auth: { ...base.auth, token, isAuthenticated: true } } : base
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(appReducer, initialState)
+  const [state, dispatch] = useReducer(appReducer, initialState, initAppState)
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>
 }
 

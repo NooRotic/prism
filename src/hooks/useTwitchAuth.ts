@@ -1,31 +1,23 @@
-import { useState, useEffect, useCallback } from 'react'
-import {
-  loginWithTwitch,
-  handleTwitchRedirect,
-  getStoredToken,
-  clearToken,
-} from '../lib/twitchAuth'
+import { useEffect, useCallback } from 'react'
+import { loginWithTwitch, handleTwitchRedirect, clearToken } from '../lib/twitchAuth'
 import { SessionExpiredError } from '../lib/twitchApi'
 import { useApp } from '../contexts/AppContext'
 
 export function useTwitchAuth() {
-  const { dispatch } = useApp()
-  const [token, setToken] = useState<string | null>(getStoredToken)
-  const [isAuthenticated, setIsAuthenticated] = useState(!!getStoredToken())
+  const { state, dispatch } = useApp()
+
+  // Signed-in state lives in AppContext, not in this hook. Many components call
+  // useTwitchAuth, and a private copy per caller went stale for all but one of
+  // them: the OAuth redirect hash is one-shot, so only the first caller to mount
+  // saw the login, and a logout or an expired session reached only its own copy.
+  // AppProvider seeds this from the stored token, so a reload starts signed in.
+  const { token, isAuthenticated } = state.auth
 
   useEffect(() => {
-    // Sync initial token state to AppContext
-    const stored = getStoredToken()
-    if (stored) {
-      dispatch({ type: 'LOGIN', token: stored })
-    }
-
-    // Check for OAuth redirect on mount
+    // Check for OAuth redirect on mount. Whichever caller mounts first consumes
+    // the hash; the context carries the result to every other caller.
     const redirectToken = handleTwitchRedirect()
     if (redirectToken) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing external OAuth redirect state on mount
-      setToken(redirectToken)
-      setIsAuthenticated(true)
       dispatch({ type: 'LOGIN', token: redirectToken })
     }
   }, [dispatch])
@@ -36,8 +28,6 @@ export function useTwitchAuth() {
 
   const logout = useCallback(() => {
     clearToken()
-    setToken(null)
-    setIsAuthenticated(false)
     dispatch({ type: 'LOGOUT' })
   }, [dispatch])
 
