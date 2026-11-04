@@ -64,6 +64,8 @@ function setup() {
         category: null,
       },
       search: { query: '', history: [] },
+      // The real <Header /> in the shell reads the debug toggle from here.
+      player: { debugMode: false },
     },
     dispatch: vi.fn(),
   } as unknown as ReturnType<typeof useApp>)
