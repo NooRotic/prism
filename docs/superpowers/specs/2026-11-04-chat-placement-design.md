@@ -111,6 +111,7 @@ For dragging there are two levels, and the owner picked the order:
 - **Plain snapping (the accepted fallback).** No zones. On release the chat docks to
   whichever half of the page the cursor is in. If drawing, showing and hiding the
   zones turns out to be more than a small amount of work, ship this.
+  **Status 2026-11-04: plain snapping ships; drop zones wait for Spike 1.**
 
 ### What the pop-out window contains
 
@@ -183,6 +184,10 @@ iframe, so it is **not** part of this work; noted so it is not forgotten.
    start?** Float a box over a *playing* embed in the owner's Chrome and watch. This
    decides how drop zones may be drawn. If it pauses, zones must stay out of the
    player, or the work falls back to plain snapping.
+   **Status 2026-11-04: not run.** It needs the owner's foreground Chrome (visibility
+   results from the automation browser are unreliable), so plain snapping ships first
+   and drop zones wait for this result. The script is in the implementation plan,
+   Task 4.
 2. **Does the Twitch chat embed render inside a PRISM-owned popup window?** (parent is
    our host, and `localhost` in development.) Expected yes: the docked chat is the same
    embed. If it does not, use the Twitch pop-out URL.
