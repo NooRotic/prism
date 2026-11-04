@@ -7,6 +7,7 @@ import ChatSource from './ChatSource'
 import ChatTab from './ChatTab'
 import { loadRatio, nextRatio } from './chatLayout'
 import { useChatPlacement } from './useChatPlacement'
+import { useDockDrag } from './useDockDrag'
 
 interface ChatDockProps {
   channel: string | undefined
@@ -20,8 +21,9 @@ interface ChatDockProps {
  * resize handle and the restore tab are all siblings beside its wrapper.
  */
 export default function ChatDock({ channel, player }: ChatDockProps) {
-  const { placement, hide, show, swapSide } = useChatPlacement()
+  const { placement, hide, show, setSide, swapSide } = useChatPlacement()
   const { side, hidden } = placement
+  const { handleProps: dragHandleProps } = useDockDrag(setSide)
 
   const [playerRatio, setPlayerRatio] = useState(loadRatio)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -88,7 +90,12 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
               border: '1px solid var(--border)',
             }}
           >
-            <ChatHeader side={side} onHide={hide} onSwapSide={swapSide} />
+            <ChatHeader
+              side={side}
+              onHide={hide}
+              onSwapSide={swapSide}
+              dragHandleProps={dragHandleProps}
+            />
             <div className="flex-1 min-h-0">
               {channel ? (
                 <ChatSource channel={channel} />

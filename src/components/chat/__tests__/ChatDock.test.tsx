@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { createEvent, render, screen, fireEvent } from '@testing-library/react'
 import ChatDock from '../ChatDock'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
 
@@ -96,6 +96,27 @@ describe('ChatDock', () => {
     renderDock()
     const header = screen.getByTestId('chat-header')
     expect(header).toHaveClass('hidden', 'md:flex')
+  })
+
+  it('dragging the chat handle onto the left half docks the chat on the left, and remembers it', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true })
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true })
+    renderDock()
+    const handle = screen.getByTitle('Drag to dock the chat on the other side')
+
+    const fire = (type: 'pointerDown' | 'pointerMove' | 'pointerUp', clientX: number) => {
+      const event = createEvent[type](handle, { button: 0 })
+      Object.defineProperty(event, 'clientX', { value: clientX })
+      Object.defineProperty(event, 'clientY', { value: 100 })
+      Object.defineProperty(event, 'pointerId', { value: 1 })
+      fireEvent(handle, event)
+    }
+    fire('pointerDown', 900)
+    fire('pointerMove', 100)
+    fire('pointerUp', 100)
+
+    expect(screen.getByTestId('chat-dock')).toHaveClass('md:flex-row-reverse')
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.LOCAL_CHAT_PLACEMENT)!).side).toBe('left')
   })
 
   it('keeps the Show chat tab visible at every width, so a hidden chat can always be restored', () => {

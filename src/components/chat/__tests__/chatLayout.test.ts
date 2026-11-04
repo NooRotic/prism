@@ -1,4 +1,11 @@
-import { DEFAULT_RATIO, MAX_RATIO, MIN_RATIO, loadRatio, nextRatio } from '../chatLayout'
+import {
+  DEFAULT_RATIO,
+  MAX_RATIO,
+  MIN_RATIO,
+  loadRatio,
+  nextRatio,
+  sideForPoint,
+} from '../chatLayout'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
 
 describe('loadRatio', () => {
@@ -42,5 +49,14 @@ describe('nextRatio', () => {
 
   it('returns the previous ratio when the container has no width', () => {
     expect(nextRatio(0.8, 100, 0, 'right')).toBe(0.8)
+  })
+})
+
+describe('sideForPoint', () => {
+  it('is left strictly before the middle of the viewport and right from the middle on', () => {
+    expect(sideForPoint(0, 1000)).toBe('left')
+    expect(sideForPoint(499, 1000)).toBe('left')
+    expect(sideForPoint(500, 1000)).toBe('right')
+    expect(sideForPoint(1000, 1000)).toBe('right')
   })
 })

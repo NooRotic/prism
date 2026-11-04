@@ -15,6 +15,11 @@ export function loadRatio(): number {
   return val
 }
 
+/** Which side of the page a dragged chat should dock to: the half the pointer is in. */
+export function sideForPoint(clientX: number, viewportWidth: number): DockSide {
+  return clientX < viewportWidth / 2 ? 'left' : 'right'
+}
+
 /**
  * The player's share after a drag of `deltaX` px. Dragging right grows the
  * player when the chat is on the right, and shrinks it when the chat is on the
