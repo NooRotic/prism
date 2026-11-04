@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Eye, Calendar, Gamepad2, Smile, Shield, Lock, Radio } from 'lucide-react'
+import { Eye, Calendar, Gamepad2, Smile, Shield, Lock } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { detectURLType } from '../../lib/urlDetection'
@@ -38,6 +38,20 @@ function formatVideoDate(iso: string): string {
 interface CurrentItem {
   title: string
   meta: string[]
+}
+
+/** The pulsing red dot that marks a channel as live. Decorative: the word beside it carries the meaning. */
+function LiveDot() {
+  return (
+    <span
+      data-testid="live-dot"
+      aria-hidden="true"
+      className="relative flex h-2.5 w-2.5 shrink-0"
+    >
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+    </span>
+  )
 }
 
 function SignedOutHeader({
@@ -240,10 +254,7 @@ export default function ProfileSidebar() {
             border: '1px solid rgba(239, 68, 68, 0.3)',
           }}
         >
-          <span className="relative flex h-2.5 w-2.5 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
-          </span>
+          <LiveDot />
           <span className="text-sm font-medium text-red-400">LIVE</span>
           <div className="flex items-center gap-1 ml-auto">
             <Eye size={12} style={{ color: 'var(--text-muted)' }} />
@@ -260,14 +271,13 @@ export default function ProfileSidebar() {
           type="button"
           onClick={backToLive}
           title="Switch the player back to the live stream"
-          className="flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20"
+          className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md text-base font-medium text-red-400 transition-colors hover:bg-red-500/20"
           style={{
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
             border: '1px solid rgba(239, 68, 68, 0.3)',
           }}
         >
-          <Radio size={14} />
-          Back to live
+          Return to <LiveDot /> LIVE Stream
         </button>
       )}
 

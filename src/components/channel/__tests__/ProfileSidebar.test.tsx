@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { AppProvider, useApp } from '../../../contexts/AppContext'
 import { detectURLType } from '../../../lib/urlDetection'
 import ProfileSidebar from '../ProfileSidebar'
@@ -183,11 +183,19 @@ describe('ProfileSidebar back to live', () => {
     )
   }
 
-  const backButton = () => screen.queryByRole('button', { name: /back to live/i })
+  const backButton = () =>
+    screen.queryByRole('button', { name: /return to live stream/i })
 
   it('offers a way back to the live stream while a clip is playing', () => {
     renderPlaying(CLIP)
     expect(backButton()).toBeInTheDocument()
+  })
+
+  it('reads "Return to LIVE Stream" with the red live dot right beside LIVE', () => {
+    renderPlaying(CLIP)
+    const dot = within(backButton()!).getByTestId('live-dot')
+    expect(dot.previousSibling?.textContent).toMatch(/^Return to\s*$/)
+    expect(dot.nextSibling?.textContent).toMatch(/^\s*LIVE Stream$/)
   })
 
   it('offers a way back to the live stream while a VOD is playing', () => {
