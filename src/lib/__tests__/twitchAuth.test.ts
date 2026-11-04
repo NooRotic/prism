@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   getStoredToken,
   clearToken,
@@ -82,6 +82,39 @@ describe('twitchAuth', () => {
       window.location.hash = '#access_token=token_xyz&state=wrong_state&token_type=bearer'
       const result = handleTwitchRedirect()
       expect(result).toBeNull()
+    })
+
+    describe('fails closed when the CSRF state cannot be verified', () => {
+      beforeEach(() => {
+        // Rejections are logged via logger.error; keep test output quiet.
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+      })
+
+      afterEach(() => {
+        vi.restoreAllMocks()
+      })
+
+      it('rejects a token when the callback omits the state parameter', () => {
+        sessionStorage.setItem('twitch_oauth_state', 'expected_state')
+        window.location.hash = '#access_token=token_xyz&token_type=bearer'
+
+        expect(handleTwitchRedirect()).toBeNull()
+        expect(localStorage.getItem('twitch_access_token')).toBeNull()
+      })
+
+      it('rejects a token when no saved state exists to compare against', () => {
+        window.location.hash = '#access_token=token_xyz&state=forged_state&token_type=bearer'
+
+        expect(handleTwitchRedirect()).toBeNull()
+        expect(localStorage.getItem('twitch_access_token')).toBeNull()
+      })
+
+      it('rejects a token when both the state parameter and the saved state are missing', () => {
+        window.location.hash = '#access_token=token_xyz&token_type=bearer'
+
+        expect(handleTwitchRedirect()).toBeNull()
+        expect(localStorage.getItem('twitch_access_token')).toBeNull()
+      })
     })
   })
 })
