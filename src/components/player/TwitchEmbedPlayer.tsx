@@ -28,6 +28,7 @@ interface TwitchEmbedInstance {
 interface TwitchPlayerInstance {
   pause: () => void
   play: () => void
+  setMuted?: (muted: boolean) => void
   // Absent on the live SDK's player proxy — see fireReady.
   addEventListener?: (event: string, callback: () => void) => void
   // Playback state getters — present on real Twitch.Player at runtime
@@ -62,6 +63,10 @@ const EMBED_TIMEOUT_MS = 15000
 // SDK is working and call onReady ourselves. This is the backup signal
 // for the known-broken "autoplay blocked by style visibility" case.
 const IFRAME_LOAD_GRACE_MS = 3000
+// We ask for unmuted autoplay first. Browsers only allow sound without a click
+// once the site has earned engagement, so if playback has not started this long
+// after the player is ready we mute and play instead of leaving a play icon.
+const SOUND_AUTOPLAY_GRACE_MS = 3000
 
 // Player-level event names (fired on Twitch.Player from embed.getPlayer()).
 // Per https://dev.twitch.tv/docs/embed/video-and-clips/ these are string
@@ -169,6 +174,10 @@ export default function TwitchEmbedPlayer({
       EMBED_TIMEOUT_MS,
     )
     let iframeLoadGraceId: ReturnType<typeof setTimeout> | undefined
+    let soundFallbackId: ReturnType<typeof setTimeout> | undefined
+    // Set by the embed's own VIDEO_PLAY event (player-level events are not
+    // available on the live SDK, see fireReady).
+    let playbackStarted = false
 
     const clearTimeoutSafe = () => {
       if (timeoutId !== undefined) {
@@ -178,6 +187,10 @@ export default function TwitchEmbedPlayer({
       if (iframeLoadGraceId !== undefined) {
         clearTimeout(iframeLoadGraceId)
         iframeLoadGraceId = undefined
+      }
+      if (soundFallbackId !== undefined) {
+        clearTimeout(soundFallbackId)
+        soundFallbackId = undefined
       }
     }
 
@@ -207,15 +220,16 @@ export default function TwitchEmbedPlayer({
 
       const Embed = window.Twitch.Embed
 
-      // Build options. `muted: true` is required for reliable autoplay under
-      // browser policies. The real Twitch player still shows an unmute button.
+      // Build options. Sound first: `muted: false` lets a site the browser
+      // trusts autoplay with audio. Where the browser blocks that, VIDEO_PLAY
+      // never arrives and fireReady's timer falls back to muted playback.
       const options: Record<string, unknown> = {
         width: '100%',
         height: '100%',
         parent: [window.location.hostname],
         layout: 'video',
         autoplay: true,
-        muted: true,
+        muted: false,
         allowfullscreen: true,
       }
 
@@ -293,6 +307,23 @@ export default function TwitchEmbedPlayer({
           return
         }
 
+        // Sound-first fallback: a browser that blocks unmuted autoplay never
+        // lets VIDEO_PLAY arrive. Give it a moment, then mute and play so the
+        // stream still starts. Skipped if playback has already begun.
+        if (!playbackStarted) {
+          soundFallbackId = setTimeout(() => {
+            soundFallbackId = undefined
+            if (playbackStarted || !mountedRef.current) return
+            const p = playerRef.current
+            try {
+              p?.setMuted?.(true)
+              p?.play()
+            } catch {
+              // Non-fatal: the player's own play button still works.
+            }
+          }, SOUND_AUTOPLAY_GRACE_MS)
+        }
+
         // Start 1Hz metrics polling now that the player is ready.
         // Uses the Twitch.Player API's getter methods (getCurrentTime,
         // getDuration, getMuted, getVolume, getPlaybackStats) — these
@@ -325,6 +356,16 @@ export default function TwitchEmbedPlayer({
       try {
         const embed = new Embed(embedId, options)
         embedRef.current = embed
+
+        // Playback began (with sound, or after the muted fallback): stop
+        // waiting. Used internally only; onPlay stays wired at player level.
+        embed.addEventListener(Embed.VIDEO_PLAY, () => {
+          playbackStarted = true
+          if (soundFallbackId !== undefined) {
+            clearTimeout(soundFallbackId)
+            soundFallbackId = undefined
+          }
+        })
 
         // Primary ready signal: Twitch's own event.
         embed.addEventListener(Embed.VIDEO_READY, () => fireReady(embed))
