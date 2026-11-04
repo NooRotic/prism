@@ -15,6 +15,9 @@ interface MatrixRainProps {
   speed?: number
   /** Rain color. Default #39FF14 (PRISM accent green) */
   color?: string
+  /** Freeze on the last painted frame and stop scheduling work. An animating
+   *  full-viewport canvas stops Twitch's embed from autoplaying. Default false */
+  paused?: boolean
 }
 
 interface ColumnState {
@@ -29,13 +32,17 @@ export default function MatrixRainBackground({
   columnGap = 20,
   speed = 1,
   color = '#39FF14',
+  paused = false,
 }: MatrixRainProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const propsRef = useRef({ opacity, columnGap, speed, color })
+  const propsRef = useRef({ opacity, columnGap, speed, color, paused })
+  // Set by the animation effect; restarts the frame loop after a pause.
+  const resumeRef = useRef<() => void>(() => {})
 
   useEffect(() => {
-    propsRef.current = { opacity, columnGap, speed, color }
-  }, [opacity, columnGap, speed, color])
+    propsRef.current = { opacity, columnGap, speed, color, paused }
+    if (!paused) resumeRef.current()
+  }, [opacity, columnGap, speed, color, paused])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -83,8 +90,15 @@ export default function MatrixRainBackground({
 
     let lastTime = 0
     const interval = 50 // ~20fps
+    // True while a frame is scheduled; false once paused or reduced-motion.
+    let running = true
 
     function frame(time: number) {
+      if (propsRef.current.paused) {
+        // Freeze: keep the last painted frame and stop scheduling work.
+        running = false
+        return
+      }
       rafId = requestAnimationFrame(frame)
       if (!ctx || !canvas) return
 
@@ -138,14 +152,22 @@ export default function MatrixRainBackground({
     }
 
     rafId = requestAnimationFrame(frame)
+    resumeRef.current = () => {
+      if (!running) {
+        running = true
+        rafId = requestAnimationFrame(frame)
+      }
+    }
 
     function onMotionChange(e: MediaQueryListEvent) {
       if (e.matches) {
         cancelAnimationFrame(rafId)
+        running = false
         if (ctx && canvas) {
           ctx.clearRect(0, 0, canvas.width, canvas.height)
         }
       } else {
+        running = true
         rafId = requestAnimationFrame(frame)
       }
     }
@@ -153,6 +175,7 @@ export default function MatrixRainBackground({
 
     return () => {
       cancelAnimationFrame(rafId)
+      resumeRef.current = () => {}
       window.removeEventListener('resize', resize)
       motionQuery.removeEventListener('change', onMotionChange)
     }

@@ -90,7 +90,9 @@ function AppLayout() {
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)]">
-      <MatrixRainBackground opacity={rainOpacity} speed={rainSpeed} />
+      {/* Frozen on player pages: an animating full-viewport canvas stops
+          Twitch's embed from autoplaying (verified in Chrome 2026-11-03). */}
+      <MatrixRainBackground opacity={rainOpacity} speed={rainSpeed} paused={isPlayerPage} />
 
       {showOnboarding && !isAuthenticated && (
         <OnboardingIntro

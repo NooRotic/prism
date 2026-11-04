@@ -1,8 +1,8 @@
-import { render, screen, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PlayerHost from '../PlayerHost'
-import { AppProvider } from '../../../contexts/AppContext'
+import { AppProvider, useApp } from '../../../contexts/AppContext'
 import type { URLDetectionResult } from '../../../lib/urlDetection'
 import type { PlayerProps } from '../../../types/player'
 
@@ -56,10 +56,20 @@ const clipDetection: URLDetectionResult = {
   metadata: { clipId: 'AbcDef123' },
 }
 
+// The real toggle lives in the header (see Header.tsx), outside the player.
+// This stand-in lets the tests switch debug mode on the way the header does.
+function DebugSwitch() {
+  const { dispatch } = useApp()
+  return (
+    <button aria-label="test debug switch" onClick={() => dispatch({ type: 'TOGGLE_DEBUG' })} />
+  )
+}
+
 function renderHost(detection = streamDetection) {
   return render(
     <AppProvider>
       <PlayerHost url={detection.originalUrl} detection={detection} />
+      <DebugSwitch />
     </AppProvider>,
   )
 }
@@ -67,7 +77,7 @@ function renderHost(detection = streamDetection) {
 // The debug overlay is off by default, so tests that drive its controls
 // have to open it the way a user would.
 async function openDebugOverlay(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByLabelText('Toggle debug overlay'))
+  await user.click(screen.getByLabelText('test debug switch'))
 }
 
 describe('PlayerHost', () => {
@@ -84,6 +94,17 @@ describe('PlayerHost', () => {
   it('starts on the SDK engine for stream detection', async () => {
     renderHost(streamDetection)
     expect(await screen.findByTestId('mock-twitch-sdk')).toBeInTheDocument()
+  })
+
+  // Anything drawn over the Twitch embed makes Twitch's visibility check fail
+  // and disables autoplay (verified 2026-11-04: hiding the old in-player gear
+  // button flipped the check and playback started). With debug mode off and
+  // the stream online, the player host must render no controls at all.
+  it('renders no controls over the player', async () => {
+    renderHost(streamDetection)
+    await screen.findByTestId('mock-twitch-sdk')
+    const host = document.getElementById('player-host-outer') as HTMLElement
+    expect(within(host).queryAllByRole('button')).toHaveLength(0)
   })
 
   it('starts on the iframe engine for clip detection (SDK skipped)', async () => {

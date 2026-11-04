@@ -1,4 +1,5 @@
 import { render, cleanup } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TwitchEmbedPlayer from '../TwitchEmbedPlayer'
 import type { URLDetectionResult } from '../../../lib/urlDetection'
@@ -14,6 +15,7 @@ type Listener = () => void
 interface MockPlayer {
   pause: ReturnType<typeof vi.fn>
   play: ReturnType<typeof vi.fn>
+  setMuted: ReturnType<typeof vi.fn>
   addEventListener: ReturnType<typeof vi.fn>
   __fire: (event: string) => void
 }
@@ -35,6 +37,7 @@ function makeMockPlayer(): MockPlayer {
   return {
     pause: vi.fn(),
     play: vi.fn(),
+    setMuted: vi.fn(),
     addEventListener: vi.fn((event: string, cb: Listener) => {
       const arr = listeners.get(event) ?? []
       arr.push(cb)
@@ -156,7 +159,7 @@ describe('TwitchEmbedPlayer', () => {
     expect(embedInstances).toHaveLength(0)
   })
 
-  it('constructs Twitch.Embed with muted autoplay for stream detection', async () => {
+  it('constructs Twitch.Embed asking for unmuted (sound) autoplay for stream detection', async () => {
     render(
       <TwitchEmbedPlayer
         url={streamDetection.originalUrl}
@@ -168,7 +171,8 @@ describe('TwitchEmbedPlayer', () => {
     const opts = embedInstances[0].__options
     expect(opts.channel).toBe('ninja')
     expect(opts.autoplay).toBe(true)
-    expect(opts.muted).toBe(true)
+    // Sound first; the muted fallback below covers browsers that block it.
+    expect(opts.muted).toBe(false)
     expect(opts.parent).toEqual([window.location.hostname])
   })
 
@@ -256,6 +260,101 @@ describe('TwitchEmbedPlayer', () => {
     expect(onReady).not.toHaveBeenCalled()
   })
 
+  it('stays ready, with no error, when the SDK player has no addEventListener (current SDK shape)', async () => {
+    const onError = vi.fn()
+    const onReady = vi.fn()
+    render(
+      <TwitchEmbedPlayer
+        url={streamDetection.originalUrl}
+        detection={streamDetection}
+        onReady={onReady}
+        onError={onError}
+      />,
+    )
+    // Flush waitForPaint without tripping the 15s timeout.
+    await vi.advanceTimersByTimeAsync(100)
+    const embed = embedInstances[0]
+    // Observed against the live SDK on 2026-11-03: getPlayer() returns a
+    // proxy exposing getters plus play/pause, but NO addEventListener.
+    // Calling it threw, which PlayerHost treated as an engine failure and
+    // answered by demoting to the plain (unmuted) iframe ~100ms after ready.
+    embed.getPlayer = vi.fn(() => ({
+      _embedWindow: {},
+      _playerState: {},
+      play: vi.fn(),
+      pause: vi.fn(),
+      isPaused: vi.fn(() => true),
+      getMuted: vi.fn(() => true),
+      getVolume: vi.fn(() => 0.5),
+    })) as unknown as typeof embed.getPlayer
+    embed.__fire('video.ready')
+    expect(onError).not.toHaveBeenCalled()
+    expect(onReady).toHaveBeenCalledTimes(1)
+  })
+
+  // Sound-first autoplay: we ask for unmuted playback. Browsers only allow
+  // sound without a click once the site has earned engagement, so when playback
+  // has not started shortly after the player is ready we mute and play.
+  describe('sound-first autoplay with muted fallback', () => {
+    async function renderReady(
+      props: Partial<ComponentProps<typeof TwitchEmbedPlayer>> = {},
+      beforeReady?: (embed: MockEmbed) => void,
+    ) {
+      const utils = render(
+        <TwitchEmbedPlayer
+          url={streamDetection.originalUrl}
+          detection={streamDetection}
+          {...props}
+        />,
+      )
+      // Flush waitForPaint without tripping the 15s embed timeout.
+      await vi.advanceTimersByTimeAsync(100)
+      const embed = embedInstances[0]
+      beforeReady?.(embed)
+      embed.__fire('video.ready')
+      return { ...utils, embed }
+    }
+
+    it('mutes and plays when unmuted autoplay has not started 3s after ready', async () => {
+      const { embed } = await renderReady()
+      expect(embed.__player.play).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(3000)
+      expect(embed.__player.setMuted).toHaveBeenCalledWith(true)
+      expect(embed.__player.play).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves the sound on when playback starts in time', async () => {
+      const { embed } = await renderReady()
+      vi.advanceTimersByTime(1000)
+      embed.__fire('video.play')
+      vi.advanceTimersByTime(5000)
+      expect(embed.__player.setMuted).not.toHaveBeenCalled()
+      expect(embed.__player.play).not.toHaveBeenCalled()
+    })
+
+    it('stops waiting when the player unmounts first', async () => {
+      const { embed, unmount } = await renderReady()
+      unmount()
+      vi.advanceTimersByTime(5000)
+      expect(embed.__player.setMuted).not.toHaveBeenCalled()
+      expect(embed.__player.play).not.toHaveBeenCalled()
+    })
+
+    it('does not raise an error when the player has no setMuted', async () => {
+      const onError = vi.fn()
+      const play = vi.fn()
+      await renderReady({ onError }, (e) => {
+        e.getPlayer = vi.fn(() => ({
+          play,
+          pause: vi.fn(),
+        })) as unknown as typeof e.getPlayer
+      })
+      vi.advanceTimersByTime(3000)
+      expect(play).toHaveBeenCalledTimes(1)
+      expect(onError).not.toHaveBeenCalled()
+    })
+  })
+
   it('fires onOffline / onOnline for stream detection only', async () => {
     const onOffline = vi.fn()
     const onOnline = vi.fn()
@@ -336,6 +435,81 @@ describe('TwitchEmbedPlayer', () => {
     expect(onError).toHaveBeenCalledWith(
       expect.stringContaining('timed out'),
     )
+  })
+
+  // In a background tab (or any window that is not painting) requestAnimationFrame
+  // never fires, so the embed cannot be created. That is not an engine failure:
+  // the 15s timer used to expire anyway and demote the player to the plain
+  // iframe (no autoplay). The embed should be created when painting resumes,
+  // with a fresh budget from that moment.
+  describe('when the page is not painting (requestAnimationFrame never fires)', () => {
+    let rafQueue: FrameRequestCallback[] = []
+
+    beforeEach(() => {
+      rafQueue = []
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+        rafQueue.push(cb)
+        return rafQueue.length
+      })
+    })
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    async function resumePainting() {
+      while (rafQueue.length) {
+        const pending = rafQueue.splice(0)
+        pending.forEach((cb) => cb(16))
+      }
+      await vi.advanceTimersByTimeAsync(0)
+    }
+
+    it('does not demote or create the embed while painting is stalled', async () => {
+      const onError = vi.fn()
+      render(
+        <TwitchEmbedPlayer
+          url={streamDetection.originalUrl}
+          detection={streamDetection}
+          onError={onError}
+        />,
+      )
+      await vi.advanceTimersByTimeAsync(20000)
+      expect(onError).not.toHaveBeenCalled()
+      expect(embedInstances).toHaveLength(0)
+    })
+
+    it('creates the embed once painting resumes and gives it a fresh 15s', async () => {
+      const onError = vi.fn()
+      render(
+        <TwitchEmbedPlayer
+          url={streamDetection.originalUrl}
+          detection={streamDetection}
+          onError={onError}
+        />,
+      )
+      await vi.advanceTimersByTimeAsync(20000)
+      await resumePainting()
+      expect(embedInstances).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(14000)
+      expect(onError).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(onError).toHaveBeenCalledWith(expect.stringContaining('timed out'))
+    })
+
+    it('still times out when the SDK script never loads (a stall that is not about painting)', async () => {
+      delete window.Twitch
+      const onError = vi.fn()
+      render(
+        <TwitchEmbedPlayer
+          url={streamDetection.originalUrl}
+          detection={streamDetection}
+          onError={onError}
+        />,
+      )
+      await vi.advanceTimersByTimeAsync(16000)
+      expect(onError).toHaveBeenCalledWith(expect.stringContaining('timed out'))
+    })
   })
 
   it('does NOT fire onError after VIDEO_READY even if 20s elapses', async () => {
