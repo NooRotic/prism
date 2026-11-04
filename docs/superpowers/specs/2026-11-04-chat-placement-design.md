@@ -1,7 +1,8 @@
 # Chat Placement — Design
 
-**Status:** Decisions complete (the open questions were answered by the owner on
-2026-11-04). Ready for an implementation plan.
+**Status:** Implemented on `feat/chat-autoplay-ergonomics` (not pushed); drop zones are
+deferred and the acceptance run in the owner's Chrome is still to do. See
+"Implementation status" at the end.
 **Date:** 2026-11-04
 **Owner decisions:** see "Decided" (their words, paraphrased).
 
@@ -191,6 +192,9 @@ iframe, so it is **not** part of this work; noted so it is not forgotten.
 2. **Does the Twitch chat embed render inside a PRISM-owned popup window?** (parent is
    our host, and `localhost` in development.) Expected yes: the docked chat is the same
    embed. If it does not, use the Twitch pop-out URL.
+   **Result 2026-11-04: it renders.** `/chat/<channel>` showed Twitch's chat in full (live
+   messages, the message box and Chat button) with no header, rail or canvas, so the
+   PRISM-owned page stays and the fallback is not needed.
 3. **Does a saved window position survive a monitor that is no longer there?**
    Unverified; the owner has several monitors.
 
@@ -216,3 +220,28 @@ iframe, so it is **not** part of this work; noted so it is not forgotten.
   oracle; it is not a unit-testable property.
 - Opening the pop-out, closing it, and reloading the main page while it is open each
   leave the chat in a sensible place.
+
+## Implementation status
+
+Built and unit-tested (497 tests, build and lint clean):
+
+- Docked chat with hide/show and a restore tab beside the player (never over it), dock
+  side left or right via a header button and via dragging the header handle with plain
+  snapping, all remembered. The restore tab stays visible at every width, so a chat
+  hidden on desktop can always be restored on a narrow screen.
+- The pop-out: a header button opens `/chat/<channel>` in a window; it remembers its size
+  and position, follows the channel, re-attaches after a main-page reload, notices the OS
+  close button, and says so when the browser blocks the popup.
+
+Not built: **drop zones**, waiting for Spike 1.
+
+Still to do in the owner's foreground Chrome (the browser pane used for development has
+no real popups and cannot reliably evaluate Twitch's visibility check):
+
+1. The autoplay oracle on a live channel in each state: docked right, docked left,
+   hidden, and popped out with the window placed over the video.
+2. Real drag across the live player iframe, to confirm pointer capture keeps tracking.
+3. Pop-out: move it to another monitor, close it with the OS button (the chat returns),
+   reload the main page with it open (it re-attaches), change channel (it follows).
+4. Spike 1 (drop zones) and Spike 3 (saved position on a missing monitor).
+5. After deploy: load `https://prism.nooroticx.tv/chat/<channel>` directly.
