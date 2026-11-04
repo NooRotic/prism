@@ -1,11 +1,14 @@
-import { LogIn, LogOut } from 'lucide-react'
+import { LogIn, LogOut, Settings } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
+import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { SmartUrlInput } from '../search/SmartUrlInput'
 import HeaderNav from './HeaderNav'
 
 export function Header() {
   const { isAuthenticated, login, logout } = useTwitchAuth()
+  const { state, dispatch } = useApp()
+  const debugMode = state.player.debugMode
   const location = useLocation()
 
   // Only show SmartUrlInput in header when on the hub page
@@ -41,6 +44,21 @@ export function Header() {
 
       <div className="flex items-center gap-3">
         {showHeaderInput && <SmartUrlInput />}
+
+        {/* Debug toggle lives here, not over the player: anything drawn on top
+            of the Twitch embed makes its visibility check fail and disables
+            autoplay. */}
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'TOGGLE_DEBUG' })}
+          className="p-1.5 rounded-md transition-colors duration-150 hover:bg-white/10"
+          style={{ color: debugMode ? 'var(--accent-green)' : 'var(--text-muted)' }}
+          title="Toggle debug overlay"
+          aria-label="Toggle debug overlay"
+          aria-pressed={debugMode}
+        >
+          <Settings size={16} />
+        </button>
 
         {isAuthenticated ? (
           <button

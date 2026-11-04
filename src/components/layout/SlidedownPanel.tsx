@@ -111,6 +111,15 @@ export default function SlidedownPanel({
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
         transform: isOpen ? 'translateY(0)' : 'translateY(-100%)',
+        // A closed panel stays mounted just above the viewport. Left merely
+        // off-screen it is still rendered, which stops Twitch's embed from
+        // autoplaying (verified in Chrome 2026-11-03). visibility:hidden takes
+        // it out of rendering: it flips after the slide-out finishes, and
+        // immediately on open so the slide-in is visible.
+        visibility: isOpen ? 'visible' : 'hidden',
+        transitionProperty: 'transform, visibility',
+        transitionDuration: '300ms, 0s',
+        transitionDelay: isOpen ? '0s, 0s' : '0s, 300ms',
         // When closed, forbid pointer events so the hidden panel
         // doesn't intercept clicks on content beneath it.
         pointerEvents: isOpen ? 'auto' : 'none',

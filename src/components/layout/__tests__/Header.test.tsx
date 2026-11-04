@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { AppProvider } from '../../../contexts/AppContext'
+import { AppProvider, useApp } from '../../../contexts/AppContext'
 import { Header } from '../Header'
 import { useTwitchAuth } from '../../../hooks/useTwitchAuth'
 
@@ -21,11 +21,17 @@ vi.mock('../../search/SmartUrlInput', () => ({
 
 const mockedUseTwitchAuth = vi.mocked(useTwitchAuth)
 
+function DebugState() {
+  const { state } = useApp()
+  return <div data-testid="debug-state">{state.player.debugMode ? 'on' : 'off'}</div>
+}
+
 function renderHeader() {
   return render(
     <MemoryRouter>
       <AppProvider>
         <Header />
+        <DebugState />
       </AppProvider>
     </MemoryRouter>,
   )
@@ -82,6 +88,17 @@ describe('Header', () => {
     const user = userEvent.setup()
     await user.click(screen.getByText('connect twitch'))
     expect(loginFn).toHaveBeenCalledOnce()
+  })
+
+  // The toggle lives in the header, not over the player: anything drawn on
+  // top of the Twitch embed makes Twitch's visibility check fail and disables
+  // autoplay (verified 2026-11-04: hiding the in-player gear flipped it).
+  it('has a debug toggle that switches debug mode', async () => {
+    renderHeader()
+    expect(screen.getByTestId('debug-state')).toHaveTextContent('off')
+    const user = userEvent.setup()
+    await user.click(screen.getByLabelText('Toggle debug overlay'))
+    expect(screen.getByTestId('debug-state')).toHaveTextContent('on')
   })
 
   it('calls logout() when logout button is clicked', async () => {
