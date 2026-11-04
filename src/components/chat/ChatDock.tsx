@@ -16,8 +16,8 @@ import { useFillMode } from './useFillMode'
 import { useFullscreen } from './useFullscreen'
 
 // Literal class strings, because Tailwind cannot see classes built from pieces.
-// The md-only variants are the fill layout when chat is docked: below 768px the
-// stacked layout stays. The unprefixed ones apply at every width, for chat that
+// The md-only variants are the fill layout when chat is docked: below the md
+// breakpoint the stacked layout stays. The unprefixed ones apply at every width, for chat that
 // is hidden or popped out, where there is no side-by-side layout to conflict.
 const ROW_NORMAL = 'w-full max-w-[1600px] mx-auto min-h-[360px]'
 const ROW_FILL_MD = 'md:fixed md:inset-0 md:z-50 md:max-w-none md:mx-0 md:min-h-0 md:bg-[var(--bg)]'

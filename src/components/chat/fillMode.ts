@@ -7,8 +7,8 @@
 export const FILL_ATTRIBUTE = 'data-fill'
 
 /**
- * `md`: the fill layout applies at 768px and wider (chat is docked, so below
- * that the stacked layout stays). `all`: it applies at every width (chat is
+ * `md`: the fill layout applies from Tailwind's md breakpoint up (chat is docked,
+ * so below that the stacked layout stays). `all`: it applies at every width (chat is
  * hidden or popped out, so there is no side-by-side layout to conflict).
  */
 export type FillScope = 'md' | 'all'
