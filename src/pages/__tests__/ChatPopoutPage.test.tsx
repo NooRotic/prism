@@ -10,12 +10,13 @@ import { createFakePopoutBus } from '../../test/fakePopoutBus'
 const createFakeBus = createFakePopoutBus
 
 function LocationProbe() {
-  return <output data-testid="location">{useLocation().pathname}</output>
+  const { pathname, search } = useLocation()
+  return <output data-testid="location">{pathname + search}</output>
 }
 
-const renderPage = (bus: PopoutBus, channel = 'streamer') =>
+const renderPage = (bus: PopoutBus, channel = 'streamer', search = '?owner=tab-1') =>
   render(
-    <MemoryRouter initialEntries={[`/chat/${channel}`]}>
+    <MemoryRouter initialEntries={[`/chat/${channel}${search}`]}>
       <Routes>
         <Route path="/chat/:channel" element={<ChatPopoutPage bus={bus} />} />
       </Routes>
@@ -62,61 +63,62 @@ describe('ChatPopoutPage', () => {
     expect(screen.getByTitle('streamer Twitch chat')).toBeInTheDocument()
   })
 
-  it('posts hello with the channel on mount', () => {
+  it('posts hello with its owner and the channel on mount', () => {
     const { bus, posted } = createFakeBus()
     renderPage(bus)
-    expect(posted).toContainEqual({ type: 'hello', channel: 'streamer' })
+    expect(posted).toContainEqual({ type: 'hello', owner: 'tab-1', channel: 'streamer' })
   })
 
-  it('answers ping with hello', () => {
+  it('answers its owner’s ping with hello', () => {
     const { bus, posted, deliver } = createFakeBus()
     renderPage(bus)
     posted.length = 0
 
-    deliver({ type: 'ping' })
+    deliver({ type: 'ping', owner: 'tab-1' })
 
-    expect(posted).toEqual([{ type: 'hello', channel: 'streamer' }])
+    expect(posted).toEqual([{ type: 'hello', owner: 'tab-1', channel: 'streamer' }])
   })
 
-  it('set-channel switches the chat to the new channel and the URL', () => {
+  it('set-channel from its owner switches the chat to the new channel and keeps the owner in the URL', () => {
     const { bus, deliver } = createFakeBus()
     renderPage(bus)
 
-    deliver({ type: 'set-channel', channel: 'someone-else' })
+    deliver({ type: 'set-channel', owner: 'tab-1', channel: 'someone-else' })
 
     expect(screen.getByTitle('someone-else Twitch chat')).toBeInTheDocument()
     expect(screen.queryByTitle('streamer Twitch chat')).not.toBeInTheDocument()
-    expect(screen.getByTestId('location')).toHaveTextContent('/chat/someone-else')
+    // The owner must survive, or a reload of the pop-out would orphan it.
+    expect(screen.getByTestId('location')).toHaveTextContent('/chat/someone-else?owner=tab-1')
   })
 
   it('answers ping with the channel it was switched to', () => {
     const { bus, posted, deliver } = createFakeBus()
     renderPage(bus)
-    deliver({ type: 'set-channel', channel: 'someone-else' })
+    deliver({ type: 'set-channel', owner: 'tab-1', channel: 'someone-else' })
     posted.length = 0
 
-    deliver({ type: 'ping' })
+    deliver({ type: 'ping', owner: 'tab-1' })
 
-    expect(posted).toEqual([{ type: 'hello', channel: 'someone-else' }])
+    expect(posted).toEqual([{ type: 'hello', owner: 'tab-1', channel: 'someone-else' }])
   })
 
-  it('close closes the window', () => {
+  it('close from its owner closes the window', () => {
     const close = vi.spyOn(window, 'close').mockImplementation(() => {})
     const { bus, deliver } = createFakeBus()
     renderPage(bus)
 
-    deliver({ type: 'close' })
+    deliver({ type: 'close', owner: 'tab-1' })
 
     expect(close).toHaveBeenCalledOnce()
   })
 
-  it('pagehide posts closed and saves the content size, not the outer size that includes the frame', () => {
+  it('pagehide posts closed for its owner and saves the content size, not the outer size that includes the frame', () => {
     const { bus, posted } = createFakeBus()
     renderPage(bus)
 
     window.dispatchEvent(new Event('pagehide'))
 
-    expect(posted).toContainEqual({ type: 'closed' })
+    expect(posted).toContainEqual({ type: 'closed', owner: 'tab-1' })
     // window.open's width/height are the content area, so saving the outer size
     // would make the window grow by its frame every time it is reopened.
     expect(loadBounds()).toEqual({ width: 464, height: 680, left: 30, top: 40 })
@@ -203,10 +205,44 @@ describe('ChatPopoutPage', () => {
     unmount()
     posted.length = 0
 
-    deliver({ type: 'ping' })
+    deliver({ type: 'ping', owner: 'tab-1' })
     window.dispatchEvent(new Event('pagehide'))
 
     expect(posted).toEqual([])
+  })
+
+  describe('with other PRISM tabs open', () => {
+    it('ignores ping, set-channel and close from a tab that is not its owner', () => {
+      const close = vi.spyOn(window, 'close').mockImplementation(() => {})
+      const { bus, posted, deliver } = createFakeBus()
+      renderPage(bus)
+      posted.length = 0
+
+      deliver({ type: 'ping', owner: 'another-tab' })
+      deliver({ type: 'set-channel', owner: 'another-tab', channel: 'someone-else' })
+      deliver({ type: 'close', owner: 'another-tab' })
+
+      expect(posted).toEqual([])
+      expect(close).not.toHaveBeenCalled()
+      expect(screen.getByTitle('streamer Twitch chat')).toBeInTheDocument()
+      expect(screen.getByTestId('location')).toHaveTextContent('/chat/streamer?owner=tab-1')
+    })
+
+    it('a pop-out loaded directly, with no owner, answers nobody and obeys nobody', () => {
+      const close = vi.spyOn(window, 'close').mockImplementation(() => {})
+      const { bus, posted, deliver } = createFakeBus()
+      renderPage(bus, 'streamer', '')
+      expect(posted).toContainEqual({ type: 'hello', owner: '', channel: 'streamer' })
+      posted.length = 0
+
+      deliver({ type: 'ping', owner: 'tab-1' })
+      deliver({ type: 'set-channel', owner: 'tab-1', channel: 'someone-else' })
+      deliver({ type: 'close', owner: 'tab-1' })
+
+      expect(posted).toEqual([])
+      expect(close).not.toHaveBeenCalled()
+      expect(screen.getByTitle('streamer Twitch chat')).toBeInTheDocument()
+    })
   })
 })
 

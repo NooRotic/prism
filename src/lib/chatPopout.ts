@@ -4,19 +4,23 @@ import { STORAGE_KEYS } from '../config/storageKeys'
 export const POPOUT_WINDOW_NAME = 'prism-chat-popout'
 
 /**
- * What the main window and the pop-out say to each other.
+ * What the main window and the pop-out say to each other. Every message names
+ * its `owner`: the id of the PRISM tab that opened the pop-out (see `getTabId`).
+ * Several PRISM tabs share one BroadcastChannel, so each side ignores any
+ * message that is not about its own pop-out. A pop-out loaded directly has the
+ * empty owner, which no tab uses, so it answers nobody and obeys nobody.
  * - `hello`: pop-out → main. "I am alive and showing this channel." Also the reply to `ping`.
- * - `ping`: main → pop-out. "Is a pop-out alive?" Sent on load so a reloaded page can re-attach.
+ * - `ping`: main → pop-out. "Is my pop-out alive?" Sent on load so a reloaded page can re-attach.
  * - `set-channel`: main → pop-out. The viewer moved to another channel; follow.
  * - `close`: main → pop-out. Close yourself (used when the main page has no window handle).
  * - `closed`: pop-out → main. The window is going away.
  */
 export type PopoutMessage =
-  | { type: 'hello'; channel: string }
-  | { type: 'ping' }
-  | { type: 'set-channel'; channel: string }
-  | { type: 'close' }
-  | { type: 'closed' }
+  | { type: 'hello'; owner: string; channel: string }
+  | { type: 'ping'; owner: string }
+  | { type: 'set-channel'; owner: string; channel: string }
+  | { type: 'close'; owner: string }
+  | { type: 'closed'; owner: string }
 
 export interface PopoutBus {
   post(msg: PopoutMessage): void
@@ -26,7 +30,8 @@ export interface PopoutBus {
 
 function isPopoutMessage(data: unknown): data is PopoutMessage {
   if (typeof data !== 'object' || data === null) return false
-  const { type, channel } = data as Record<string, unknown>
+  const { type, owner, channel } = data as Record<string, unknown>
+  if (typeof owner !== 'string') return false
   switch (type) {
     case 'hello':
     case 'set-channel':
@@ -148,10 +153,38 @@ export function boundsToFeatures(bounds: WindowBounds | null): string {
 }
 
 /**
- * Where the pop-out window points. One function on purpose: if the PRISM-owned
- * page cannot host Twitch's chat, the fallback is returning Twitch's own
- * pop-out URL from here.
+ * Where the pop-out window points, naming the tab that owns it. One function on
+ * purpose: if the PRISM-owned page cannot host Twitch's chat, the fallback is
+ * returning Twitch's own pop-out URL from here (which has no owner, so it could
+ * not follow channel changes either).
  */
-export function buildPopoutUrl(channel: string): string {
-  return `/chat/${encodeURIComponent(channel)}`
+export function buildPopoutUrl(channel: string, owner: string): string {
+  return `/chat/${encodeURIComponent(channel)}?owner=${encodeURIComponent(owner)}`
+}
+
+function makeId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+
+let fallbackTabId: string | null = null
+
+/**
+ * An id for this browser tab. `sessionStorage` is per tab and survives a
+ * reload, so a reloaded page keeps owning the pop-out it opened. If storage is
+ * unavailable the id lasts as long as the page, which only costs re-attaching
+ * after a reload.
+ */
+export function getTabId(): string {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEYS.SESSION_TAB_ID)
+    if (stored) return stored
+    const id = makeId()
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_TAB_ID, id)
+    return id
+  } catch {
+    fallbackTabId ??= makeId()
+    return fallbackTabId
+  }
 }

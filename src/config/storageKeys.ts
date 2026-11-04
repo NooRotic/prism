@@ -31,4 +31,6 @@ export const STORAGE_KEYS = {
   LOCAL_CHAT_PLACEMENT: 'prism_chat_placement',
   /** Last size and position of the chat pop-out window (JSON). */
   LOCAL_CHAT_POPOUT_BOUNDS: 'prism_chat_popout_bounds',
+  /** Id of this browser tab, so a chat pop-out knows which tab owns it. Survives a reload. */
+  SESSION_TAB_ID: 'prism_tab_id',
 } as const

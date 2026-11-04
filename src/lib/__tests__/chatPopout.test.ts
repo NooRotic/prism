@@ -4,6 +4,7 @@ import {
   boundsToFeatures,
   buildPopoutUrl,
   createPopoutBus,
+  getTabId,
   loadBounds,
   saveBounds,
 } from '../chatPopout'
@@ -100,9 +101,42 @@ describe('boundsToFeatures', () => {
 })
 
 describe('buildPopoutUrl', () => {
-  it('points at the PRISM chat page and encodes the channel', () => {
-    expect(buildPopoutUrl('streamer')).toBe('/chat/streamer')
-    expect(buildPopoutUrl('a b/c')).toBe('/chat/a%20b%2Fc')
+  it('points at the PRISM chat page, names the owning tab, and encodes both', () => {
+    expect(buildPopoutUrl('streamer', 'tab-1')).toBe('/chat/streamer?owner=tab-1')
+    expect(buildPopoutUrl('a b/c', 't 1')).toBe('/chat/a%20b%2Fc?owner=t%201')
+  })
+})
+
+describe('getTabId', () => {
+  beforeEach(() => sessionStorage.clear())
+
+  it('creates an id, keeps it for the session, and stores it in sessionStorage', () => {
+    const id = getTabId()
+
+    expect(id).toBeTruthy()
+    expect(getTabId()).toBe(id)
+    expect(sessionStorage.getItem(STORAGE_KEYS.SESSION_TAB_ID)).toBe(id)
+  })
+
+  it('reuses the id an earlier page load of the same tab stored (a reload)', () => {
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_TAB_ID, 'from-before-the-reload')
+    expect(getTabId()).toBe('from-before-the-reload')
+  })
+
+  it('still returns one stable id when sessionStorage throws', () => {
+    const get = vi.spyOn(sessionStorage, 'getItem').mockImplementation(() => {
+      throw new DOMException('SecurityError')
+    })
+    const set = vi.spyOn(sessionStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('SecurityError')
+    })
+
+    const id = getTabId()
+    expect(id).toBeTruthy()
+    expect(getTabId()).toBe(id)
+
+    get.mockRestore()
+    set.mockRestore()
   })
 })
 
@@ -150,10 +184,14 @@ describe('createPopoutBus', () => {
     popout.subscribe(atPopout)
     main.subscribe(atMain)
 
-    main.post({ type: 'set-channel', channel: 'streamer' })
+    main.post({ type: 'set-channel', owner: 'tab-1', channel: 'streamer' })
 
     expect(FakeBroadcastChannel.instances.every((c) => c.name === POPOUT_WINDOW_NAME)).toBe(true)
-    expect(atPopout).toHaveBeenCalledExactlyOnceWith({ type: 'set-channel', channel: 'streamer' })
+    expect(atPopout).toHaveBeenCalledExactlyOnceWith({
+      type: 'set-channel',
+      owner: 'tab-1',
+      channel: 'streamer',
+    })
     expect(atMain).not.toHaveBeenCalled()
   })
 
@@ -165,7 +203,7 @@ describe('createPopoutBus', () => {
     const unsubscribe = popout.subscribe(cb)
 
     unsubscribe()
-    main.post({ type: 'ping' })
+    main.post({ type: 'ping', owner: 'tab-1' })
 
     expect(cb).not.toHaveBeenCalled()
   })
@@ -180,11 +218,14 @@ describe('createPopoutBus', () => {
     raw.postMessage(null)
     raw.postMessage('ping')
     raw.postMessage({ type: 'nope' })
-    raw.postMessage({ type: 'hello' }) // missing channel
-    raw.postMessage({ type: 'set-channel', channel: 42 })
-    raw.postMessage({ type: 'ping' } satisfies PopoutMessage)
+    raw.postMessage({ type: 'hello', owner: 'tab-1' }) // missing channel
+    raw.postMessage({ type: 'hello', channel: 'streamer' }) // missing owner
+    raw.postMessage({ type: 'set-channel', owner: 'tab-1', channel: 42 })
+    raw.postMessage({ type: 'ping' }) // missing owner
+    raw.postMessage({ type: 'closed', owner: 5 })
+    raw.postMessage({ type: 'ping', owner: 'tab-1' } satisfies PopoutMessage)
 
-    expect(cb).toHaveBeenCalledExactlyOnceWith({ type: 'ping' })
+    expect(cb).toHaveBeenCalledExactlyOnceWith({ type: 'ping', owner: 'tab-1' })
   })
 
   it('close() closes the underlying channel', () => {
@@ -198,7 +239,7 @@ describe('createPopoutBus', () => {
     const bus = createPopoutBus()
     const cb = vi.fn()
 
-    expect(() => bus.post({ type: 'ping' })).not.toThrow()
+    expect(() => bus.post({ type: 'ping', owner: 'tab-1' })).not.toThrow()
     const unsubscribe = bus.subscribe(cb)
     expect(typeof unsubscribe).toBe('function')
     expect(() => unsubscribe()).not.toThrow()

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import ChatSource from '../components/chat/ChatSource'
 import { createPopoutBus, saveBounds } from '../lib/chatPopout'
 import type { PopoutBus, WindowBounds } from '../lib/chatPopout'
@@ -29,13 +29,19 @@ interface ChatPopoutPageProps {
  */
 export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps) {
   const { channel = '' } = useParams<{ channel: string }>()
+  // The PRISM tab that opened this window. Empty when the page was loaded
+  // directly, which no tab uses, so such a window answers nobody and obeys nobody.
+  const [searchParams] = useSearchParams()
+  const owner = searchParams.get('owner') ?? ''
   const navigate = useNavigate()
 
   // The bus effect below runs once; these keep it reading the latest values.
   const channelRef = useRef(channel)
+  const ownerRef = useRef(owner)
   const navigateRef = useRef(navigate)
   useEffect(() => {
     channelRef.current = channel
+    ownerRef.current = owner
     navigateRef.current = navigate
   })
 
@@ -45,15 +51,23 @@ export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps
 
   useEffect(() => {
     const bus = injectedBus ?? createPopoutBus()
-    bus.post({ type: 'hello', channel: channelRef.current })
+    bus.post({ type: 'hello', owner: ownerRef.current, channel: channelRef.current })
 
     const unsubscribe = bus.subscribe((msg) => {
+      if (msg.owner !== ownerRef.current) return // another tab's pop-out
       switch (msg.type) {
         case 'ping':
-          bus.post({ type: 'hello', channel: channelRef.current })
+          bus.post({ type: 'hello', owner: ownerRef.current, channel: channelRef.current })
           break
         case 'set-channel':
-          navigateRef.current(`/chat/${encodeURIComponent(msg.channel)}`, { replace: true })
+          // Keep the owner in the URL, or a reload of this window would orphan it.
+          navigateRef.current(
+            {
+              pathname: `/chat/${encodeURIComponent(msg.channel)}`,
+              search: ownerRef.current ? `?owner=${encodeURIComponent(ownerRef.current)}` : '',
+            },
+            { replace: true },
+          )
           break
         case 'close':
           window.close()
@@ -71,7 +85,7 @@ export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps
     }
     const onPageHide = () => {
       saveBounds(readBounds())
-      bus.post({ type: 'closed' })
+      bus.post({ type: 'closed', owner: ownerRef.current })
     }
 
     // There is no window "move" event, so position is sampled as well as read on resize.

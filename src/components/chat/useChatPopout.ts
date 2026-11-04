@@ -4,6 +4,7 @@ import {
   boundsToFeatures,
   buildPopoutUrl,
   createPopoutBus,
+  getTabId,
   loadBounds,
 } from '../../lib/chatPopout'
 import type { PopoutBus } from '../../lib/chatPopout'
@@ -33,6 +34,8 @@ export function useChatPopout(
 ): UseChatPopoutReturn {
   const [isOpen, setIsOpen] = useState(false)
   const [blocked, setBlocked] = useState(false)
+  // Other PRISM tabs share the bus; this id says which pop-out is ours.
+  const [tabId] = useState(getTabId)
 
   const busRef = useRef<PopoutBus | null>(null)
   /** Only set when this page opened the window; a re-attached pop-out has no handle. */
@@ -45,6 +48,7 @@ export function useChatPopout(
     const bus = injectedBus ?? createPopoutBus()
     busRef.current = bus
     const unsubscribe = bus.subscribe((msg) => {
+      if (msg.owner !== tabId) return // another tab's pop-out
       if (msg.type === 'hello') {
         lastChannelRef.current = msg.channel
         setBlocked(false)
@@ -54,13 +58,13 @@ export function useChatPopout(
         setIsOpen(false)
       }
     })
-    bus.post({ type: 'ping' })
+    bus.post({ type: 'ping', owner: tabId })
     return () => {
       unsubscribe()
       if (!injectedBus) bus.close()
       busRef.current = null
     }
-  }, [injectedBus])
+  }, [injectedBus, tabId])
 
   // Notice a window closed with the OS button, which sends no message reliably.
   useEffect(() => {
@@ -85,15 +89,15 @@ export function useChatPopout(
     if (!isOpen || !channel) return
     if (lastChannelRef.current === channel) return
     lastChannelRef.current = channel
-    busRef.current?.post({ type: 'set-channel', channel })
-  }, [channel, isOpen])
+    busRef.current?.post({ type: 'set-channel', owner: tabId, channel })
+  }, [channel, isOpen, tabId])
 
   const open = useCallback(() => {
     if (!channel) return
     // Must run inside the click handler, or popup blockers refuse it. No
     // `noopener`: it would make this return null and lose the handle.
     const popup = window.open(
-      buildPopoutUrl(channel),
+      buildPopoutUrl(channel, tabId),
       POPOUT_WINDOW_NAME,
       boundsToFeatures(loadBounds()),
     )
@@ -105,7 +109,7 @@ export function useChatPopout(
     lastChannelRef.current = channel
     setBlocked(false)
     setIsOpen(true)
-  }, [channel])
+  }, [channel, tabId])
 
   const close = useCallback(() => {
     try {
@@ -115,9 +119,9 @@ export function useChatPopout(
     }
     popupRef.current = null
     // Covers a re-attached pop-out, which this page has no handle for.
-    busRef.current?.post({ type: 'close' })
+    busRef.current?.post({ type: 'close', owner: tabId })
     setIsOpen(false)
-  }, [])
+  }, [tabId])
 
   return { isOpen, blocked, open, close }
 }
