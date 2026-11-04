@@ -42,10 +42,14 @@ export default function TwitchPlayerPage() {
     }
   }, [channel]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll to top on channel change
+  // Scroll to top on channel change, and whenever the player is pointed at
+  // something: the clip and VOD grids and "Back to live" all sit below it, so
+  // without this the new video would start out of view. Every PLAY_URL stores
+  // a fresh `detection` object, so this also fires when the video already
+  // playing is selected again, and not for state changes that leave it alone.
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [channel])
+  }, [channel, player.detection])
 
   return (
     <div className="flex flex-col gap-4 w-full px-4 md:px-6 lg:px-8 pt-4 pb-8">
