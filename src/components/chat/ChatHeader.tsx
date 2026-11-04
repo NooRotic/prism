@@ -46,7 +46,9 @@ export default function ChatHeader({
   dragHandleProps,
 }: ChatHeaderProps) {
   const target: DockSide = side === 'left' ? 'right' : 'left'
-  const fillLabel = fill ? 'Exit fill mode' : 'Fill window'
+  // The header exists only while chat is docked, so filling here fills the video
+  // and the chat. (The strip, shown when chat is hidden, says "Fill window".)
+  const fillLabel = fill ? 'Exit fill mode' : 'Fill video & chat'
   const fullscreenLabel = isFullscreen ? 'Exit fullscreen' : 'Fullscreen chat and video'
   return (
     <div

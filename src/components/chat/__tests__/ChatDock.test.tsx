@@ -333,18 +333,32 @@ describe('ChatDock', () => {
     const setPlacement = (hidden: boolean, side: 'left' | 'right' = 'right') =>
       localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_PLACEMENT, JSON.stringify({ side, hidden }))
 
-    it('the header offers Fill window, and clicking it turns fill on and remembers it', () => {
+    it('the header offers Fill video & chat, and clicking it turns fill on and remembers it', () => {
       renderDock()
-      fireEvent.click(screen.getByRole('button', { name: 'Fill window' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Fill video & chat' }))
 
       expect(screen.getByRole('button', { name: 'Exit fill mode' })).toBeInTheDocument()
       expect(rootFill()).toBe('md')
       expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('true')
     })
 
+    // The two buttons fill different things: with chat docked it is the video and
+    // the chat, with chat hidden or popped out it is the video alone.
+    it('names the fill button for what it fills: video & chat in the header, the window in the strip', () => {
+      const docked = renderDock()
+      expect(screen.getByRole('button', { name: 'Fill video & chat' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Fill window' })).not.toBeInTheDocument()
+      docked.unmount()
+
+      setPlacement(true)
+      renderDock()
+      expect(screen.getByRole('button', { name: 'Fill window' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Fill video & chat' })).not.toBeInTheDocument()
+    })
+
     it('the header fill button reflects the state with aria-pressed', () => {
       renderDock()
-      const button = screen.getByRole('button', { name: 'Fill window' })
+      const button = screen.getByRole('button', { name: 'Fill video & chat' })
       expect(button).toHaveAttribute('aria-pressed', 'false')
 
       fireEvent.click(button)
@@ -403,7 +417,7 @@ describe('ChatDock', () => {
 
     it('keeps the same button element, and its focus, after it is clicked', () => {
       renderDock()
-      const button = screen.getByRole('button', { name: 'Fill window' })
+      const button = screen.getByRole('button', { name: 'Fill video & chat' })
       button.focus()
 
       fireEvent.click(button)
@@ -455,7 +469,7 @@ describe('ChatDock', () => {
       const player0 = screen.getByText('player')
       const wrapper0 = screen.getByTestId('chat-player')
 
-      fireEvent.click(screen.getByRole('button', { name: 'Fill window' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Fill video & chat' }))
       expect(screen.getByText('player')).toBe(player0)
       expect(screen.getByTestId('chat-player')).toBe(wrapper0)
 
@@ -468,7 +482,7 @@ describe('ChatDock', () => {
       renderDock()
       const player0 = screen.getByText('player')
 
-      fireEvent.click(screen.getByRole('button', { name: 'Fill window' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Fill video & chat' }))
       fireEvent.click(screen.getByRole('button', { name: 'Hide chat' }))
       fireEvent.click(screen.getByRole('button', { name: 'Exit fill mode' }))
 

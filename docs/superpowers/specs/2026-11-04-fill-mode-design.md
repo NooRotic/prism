@@ -218,10 +218,12 @@ names of the state and storage keys.
 
 ## Implementation status
 
-Built and unit-tested (the suite stands at 693 tests, build and lint clean): the remembered fill
+Built and unit-tested (the suite stands at 694 tests, build and lint clean): the remembered fill
 setting; the fill layout and the hidden page chrome (hide, never unmount); fullscreen of the dock
 row, tracked only for that element; fill and fullscreen buttons in the chat header and in a strip
-beside the player, with an exit in every chat state, Esc, and focus kept on a toggled button; chat
+beside the player (the fill button is named for what it fills: "Fill video & chat" in the header,
+where chat is docked, and "Fill window" in the strip, where it is not; both read "Exit fill mode"
+once on; the fullscreen button is "Fullscreen chat and video"), with an exit in every chat state, Esc, and focus kept on a toggled button; chat
 text size (state, scaled wrapper, header controls, and the pop-out's own strip), all following one
 saved size across windows. Nothing in the spec was left out.
 
