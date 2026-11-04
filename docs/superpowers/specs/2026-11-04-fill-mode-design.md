@@ -1,7 +1,8 @@
 # Fill Mode (PRISM-VIEW) — Design
 
-**Status:** Draft for the owner's approval; every question is answered. A fresh reviewer read it
-as the builder first; its answers are folded in as numbered calls below. Builds on `ChatDock`, which is
+**Status:** Approved by the owner and implemented on `feat/fill-mode` (not pushed); the checks in
+the owner's Chrome are still to do (see "Implementation status"). A fresh reviewer read it as the
+builder first; its answers are folded in as numbered calls below. Builds on `ChatDock`, which is
 in PR #55 (not yet merged).
 **Date:** 2026-11-04
 
@@ -179,6 +180,17 @@ existing keys. All remembered across visits.
   inside the iframe. The exact scale factor and crispness could not be measured reliably in the
   development browser, so **the fit must be confirmed in the owner's Chrome.**
 - The owner's screenshots show the pop-out working in a real Chrome window beside a playing stream.
+- Measured in the development browser after building (not the owner's Chrome): at 1440x900 with
+  fill on, the dock row is `fixed` and covers the whole window, the player fills the left 80% at
+  full height with no 16:9 box, and the header, rail, rain canvas and page sections are `display:
+  none`. A narrow window (600px) with chat docked keeps the stacked page; with chat hidden it fills
+  and shows a 36px bar of restore, fullscreen and exit-fill. The scaled chat at 150% lands exactly
+  on its container (outer, scaled box and iframe all the same size), in the dock and in a 420px
+  pop-out, and the strip that holds the buttons is outside the scaled area. This also found and
+  fixed an 8px overflow (player + handle + chat was wider than the row) that a full-window row
+  would have clipped.
+- The owner ran the scaling snippet on a live page; only the console echo came back, so how it
+  looked (crisp, typing, clipping) is still unreported.
 
 ## Acceptance
 
@@ -200,6 +212,28 @@ pop-out in another; the Volume Meter extension on and off.
 Shortcut keys (avoid Alt+F and anything that clashes with Chrome or with typing in chat), the exact
 scale steps and labels, icons, how the strip and header arrange their buttons, transitions, and the
 names of the state and storage keys.
+
+## Implementation status
+
+Built and unit-tested (the suite stands at 689 tests, build and lint clean): the remembered fill
+setting; the fill layout and the hidden page chrome (hide, never unmount); fullscreen of the dock
+row, tracked only for that element; fill and fullscreen buttons in the chat header and in a strip
+beside the player, with an exit in every chat state, Esc, and focus kept on a toggled button; chat
+text size (state, scaled wrapper, header controls, and the pop-out's own strip), all following one
+saved size across windows. Nothing in the spec was left out.
+
+Still to do in the owner's foreground Chrome (the development browser has no real popups and cannot
+evaluate Twitch's visibility check):
+
+1. The scaling check: text clearly bigger and crisp, nothing clipped, scrolling and typing work.
+2. The autoplay oracle (`IntersectionObserver` with `trackVisibility`, `isVisible` stays true) in
+   fill mode and in fullscreen both.
+3. Flipping fill on and off without the stream restarting.
+4. Fullscreen both: chat beside the video, and Esc leaving it; Twitch's own fullscreen button still
+   fullscreens the video only and does not flip our state.
+5. Text size changed from the pop-out's own strip, with the main window following.
+6. Fill mode in one window beside the pop-out in another, and a narrow video-only window filling.
+7. The Volume Meter extension on and off.
 
 ## Dependencies
 
