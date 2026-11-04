@@ -229,7 +229,25 @@ describe('buildTwitchEmbedUrl - clips use clips.twitch.tv host', () => {
   it('produces a clips.twitch.tv/embed URL for clip detections', () => {
     const detection = detectURLType('https://clips.twitch.tv/AbcDef123SlugXyz')
     const url = buildTwitchEmbedUrl(detection, 'example.com')
-    expect(url).toBe('https://clips.twitch.tv/embed?clip=AbcDef123SlugXyz&parent=example.com')
+    expect(url).toBe(
+      'https://clips.twitch.tv/embed?clip=AbcDef123SlugXyz&parent=example.com&autoplay=true',
+    )
+  })
+
+  // The clips embed defaults to autoplay=false (the live and VOD players default
+  // to true), and a clip iframe has no JS API to start playback afterwards, so
+  // the URL has to ask for it.
+  it('asks the clips embed to autoplay, as it is off by default', () => {
+    const detection = detectURLType('https://clips.twitch.tv/AbcDef123SlugXyz')
+    const url = new URL(buildTwitchEmbedUrl(detection, 'example.com')!)
+    expect(url.searchParams.get('autoplay')).toBe('true')
+  })
+
+  it('leaves the live and VOD players on their own autoplay default', () => {
+    for (const link of ['https://twitch.tv/ninja', 'https://twitch.tv/videos/123456789']) {
+      const url = new URL(buildTwitchEmbedUrl(detectURLType(link), 'example.com')!)
+      expect(url.searchParams.has('autoplay')).toBe(false)
+    }
   })
 
   it('uses player.twitch.tv for VOD detections', () => {

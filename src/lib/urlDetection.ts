@@ -145,6 +145,9 @@ export function buildTwitchEmbedUrl(detection: URLDetectionResult, parent?: stri
     const params = new URLSearchParams({
       clip: detection.metadata.clipId,
       parent: hostname,
+      // Unlike the live/VOD players (autoplay defaults to true), the clips embed
+      // defaults to false, and it has no JS API to start playback later.
+      autoplay: 'true',
     })
     return `https://clips.twitch.tv/embed?${params.toString()}`
   }
