@@ -4,29 +4,10 @@ import { vi } from 'vitest'
 import App from '../../App'
 import ChatPopoutPage from '../ChatPopoutPage'
 import { loadBounds } from '../../lib/chatPopout'
-import type { PopoutBus, PopoutMessage } from '../../lib/chatPopout'
+import type { PopoutBus } from '../../lib/chatPopout'
+import { createFakePopoutBus } from '../../test/fakePopoutBus'
 
-function createFakeBus() {
-  const subscribers = new Set<(msg: PopoutMessage) => void>()
-  const posted: PopoutMessage[] = []
-  const bus: PopoutBus = {
-    post: (msg) => {
-      posted.push(msg)
-    },
-    subscribe: (cb) => {
-      subscribers.add(cb)
-      return () => {
-        subscribers.delete(cb)
-      }
-    },
-    close: vi.fn(),
-  }
-  const deliver = (msg: PopoutMessage) =>
-    act(() => {
-      subscribers.forEach((cb) => cb(msg))
-    })
-  return { bus, posted, deliver }
-}
+const createFakeBus = createFakePopoutBus
 
 function LocationProbe() {
   return <output data-testid="location">{useLocation().pathname}</output>

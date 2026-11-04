@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, GripVertical, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ExternalLink, GripVertical, X } from 'lucide-react'
 import type { HTMLAttributes } from 'react'
 import type { DockSide } from './chatPlacement'
 
@@ -6,6 +6,7 @@ interface ChatHeaderProps {
   side: DockSide
   onHide: () => void
   onSwapSide: () => void
+  onPopOut: () => void
   /** Pointer handlers and style from useDockDrag, applied to the drag handle. */
   dragHandleProps: HTMLAttributes<HTMLElement>
 }
@@ -17,6 +18,7 @@ export default function ChatHeader({
   side,
   onHide,
   onSwapSide,
+  onPopOut,
   dragHandleProps,
 }: ChatHeaderProps) {
   const target: DockSide = side === 'left' ? 'right' : 'left'
@@ -43,6 +45,15 @@ export default function ChatHeader({
           className={buttonClass}
         >
           {target === 'left' ? <ArrowLeft size={14} /> : <ArrowRight size={14} />}
+        </button>
+        <button
+          type="button"
+          onClick={onPopOut}
+          aria-label="Pop out chat"
+          title="Pop out chat into its own window"
+          className={buttonClass}
+        >
+          <ExternalLink size={14} />
         </button>
         <button
           type="button"

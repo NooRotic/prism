@@ -7,6 +7,7 @@ import ChatSource from './ChatSource'
 import ChatTab from './ChatTab'
 import { loadRatio, nextRatio } from './chatLayout'
 import { useChatPlacement } from './useChatPlacement'
+import { useChatPopout } from './useChatPopout'
 import { useDockDrag } from './useDockDrag'
 
 interface ChatDockProps {
@@ -24,6 +25,9 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   const { placement, hide, show, setSide, swapSide } = useChatPlacement()
   const { side, hidden } = placement
   const { handleProps: dragHandleProps } = useDockDrag(setSide)
+  const popout = useChatPopout(channel)
+  // What the viewer sees: popped out, else hidden, else docked on `side`.
+  const chatVisible = !hidden && !popout.isOpen
 
   const [playerRatio, setPlayerRatio] = useState(loadRatio)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -61,7 +65,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
         className="w-full md:flex-none relative overflow-hidden rounded-lg"
         style={{
           width: undefined,
-          flex: hidden ? '1 1 0%' : `0 0 ${playerPercent}`,
+          flex: chatVisible ? `0 0 ${playerPercent}` : '1 1 0%',
           aspectRatio: '16 / 9',
           backgroundColor: 'var(--bg-card)',
           border: '1px solid var(--border)',
@@ -70,7 +74,9 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
         {player}
       </div>
 
-      {hidden ? (
+      {popout.isOpen ? (
+        <ChatTab side={side} label="Return chat to the page" onClick={popout.close} />
+      ) : hidden ? (
         <ChatTab side={side} label="Show chat" onClick={show} />
       ) : (
         <>
@@ -94,8 +100,18 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
               side={side}
               onHide={hide}
               onSwapSide={swapSide}
+              onPopOut={popout.open}
               dragHandleProps={dragHandleProps}
             />
+            {popout.blocked && (
+              <p
+                role="status"
+                className="px-3 py-2 text-xs"
+                style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+              >
+                Pop-up blocked. Allow pop-ups for this site to use the chat window.
+              </p>
+            )}
             <div className="flex-1 min-h-0">
               {channel ? (
                 <ChatSource channel={channel} />

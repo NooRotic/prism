@@ -1,6 +1,19 @@
 import { createEvent, render, screen, fireEvent } from '@testing-library/react'
 import ChatDock from '../ChatDock'
+import { useChatPopout } from '../useChatPopout'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
+
+// The pop-out's own behaviour is covered in useChatPopout.test.ts; here the dock
+// is only checked for how it reacts to the hook's state.
+vi.mock('../useChatPopout', () => ({ useChatPopout: vi.fn() }))
+
+const popout = (overrides: Partial<ReturnType<typeof useChatPopout>> = {}) => ({
+  isOpen: false,
+  blocked: false,
+  open: vi.fn(),
+  close: vi.fn(),
+  ...overrides,
+})
 
 const player = <div>player</div>
 const renderDock = (channel = 'streamer') =>
@@ -9,7 +22,11 @@ const renderDock = (channel = 'streamer') =>
 const chatFrame = () => screen.queryByTitle('streamer Twitch chat')
 
 describe('ChatDock', () => {
-  beforeEach(() => localStorage.clear())
+  beforeEach(() => {
+    localStorage.clear()
+    vi.mocked(useChatPopout).mockReset()
+    vi.mocked(useChatPopout).mockReturnValue(popout())
+  })
 
   it('docks the chat on the right by default', () => {
     renderDock()
@@ -117,6 +134,78 @@ describe('ChatDock', () => {
 
     expect(screen.getByTestId('chat-dock')).toHaveClass('md:flex-row-reverse')
     expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.LOCAL_CHAT_PLACEMENT)!).side).toBe('left')
+  })
+
+  it('hands the channel to the pop-out hook', () => {
+    renderDock()
+    expect(useChatPopout).toHaveBeenCalledWith('streamer')
+  })
+
+  it('the Pop out chat button calls open', () => {
+    const p = popout()
+    vi.mocked(useChatPopout).mockReturnValue(p)
+    renderDock()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pop out chat' }))
+
+    expect(p.open).toHaveBeenCalledOnce()
+  })
+
+  it('while popped out the chat panel is gone and Return chat to the page is shown', () => {
+    vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+    renderDock()
+
+    expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument()
+    expect(chatFrame()).not.toBeInTheDocument()
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+    const tab = screen.getByRole('button', { name: 'Return chat to the page' })
+    expect(screen.getByTestId('chat-player')).not.toContainElement(tab)
+  })
+
+  it('popped out wins over hidden', () => {
+    localStorage.setItem(
+      STORAGE_KEYS.LOCAL_CHAT_PLACEMENT,
+      JSON.stringify({ side: 'right', hidden: true }),
+    )
+    vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+    renderDock()
+
+    expect(screen.getByRole('button', { name: 'Return chat to the page' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show chat' })).not.toBeInTheDocument()
+  })
+
+  it('returning calls close, and the chat is back on the side it was docked', () => {
+    localStorage.setItem(
+      STORAGE_KEYS.LOCAL_CHAT_PLACEMENT,
+      JSON.stringify({ side: 'left', hidden: false }),
+    )
+    const p = popout({ isOpen: true })
+    vi.mocked(useChatPopout).mockReturnValue(p)
+    const { rerender } = renderDock()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Return chat to the page' }))
+    expect(p.close).toHaveBeenCalledOnce()
+
+    vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: false }))
+    rerender(<ChatDock channel="streamer" player={player} />)
+
+    expect(chatFrame()).toBeInTheDocument()
+    expect(screen.getByTestId('chat-dock')).toHaveClass('md:flex-row-reverse')
+  })
+
+  it('a blocked popup shows a status message and the chat stays docked', () => {
+    vi.mocked(useChatPopout).mockReturnValue(popout({ blocked: true }))
+    renderDock()
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Pop-up blocked. Allow pop-ups for this site to use the chat window.',
+    )
+    expect(chatFrame()).toBeInTheDocument()
+  })
+
+  it('shows no status message when nothing was blocked', () => {
+    renderDock()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('keeps the Show chat tab visible at every width, so a hidden chat can always be restored', () => {
