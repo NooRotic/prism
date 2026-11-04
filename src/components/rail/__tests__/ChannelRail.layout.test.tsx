@@ -132,6 +132,15 @@ describe('ChannelRail stays out of the page layout', () => {
     expect(style.position).toBe('fixed')
   })
 
+  it('is marked fill-hide so fill mode can hide it', () => {
+    render(
+      <MemoryRouter>
+        <ChannelRail />
+      </MemoryRouter>,
+    )
+    expect(screen.getByTestId('channel-rail')).toHaveClass('fill-hide')
+  })
+
   it('scrolls internally rather than growing the page', () => {
     render(
       <MemoryRouter>

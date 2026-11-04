@@ -217,7 +217,7 @@ export default function ChannelRail() {
       onFocus={openNow}
       onBlur={closeAfterDelay}
       onTouchStart={openNow}
-      className="flex flex-col gap-2 overflow-y-auto py-3 transition-[width] duration-150"
+      className="fill-hide flex flex-col gap-2 overflow-y-auto py-3 transition-[width] duration-150"
       style={{
         position: 'fixed',
         top: 'var(--header-height)',

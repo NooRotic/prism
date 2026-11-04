@@ -51,6 +51,18 @@
   --rail-reserve-right: 0px;
 }
 
+/* Fill mode. ChatDock sets data-fill on the page root while it is in effect; anything
+   marked fill-hide is hidden (never unmounted, so state survives). `md` applies at
+   768px and wider; `all` at every width (chat hidden or popped out). */
+:root[data-fill='all'] .fill-hide {
+  display: none !important;
+}
+@media (min-width: 768px) {
+  :root[data-fill='md'] .fill-hide {
+    display: none !important;
+  }
+}
+
 /* ─── Brushed metal surface ──────────────────────────────────────────
    A distinctive, anti-slop card/panel material (Law 9: "one memorable
    thing" — unusual surface texture).

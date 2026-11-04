@@ -184,6 +184,7 @@ export default function MatrixRainBackground({
   return (
     <canvas
       ref={canvasRef}
+      className="fill-hide"
       style={{
         position: 'fixed',
         inset: 0,

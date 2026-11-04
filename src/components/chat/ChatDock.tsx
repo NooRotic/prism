@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ResizableHandle } from '../layout/ResizableHandle'
 import { STORAGE_KEYS } from '../../config/storageKeys'
@@ -6,9 +6,23 @@ import ChatHeader from './ChatHeader'
 import ChatSource from './ChatSource'
 import ChatTab from './ChatTab'
 import { loadRatio, nextRatio } from './chatLayout'
+import { FILL_ATTRIBUTE, fillScopeFor } from './fillMode'
 import { useChatPlacement } from './useChatPlacement'
 import { useChatPopout } from './useChatPopout'
 import { useDockDrag } from './useDockDrag'
+import { useFillMode } from './useFillMode'
+
+// Literal class strings, because Tailwind cannot see classes built from pieces.
+// The md-only variants are the fill layout when chat is docked: below 768px the
+// stacked layout stays. The unprefixed ones apply at every width, for chat that
+// is hidden or popped out, where there is no side-by-side layout to conflict.
+const ROW_NORMAL = 'w-full max-w-[1600px] mx-auto min-h-[360px]'
+const ROW_FILL_MD = 'md:fixed md:inset-0 md:z-50 md:max-w-none md:mx-0 md:min-h-0 md:bg-[var(--bg)]'
+const ROW_FILL_ALL = 'w-full fixed inset-0 z-50 bg-[var(--bg)]'
+const PLAYER_NORMAL =
+  'w-full md:flex-none relative overflow-hidden rounded-lg border border-[color:var(--border)] aspect-video'
+const PLAYER_FILL_MD = 'md:aspect-auto md:rounded-none md:border-0'
+const PLAYER_FILL_ALL = 'w-full md:flex-none relative overflow-hidden aspect-auto'
 
 interface ChatDockProps {
   channel: string | undefined
@@ -29,6 +43,18 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   // What the viewer sees: popped out, else hidden, else docked on `side`.
   const chatVisible = !hidden && !popout.isOpen
 
+  // Fill mode: the remembered setting (fullscreen joins in a later task). The root
+  // attribute exists only while this dock is mounted, which is only on the Twitch
+  // player page, so no other page is ever affected.
+  const { fill } = useFillMode()
+  const scope = fillScopeFor({ fill, fullscreen: false, chatDocked: chatVisible })
+  useLayoutEffect(() => {
+    if (!scope) return
+    const root = document.documentElement
+    root.setAttribute(FILL_ATTRIBUTE, scope)
+    return () => root.removeAttribute(FILL_ATTRIBUTE)
+  }, [scope])
+
   const [playerRatio, setPlayerRatio] = useState(loadRatio)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -42,7 +68,11 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
 
   const handleResizeEnd = useCallback(() => {
     setPlayerRatio((current) => {
-      localStorage.setItem(STORAGE_KEYS.LOCAL_PANEL_RATIO, current.toFixed(3))
+      try {
+        localStorage.setItem(STORAGE_KEYS.LOCAL_PANEL_RATIO, current.toFixed(3))
+      } catch {
+        // storage full or unavailable — the split still holds for this session
+      }
       return current
     })
   }, [])
@@ -50,25 +80,29 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   const playerPercent = `${(playerRatio * 100).toFixed(1)}%`
   const chatPercent = `${((1 - playerRatio) * 100).toFixed(1)}%`
 
+  const direction = side === 'left' ? 'md:flex-row-reverse' : 'md:flex-row'
+  const rowClass =
+    scope === 'all' ? ROW_FILL_ALL : scope === 'md' ? `${ROW_NORMAL} ${ROW_FILL_MD}` : ROW_NORMAL
+  const playerClass =
+    scope === 'all'
+      ? PLAYER_FILL_ALL
+      : scope === 'md'
+        ? `${PLAYER_NORMAL} ${PLAYER_FILL_MD}`
+        : PLAYER_NORMAL
+
   return (
     <div
       ref={containerRef}
       data-testid="chat-dock"
-      className={`flex flex-col ${
-        side === 'left' ? 'md:flex-row-reverse' : 'md:flex-row'
-      } w-full max-w-[1600px] mx-auto`}
-      style={{ minHeight: '360px' }}
+      className={`flex flex-col ${direction} ${rowClass}`}
     >
       {/* Player */}
       <div
         data-testid="chat-player"
-        className="w-full md:flex-none relative overflow-hidden rounded-lg"
+        className={playerClass}
         style={{
-          width: undefined,
           flex: chatVisible ? `0 0 ${playerPercent}` : '1 1 0%',
-          aspectRatio: '16 / 9',
           backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border)',
         }}
       >
         {player}
@@ -90,7 +124,9 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
             data-testid="chat-panel"
             className="w-full md:flex-none rounded-lg overflow-hidden flex flex-col"
             style={{
-              flex: `0 0 ${chatPercent}`,
+              // Shrinkable: player% + the 8px handle + chat% is 8px over the row,
+              // which a full-window row would clip off-screen.
+              flex: `0 1 ${chatPercent}`,
               minHeight: '300px',
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border)',

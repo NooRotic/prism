@@ -101,6 +101,13 @@ describe('Header', () => {
     expect(screen.getByTestId('debug-state')).toHaveTextContent('on')
   })
 
+  // Fill mode hides the page chrome with CSS (display: none), never by unmounting,
+  // so auth and the rest of the header keep their state.
+  it('is marked fill-hide so fill mode can hide it', () => {
+    renderHeader()
+    expect(screen.getByRole('banner')).toHaveClass('fill-hide')
+  })
+
   it('calls logout() when logout button is clicked', async () => {
     const logoutFn = vi.fn()
     mockedUseTwitchAuth.mockReturnValue({

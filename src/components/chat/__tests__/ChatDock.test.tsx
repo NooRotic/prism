@@ -28,6 +28,11 @@ describe('ChatDock', () => {
     vi.mocked(useChatPopout).mockReturnValue(popout())
   })
 
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-fill')
+    vi.restoreAllMocks()
+  })
+
   it('docks the chat on the right by default', () => {
     renderDock()
     const dock = screen.getByTestId('chat-dock')
@@ -206,6 +211,141 @@ describe('ChatDock', () => {
   it('shows no status message when nothing was blocked', () => {
     renderDock()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  describe('fill mode', () => {
+    const remember = (fill = true) => localStorage.setItem(STORAGE_KEYS.LOCAL_FILL_MODE, String(fill))
+    const rootFill = () => document.documentElement.getAttribute('data-fill')
+
+    it('sets data-fill="md" on the page root when fill is remembered and chat is docked', () => {
+      remember()
+      renderDock()
+      expect(rootFill()).toBe('md')
+    })
+
+    it('sets data-fill="all" when fill is remembered and chat is hidden', () => {
+      remember()
+      localStorage.setItem(
+        STORAGE_KEYS.LOCAL_CHAT_PLACEMENT,
+        JSON.stringify({ side: 'right', hidden: true }),
+      )
+      renderDock()
+      expect(rootFill()).toBe('all')
+    })
+
+    it('sets data-fill="all" when fill is remembered and chat is popped out', () => {
+      remember()
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+      expect(rootFill()).toBe('all')
+    })
+
+    it('sets no data-fill when fill is off', () => {
+      renderDock()
+      expect(rootFill()).toBeNull()
+    })
+
+    it('treats a garbage saved fill value as off', () => {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_FILL_MODE, 'banana')
+      renderDock()
+      expect(rootFill()).toBeNull()
+    })
+
+    it('removes data-fill when the dock unmounts, so other pages are untouched', () => {
+      remember()
+      const { unmount } = renderDock()
+      expect(rootFill()).toBe('md')
+
+      unmount()
+
+      expect(rootFill()).toBeNull()
+    })
+
+    it('gives the row md-only fill classes when chat is docked', () => {
+      remember()
+      renderDock()
+      const row = screen.getByTestId('chat-dock')
+      expect(row).toHaveClass('md:fixed', 'md:inset-0', 'md:z-50')
+      expect(row).not.toHaveClass('fixed')
+    })
+
+    it('gives the row all-width fill classes when chat is not docked', () => {
+      remember()
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+      const row = screen.getByTestId('chat-dock')
+      expect(row).toHaveClass('fixed', 'inset-0', 'z-50')
+      expect(row).not.toHaveClass('max-w-[1600px]')
+    })
+
+    it('has no fill classes when fill is off', () => {
+      renderDock()
+      const row = screen.getByTestId('chat-dock')
+      expect(row).not.toHaveClass('fixed')
+      expect(row).not.toHaveClass('md:fixed')
+      expect(row).toHaveClass('max-w-[1600px]')
+    })
+
+    it('keeps the 16:9 box below md while chat is docked, and drops it at md and wider', () => {
+      remember()
+      renderDock()
+      const wrapper = screen.getByTestId('chat-player')
+      expect(wrapper).toHaveClass('aspect-video', 'md:aspect-auto')
+    })
+
+    it('drops the 16:9 box at every width when chat is not docked', () => {
+      remember()
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+      const wrapper = screen.getByTestId('chat-player')
+      expect(wrapper).toHaveClass('aspect-auto')
+      expect(wrapper).not.toHaveClass('aspect-video')
+    })
+
+    it('keeps the 16:9 box when fill is off', () => {
+      renderDock()
+      const wrapper = screen.getByTestId('chat-player')
+      expect(wrapper).toHaveClass('aspect-video')
+      expect(wrapper).not.toHaveClass('md:aspect-auto')
+    })
+
+    it('puts nothing from the dock inside the player wrapper in fill mode', () => {
+      remember()
+      renderDock()
+      const wrapper = screen.getByTestId('chat-player')
+      expect(wrapper).toContainElement(screen.getByText('player'))
+      expect(wrapper).not.toContainElement(screen.getByTestId('chat-panel'))
+    })
+
+    it('puts no transition or animation on the row or the player wrapper', () => {
+      for (const on of [false, true]) {
+        localStorage.clear()
+        remember(on)
+        const { unmount } = renderDock()
+        expect(screen.getByTestId('chat-dock').className).not.toMatch(/transition|animate/)
+        expect(screen.getByTestId('chat-player').className).not.toMatch(/transition|animate/)
+        unmount()
+      }
+    })
+
+    // 80% player + the 8px handle + 20% chat is 8px more than the row. In a row that
+    // fills the window that clips the chat's right edge off-screen, so the chat
+    // shrinks by the handle's width instead.
+    it('lets the chat panel shrink so the handle never pushes it past the window edge', () => {
+      renderDock()
+      expect(screen.getByTestId('chat-panel')).toHaveStyle({ flexShrink: '1' })
+    })
+
+    it('does not throw when saving the split ratio fails', () => {
+      renderDock()
+      const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw new DOMException('QuotaExceededError')
+      })
+
+      expect(() => fireEvent.pointerUp(screen.getByRole('separator'))).not.toThrow()
+
+      spy.mockRestore()
+    })
   })
 
   it('keeps the Show chat tab visible at every width, so a hidden chat can always be restored', () => {

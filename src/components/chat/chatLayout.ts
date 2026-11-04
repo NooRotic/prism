@@ -8,7 +8,12 @@ export const MAX_RATIO = 0.92
 /** The player's share of the row, from storage; the default when missing or out of range. */
 export function loadRatio(): number {
   if (typeof localStorage === 'undefined') return DEFAULT_RATIO
-  const stored = localStorage.getItem(STORAGE_KEYS.LOCAL_PANEL_RATIO)
+  let stored: string | null
+  try {
+    stored = localStorage.getItem(STORAGE_KEYS.LOCAL_PANEL_RATIO)
+  } catch {
+    return DEFAULT_RATIO
+  }
   if (!stored) return DEFAULT_RATIO
   const val = parseFloat(stored)
   if (isNaN(val) || val < MIN_RATIO || val > MAX_RATIO) return DEFAULT_RATIO
