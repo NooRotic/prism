@@ -1,7 +1,7 @@
 # Fill Mode (PRISM-VIEW) — Design
 
-**Status:** Draft for the owner's review, with one open question. A fresh reviewer read it as the
-builder first; its answers are folded in as numbered calls below. Builds on `ChatDock`, which is
+**Status:** Draft for the owner's approval; every question is answered. A fresh reviewer read it
+as the builder first; its answers are folded in as numbered calls below. Builds on `ChatDock`, which is
 in PR #55 (not yet merged).
 **Date:** 2026-11-04
 
@@ -33,6 +33,8 @@ layout the owner is reading chat at a distance.
 - **Fullscreen both**, video and chat together, is wanted. ("WOW YES, that'd be GREAT.")
 - The chat pop-out stays, for when they want chat in a second window. ("Correct.")
 - **Chat text-size controls** belong in fill mode. ("Would be great.")
+- While chat is popped out, the **text-size buttons live in the pop-out window itself**, as a slim
+  strip with smaller, larger and reset. ("In the pop-out.")
 - Earlier decisions still stand: no bottom dock, chat placement as built in PR #55.
 
 ## My calls (the owner has not seen these; they are open to change)
@@ -48,8 +50,7 @@ layout the owner is reading chat at a distance.
    remembered "on" can never strand a window. This also lets a narrow video-only window, tiled
    beside the pop-out, fill.
 5. **Esc leaves fill mode** (best effort, see constraints), and shortcut keys are left to the builder.
-6. **Text-size controls live in the chat header in both modes**, since the header exists in both,
-   and the **pop-out window shows the saved size** (see Behaviour).
+6. **Text-size controls live in the chat header in both modes**, since the header exists in both.
 7. **Text size uses `transform: scale()`, not CSS `zoom`**, in steps of roughly 70% to 200%.
 8. **Fullscreen both is requested on the dock row** (video and chat), never on the Twitch iframe.
 9. **Fullscreen both works from normal mode too.** While fullscreen it uses the fill layout through
@@ -146,17 +147,19 @@ pop-out work unchanged.
 | Chat state | Where the controls are |
 |---|---|
 | Docked | Chat header: fill, fullscreen both, text size, side, pop out, hide |
-| Hidden or popped out | The strip beside the player: restore or return chat, fill, fullscreen both. Text size while popped out: see the open question below |
+| Hidden or popped out | The strip beside the player: restore or return chat, fill, fullscreen both |
+| Popped out (in the pop-out window) | A slim strip in that window: text size smaller, larger and reset |
 
 **Fullscreen both.** Fullscreens the dock row, so the video and the docked chat go fullscreen
 together. If chat is hidden or popped out, it is the video alone. Twitch's own fullscreen button
 keeps working and still fullscreens the video only.
 
 **Text size.** Smaller and larger buttons (and a way to reset), remembered as a number. It scales
-the chat iframe only. The pop-out window shows the saved size and follows a change made in any
-window (see my call 14). Where the buttons live **while chat is popped out** is the open question
-below; the browser's own zoom is no substitute, because it is per site and would resize PRISM's
-other window too.
+the chat iframe only, never the strip that carries the buttons. The pop-out window has its own slim
+strip with the same three buttons (decided by the owner), so the size can be changed where the chat
+is being read. Every window shows the saved size and follows a change made in any other (see my
+call 14). The browser's own zoom is no substitute, because it is per site and would resize PRISM's
+other window too. The pop-out still shows nothing but the chat and this strip: no PRISM chrome.
 
 **Persistence.** Fill on or off, and the text size, are new; dock side and bar position are the
 existing keys. All remembered across visits.
@@ -166,7 +169,8 @@ existing keys. All remembered across visits.
 - A small piece of shared state for "fill mode" that both `ChatDock` and the page shell (`AppLayout`)
   can read, persisted, with one source of truth. The shell hides its chrome from it.
 - `ChatDock` gains the fill class and the new controls; `ChatHeader` and `ChatTab` carry the buttons.
-- A scaled-chat wrapper around `ChatSource`, used by the dock and by the pop-out page.
+- A scaled-chat wrapper around `ChatSource`, used by the dock and by the pop-out page, and one
+  small text-size control cluster that the chat header and the pop-out strip both use.
 
 ## Evidence so far
 
@@ -186,20 +190,10 @@ rejected request); fill ignored below `md`; Esc; focus after a toggle.
 
 In the owner's foreground Chrome: the autoplay oracle (`IntersectionObserver` with
 `trackVisibility`, `isVisible` stays true) in fill mode and in fullscreen both; flipping fill on
-and off without the stream restarting; chat typing and scrolling at 150% size; fullscreen both
+and off without the stream restarting; chat typing and scrolling at 150% size; changing the size from the pop-out's own strip and seeing
+the main window's saved size follow; fullscreen both
 showing chat beside the video and Esc leaving it; fill mode in one window tiled next to the
 pop-out in another; the Volume Meter extension on and off.
-
-## Open question for the owner
-
-While chat is popped out, where should the text-size buttons live? The owner's own setup is a video
-window tiled beside the chat pop-out, so the answer decides which window gets them:
-
-- **In the pop-out window itself** (a slim strip of smaller, larger and reset). Most direct for
-  someone reading that window; it adds a little chrome to a window that is now only chat. The
-  reviewer's reading and my recommendation.
-- **In the strip beside the player in the main window.** Keeps the pop-out as pure chat; the owner
-  has to reach over to the other window to change the size.
 
 ## Left to the builder
 
