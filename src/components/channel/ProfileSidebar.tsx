@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import { Eye, Calendar, Gamepad2, Smile, Shield, Lock, LogIn } from 'lucide-react'
+import { Eye, Calendar, Gamepad2, Smile, Shield, Lock } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import ConnectTwitchButton from '../ui/ConnectTwitchButton'
 import StreamUptime from './StreamUptime'
 
 function formatAccountAge(createdAt: string): string {
@@ -76,21 +77,9 @@ function SignedOutHeader({
           </p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onConnect}
-        className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-md transition-all duration-200 hover:scale-[1.02] self-start"
-        style={{
-          background: 'linear-gradient(135deg, var(--accent-twitch), #7b2ff2)',
-          color: '#fff',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '0.7rem',
-          letterSpacing: '0.05em',
-        }}
-      >
-        <LogIn size={12} />
-        connect twitch
-      </button>
+      <div className="self-start">
+        <ConnectTwitchButton onClick={onConnect} />
+      </div>
     </div>
   )
 }

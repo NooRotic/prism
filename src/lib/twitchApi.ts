@@ -92,6 +92,60 @@ export async function getChannelInfo(broadcasterId: string): Promise<TwitchChann
   return data.data[0]
 }
 
+/** Helix caps id params per request on /users and /streams alike. */
+const HELIX_ID_CHUNK_SIZE = 100
+
+/**
+ * Batch-fetch profile data for multiple user IDs.
+ *
+ * Unlike `getStreamsByUserIds`, which truncates at 100 because a stream list
+ * is already a "top N", every requested profile matters here — so ids are
+ * chunked and the chunks merged.
+ *
+ * A single failing chunk does not fail the call: its ids are simply absent
+ * from the result, and callers fall back to an initial-letter avatar. A 401
+ * is the exception — an expired session is global, not per-chunk, so it
+ * propagates.
+ */
+export async function getUsersByIds(userIds: string[]): Promise<TwitchUser[]> {
+  if (userIds.length === 0) return []
+
+  const chunks: string[][] = []
+  for (let i = 0; i < userIds.length; i += HELIX_ID_CHUNK_SIZE) {
+    chunks.push(userIds.slice(i, i + HELIX_ID_CHUNK_SIZE))
+  }
+
+  const results = await Promise.all(
+    chunks.map(async (ids) => {
+      const url = new URL(`${TWITCH_API_BASE}/users`)
+      ids.forEach((id) => url.searchParams.append('id', id))
+
+      const token = getAccessToken()
+      const headers: Record<string, string> = { 'Client-ID': CLIENT_ID }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      let res: Response
+      try {
+        res = await fetch(url.toString(), { headers })
+      } catch {
+        // Network-level failure for this chunk only.
+        return [] as TwitchUser[]
+      }
+
+      if (res.status === 401) {
+        localStorage.removeItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN)
+        throw new SessionExpiredError()
+      }
+      if (!res.ok) return [] as TwitchUser[]
+
+      const data = await res.json()
+      return (data.data ?? []) as TwitchUser[]
+    }),
+  )
+
+  return results.flat()
+}
+
 // --- Streams ---
 
 export async function getStreams(userId: string): Promise<TwitchStream | null> {

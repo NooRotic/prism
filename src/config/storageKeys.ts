@@ -25,4 +25,6 @@ export const STORAGE_KEYS = {
   LOCAL_INTROS_SEEN: 'prism_intros_seen',
   /** Prefix for per-category YouTube cache entries (e.g. prism_yt_cache_popular). */
   LOCAL_YOUTUBE_CACHE_PREFIX: 'prism_yt_cache_',
+  /** Channel rail edge: 'left' or 'right'. */
+  LOCAL_RAIL_POSITION: 'prism_rail_position',
 } as const
