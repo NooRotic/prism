@@ -1,11 +1,20 @@
 import { createEvent, render, screen, fireEvent } from '@testing-library/react'
 import ChatDock from '../ChatDock'
 import { useChatPopout } from '../useChatPopout'
+import { useFullscreen } from '../useFullscreen'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
 
-// The pop-out's own behaviour is covered in useChatPopout.test.ts; here the dock
-// is only checked for how it reacts to the hook's state.
+// The pop-out's and fullscreen's own behaviour is covered in their hook tests; here
+// the dock is only checked for how it reacts to what the hooks report.
 vi.mock('../useChatPopout', () => ({ useChatPopout: vi.fn() }))
+vi.mock('../useFullscreen', () => ({ useFullscreen: vi.fn() }))
+
+const fullscreenState = (overrides: Partial<ReturnType<typeof useFullscreen>> = {}) => ({
+  supported: false,
+  isFullscreen: false,
+  toggle: vi.fn(),
+  ...overrides,
+})
 
 const popout = (overrides: Partial<ReturnType<typeof useChatPopout>> = {}) => ({
   isOpen: false,
@@ -26,6 +35,8 @@ describe('ChatDock', () => {
     localStorage.clear()
     vi.mocked(useChatPopout).mockReset()
     vi.mocked(useChatPopout).mockReturnValue(popout())
+    vi.mocked(useFullscreen).mockReset()
+    vi.mocked(useFullscreen).mockReturnValue(fullscreenState())
   })
 
   afterEach(() => {
@@ -238,6 +249,48 @@ describe('ChatDock', () => {
       vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
       renderDock()
       expect(rootFill()).toBe('all')
+    })
+
+    it('hands the dock row to the fullscreen hook', () => {
+      renderDock()
+      const ref = vi.mocked(useFullscreen).mock.calls[0][0]
+      expect(ref.current).toBe(screen.getByTestId('chat-dock'))
+    })
+
+    it('uses the fill layout and data-fill while fullscreen, even when fill is off', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: true }))
+      renderDock()
+      expect(rootFill()).toBe('md')
+      expect(screen.getByTestId('chat-dock')).toHaveClass('md:fixed', 'md:inset-0')
+    })
+
+    it('does not write the remembered fill setting while fullscreen', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: true }))
+      renderDock()
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBeNull()
+    })
+
+    it('gives data-fill="all" when fullscreen with chat hidden, and the video alone fills', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: true }))
+      localStorage.setItem(
+        STORAGE_KEYS.LOCAL_CHAT_PLACEMENT,
+        JSON.stringify({ side: 'right', hidden: true }),
+      )
+      renderDock()
+      expect(rootFill()).toBe('all')
+      expect(screen.getByTestId('chat-dock')).toHaveClass('fixed', 'inset-0')
+    })
+
+    it('goes back to the layout it started in when fullscreen ends', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: true }))
+      const { rerender } = renderDock()
+      expect(rootFill()).toBe('md')
+
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: false }))
+      rerender(<ChatDock channel="streamer" player={player} />)
+
+      expect(rootFill()).toBeNull()
+      expect(screen.getByTestId('chat-dock')).not.toHaveClass('md:fixed')
     })
 
     it('sets no data-fill when fill is off', () => {

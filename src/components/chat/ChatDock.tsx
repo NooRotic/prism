@@ -11,6 +11,7 @@ import { useChatPlacement } from './useChatPlacement'
 import { useChatPopout } from './useChatPopout'
 import { useDockDrag } from './useDockDrag'
 import { useFillMode } from './useFillMode'
+import { useFullscreen } from './useFullscreen'
 
 // Literal class strings, because Tailwind cannot see classes built from pieces.
 // The md-only variants are the fill layout when chat is docked: below 768px the
@@ -43,11 +44,17 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   // What the viewer sees: popped out, else hidden, else docked on `side`.
   const chatVisible = !hidden && !popout.isOpen
 
-  // Fill mode: the remembered setting (fullscreen joins in a later task). The root
-  // attribute exists only while this dock is mounted, which is only on the Twitch
-  // player page, so no other page is ever affected.
+  // Fill mode: the remembered setting, or fullscreen of this row (which is never
+  // saved). The root attribute exists only while this dock is mounted, which is
+  // only on the Twitch player page, so no other page is ever affected.
+  const containerRef = useRef<HTMLDivElement>(null)
+  const fullscreen = useFullscreen(containerRef)
   const { fill } = useFillMode()
-  const scope = fillScopeFor({ fill, fullscreen: false, chatDocked: chatVisible })
+  const scope = fillScopeFor({
+    fill,
+    fullscreen: fullscreen.isFullscreen,
+    chatDocked: chatVisible,
+  })
   useLayoutEffect(() => {
     if (!scope) return
     const root = document.documentElement
@@ -56,7 +63,6 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   }, [scope])
 
   const [playerRatio, setPlayerRatio] = useState(loadRatio)
-  const containerRef = useRef<HTMLDivElement>(null)
 
   const handleResize = useCallback(
     (deltaX: number) => {
