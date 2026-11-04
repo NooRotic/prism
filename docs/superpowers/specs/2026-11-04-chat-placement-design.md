@@ -73,7 +73,8 @@ see it. That is expected, not yet measured; the acceptance run below confirms it
 ## Behaviour
 
 - A **hide/show** control collapses the chat so the video takes the full width, with a
-  small edge tab to bring it back. The state is remembered across sessions.
+  narrow tab strip beside the video to bring it back. The strip is reserved space
+  outside the player, never drawn over it. The state is remembered across sessions.
 - **Dock side**: the chat is docked on the left or the right of the video (default:
   right, as today). The side is remembered. On narrow screens the current stacked
   layout stays and placement controls are hidden (my guess).
@@ -93,10 +94,11 @@ Two ways to change sides, from most to least certain:
 
 1. **A move button** in the chat header swaps the side. It always works, with keyboard
    and touch, and is built first.
-2. **Dragging** the chat by a header handle onto the other side. Use the browser's
-   native drag and drop, so the thing following the cursor is drawn by the browser and
-   not by the page. A panel dragged across the video by the page itself would sit over
-   the embed.
+2. **Dragging** the chat by a header handle onto the other side, using pointer events
+   with pointer capture (the pattern `ResizableHandle` already uses). Capture matters:
+   the player is a cross-origin iframe, and native drag events stop reaching the page
+   while the cursor is over it. Nothing is drawn following the cursor, because a ghost
+   panel dragged across the video would sit over the embed.
 
 For dragging there are two levels, and the owner picked the order:
 
@@ -149,10 +151,13 @@ iframe, so it is **not** part of this work; noted so it is not forgotten.
 
 ## Architecture
 
-- `ChatDock`: owns placement state and layout. Placement is a small union
-  (`docked-right | docked-left | hidden | popped-out`), persisted under a new
-  `STORAGE_KEYS` entry, following the existing `prism_rail_position` precedent.
-  `hidden` and `popped-out` each remember which side to return to.
+- `ChatDock`: owns placement state and layout. The persisted state is
+  `{ side: 'left' | 'right', hidden: boolean }` under a new `STORAGE_KEYS` entry,
+  following the existing `prism_rail_position` precedent. `popped-out` is **runtime
+  state, never persisted**: it is true while a pop-out window answers on the
+  `BroadcastChannel`, so it cannot get stuck after the window or the browser is
+  closed. What the viewer sees is derived: popped-out, else hidden, else docked on
+  `side`.
 - `ChatSource`: the content component. Today it is the existing `TwitchChatEmbed`
   iframe; later it can be YouTube, Kick, or a combined feed without touching
   `ChatDock` or the pop-out.
