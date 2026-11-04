@@ -130,6 +130,14 @@ type Action =
   | { type: 'SET_FOLLOWING_SORT'; sort: FollowingSort }
   | { type: 'OPEN_CATEGORY_PANEL'; category: string }
 
+/** A channel that is live or has a broadcaster tier is a streamer; any other is a chatter. */
+function channelDisplayMode(
+  isLive: boolean,
+  profile: TwitchUser,
+): 'streamer' | 'chatter' {
+  return isLive || profile.broadcaster_type !== '' ? 'streamer' : 'chatter'
+}
+
 const initialState: AppState = {
   auth: { token: null, isAuthenticated: false, user: null },
   search: { query: '', history: [] },
@@ -191,8 +199,7 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'LOAD_CHANNEL_SUCCESS': {
       const { stream, profile } = action.payload
       const isLive = stream?.type === 'live'
-      const displayMode: 'streamer' | 'chatter' =
-        isLive || profile.broadcaster_type !== '' ? 'streamer' : 'chatter'
+      const displayMode = channelDisplayMode(isLive, profile)
       return {
         ...state,
         loading: false,
@@ -210,10 +217,22 @@ function appReducer(state: AppState, action: Action): AppState {
       // App.tsx triggers useChannelData → LOAD_CHANNEL_SUCCESS sets
       // displayMode to 'streamer'/'chatter'.
       const det = action.detection
-      const isTwitchWithChannel =
-        det.type === 'twitch' && !!det.metadata?.channelName
+      const channelName =
+        det.type === 'twitch' ? det.metadata?.channelName : undefined
+      const loadedProfile = state.channel.profile
       let nextDisplayMode: AppState['displayMode']
-      if (isTwitchWithChannel) {
+      if (
+        channelName &&
+        state.displayMode === 'video' &&
+        loadedProfile &&
+        loadedProfile.login.toLowerCase() === channelName.toLowerCase()
+      ) {
+        // Back to the live stream of the channel that is already loaded, after
+        // one of its clips or VODs put us in video mode. Its data is still
+        // here and nothing reloads it, so restore its layout rather than
+        // leaving the page stuck in video mode.
+        nextDisplayMode = channelDisplayMode(state.channel.isLive, loadedProfile)
+      } else if (channelName) {
         // Preserve streamer/chatter when switching content within a
         // channel. But if we're idle, jump to streamer so ChannelLayout
         // renders immediately (loading overlay covers the data fetch).
