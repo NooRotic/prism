@@ -112,7 +112,9 @@ For dragging there are two levels, and the owner picked the order:
 - **Plain snapping (the accepted fallback).** No zones. On release the chat docks to
   whichever half of the page the cursor is in. If drawing, showing and hiding the
   zones turns out to be more than a small amount of work, ship this.
-  **Status 2026-11-04: plain snapping ships; drop zones wait for Spike 1.**
+  **Status 2026-11-04: plain snapping ships.** Only the over-video zones depend on Spike
+  1; the edge zones (outside the player) are safe whatever it finds and are simply not
+  built yet.
 
 ### What the pop-out window contains
 
@@ -129,16 +131,29 @@ streamer's Twitch chat URL directly (`https://www.twitch.tv/popout/<channel>/cha
 UNVERIFIED, check before building). It works, but PRISM can then neither remember the
 window's geometry nor follow channel changes.
 
-- **Remembering size and position:** the pop-out page records `outerWidth`,
-  `outerHeight`, `screenX` and `screenY` on resize and on `pagehide` (there is no move
+- **Remembering size and position:** the pop-out page records `innerWidth`,
+  `innerHeight`, `screenX` and `screenY` on resize and on `pagehide` (there is no move
   event, so also sample on an interval while open) under a new `STORAGE_KEYS` entry,
-  and the opener passes them as `window.open` features. Open risk: the saved monitor
-  may be gone; browsers generally clamp, but that is unverified.
+  and the opener passes them as `window.open` features. The size is the **content
+  area** (`inner*`), because that is what the `width` and `height` features mean;
+  saving `outer*` would make the window grow by its frame on every reopen. Bounds that
+  are not valid (non-finite, under 200px, or the roughly -32000 position a minimized
+  Windows window reports) are never saved, so a bad reading cannot replace a good one.
+  Open risk: the saved monitor may be gone; browsers generally clamp, but that is
+  unverified.
 - **Talking to the main window:** a `BroadcastChannel`, which does not depend on
   `window.opener`. The pop-out announces itself, says when it closes, and receives
   channel changes. If the main page reloads while the pop-out is open, the main page
   asks "is a pop-out alive?" on load and the pop-out answers, so placement does not
   get stuck on `popped-out` or on docked.
+- **Every message names its owner.** Several PRISM tabs share the channel (watching two
+  streams at once is ordinary), so each tab has an id kept in `sessionStorage` (it
+  survives a reload). It is passed to the pop-out as `?owner=<id>` in the URL, which the
+  page keeps when it follows a channel change, and it is on every message. A tab ignores
+  `hello` and `closed` that are not its own, and a pop-out ignores `ping`, `set-channel`
+  and `close` that are not from its owner. A pop-out loaded directly has no owner, so it
+  answers nobody and obeys nobody. One shared window name means a second tab's pop-out
+  takes over the window; the old owner is told it closed, and its chat returns.
 - **Do not open it with `noopener`.** It is PRISM's own page, so there is nothing to
   protect, and `noopener` makes `window.open` return `null`, which would be
   indistinguishable from a blocked popup and would lose the handle used to notice a
@@ -187,7 +202,7 @@ iframe, so it is **not** part of this work; noted so it is not forgotten.
    player, or the work falls back to plain snapping.
    **Status 2026-11-04: not run.** It needs the owner's foreground Chrome (visibility
    results from the automation browser are unreliable), so plain snapping ships first
-   and drop zones wait for this result. The script is in the implementation plan,
+   and the over-video drop zones wait for this result (edge zones never depended on it). The script is in the implementation plan,
    Task 4.
 2. **Does the Twitch chat embed render inside a PRISM-owned popup window?** (parent is
    our host, and `localhost` in development.) Expected yes: the docked chat is the same
@@ -223,7 +238,9 @@ iframe, so it is **not** part of this work; noted so it is not forgotten.
 
 ## Implementation status
 
-Built and unit-tested (497 tests, build and lint clean):
+Built and unit-tested (513 tests, build and lint clean), and reviewed as a whole branch
+once; the review's two Important findings and one re-graded Minor are fixed (owner-scoped
+pop-out messages, content-size bounds, invalid bounds never saved):
 
 - Docked chat with hide/show and a restore tab beside the player (never over it), dock
   side left or right via a header button and via dragging the header handle with plain
@@ -233,7 +250,21 @@ Built and unit-tested (497 tests, build and lint clean):
   and position, follows the channel, re-attaches after a main-page reload, notices the OS
   close button, and says so when the browser blocks the popup.
 
-Not built: **drop zones**, waiting for Spike 1.
+Not built: **drop zones** (the over-video kind waits for Spike 1; the edge kind is just
+not built yet).
+
+Known gaps from the final review, deliberately deferred:
+
+- With the chat hidden on a narrow screen the player stretches past 16:9.
+- A plain click on the "Chat" grip can flip the side when the grip straddles the page
+  middle; a small drag threshold would fix it.
+- Changing channel in the first second after popping out can leave the pop-out on the
+  old channel.
+- A re-attached pop-out (after a main-page reload) has no liveness check if its `closed`
+  message is lost; the Return tab is always available.
+- Keyboard focus falls to the page body after hide, show, pop out and return.
+- The split-ratio storage access carried over from the old page is not wrapped in
+  try/catch.
 
 Still to do in the owner's foreground Chrome (the browser pane used for development has
 no real popups and cannot reliably evaluate Twitch's visibility check):
