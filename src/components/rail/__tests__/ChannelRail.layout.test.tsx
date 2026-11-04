@@ -53,6 +53,9 @@ vi.mock('../../../components/ui/MatrixRainBackground', () => ({
 vi.mock('../../../pages/TwitchPlayerPage', () => ({
   default: () => <div data-testid="player-page" />,
 }))
+vi.mock('../../../pages/ProtocolPage', () => ({
+  default: () => <div data-testid="protocol-page" />,
+}))
 
 function setup() {
   vi.mocked(useTwitchAuth).mockReturnValue({
@@ -235,6 +238,21 @@ describe('the app shell keeps the player clear of the rail', () => {
     expect(gutter).toHaveClass('pl-(--rail-reserve-left)', 'pr-(--rail-reserve-right)')
     expect(within(gutter).getByTestId('player-page')).toBeInTheDocument()
   })
+
+  // The listing pages (/twitch, /youtube, /hls-dash) put a nav sidebar flush
+  // against the left edge. Overlaying the rail there hides the first 56px of
+  // every nav label (measured on /hls-dash, 2026-11-04: rail x 0-56, links x 0-219).
+  it.each(['/twitch', '/youtube', '/hls-dash'])(
+    'pads the route content by the rail reservation on the %s listing page, whose sidebar sits at the edge',
+    (path) => {
+      window.history.pushState({}, '', path)
+      render(<App />)
+
+      const gutter = screen.getByTestId('rail-gutter')
+      expect(gutter).toHaveClass('pl-(--rail-reserve-left)', 'pr-(--rail-reserve-right)')
+      expect(within(gutter).getByTestId('protocol-page')).toBeInTheDocument()
+    },
+  )
 
   it('leaves other pages unpadded, so the rail still just overlays there', () => {
     render(<App />)

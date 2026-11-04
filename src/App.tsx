@@ -117,8 +117,11 @@ function AppLayout() {
       <ChannelRail />
 
       {/* Route content. On player pages the rail's collapsed strip is
-          reserved, so it never sits over the embed (see RailGutter). */}
-      <RailGutter active={isPlayerPage}>
+          reserved, so it never sits over the embed; on the protocol listing
+          pages it is reserved too, as their nav sidebar sits flush against the
+          left edge and the rail would hide the front of every label (see
+          RailGutter). */}
+      <RailGutter active={isPlayerPage || isProtocolPage}>
         <Outlet />
       </RailGutter>
     </div>

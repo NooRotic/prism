@@ -10,7 +10,11 @@ export const RAIL_RESERVE_LEFT_VAR = '--rail-reserve-left'
 export const RAIL_RESERVE_RIGHT_VAR = '--rail-reserve-right'
 
 interface RailGutterProps {
-  /** Reserve the rail's edge. Player pages only; elsewhere it just overlays. */
+  /**
+   * Reserve the rail's edge. Player pages (nothing may cover the embed) and the
+   * protocol listing pages (their sidebar sits at the edge); elsewhere it just
+   * overlays.
+   */
   active: boolean
   children: ReactNode
 }
