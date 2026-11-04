@@ -45,8 +45,11 @@ layout the owner is reading chat at a distance.
    the player. The page header, rail, slide-down panels and everything below the player row are hidden.
 2. **Fill mode on or off is remembered too**, not only the layout, so returning lands where they left.
 3. **Fill and normal mode share one layout:** the same dock side and the same bar position.
-4. **Fill mode applies at `md` (768px) and wider, or at any width when chat is hidden or popped
-   out.** With chat docked below `md` the stacked layout stays and fill is ignored. With no docked
+4. **Fill mode applies at `md` and wider, or at any width when chat is hidden or popped
+   out.** `md` is Tailwind's own breakpoint (48rem, which is 768px only at the browser's default
+   font size), and the rule that hides the page chrome uses that same breakpoint, so the chrome
+   never goes away in a window where the fill layout and its toggle have not switched on. With
+   chat docked below `md` the stacked layout stays and fill is ignored. With no docked
    chat there is no layout to conflict, and the strip beside the player is always there, so a
    remembered "on" can never strand a window. This also lets a narrow video-only window, tiled
    beside the pop-out, fill.
@@ -215,7 +218,7 @@ names of the state and storage keys.
 
 ## Implementation status
 
-Built and unit-tested (the suite stands at 689 tests, build and lint clean): the remembered fill
+Built and unit-tested (the suite stands at 693 tests, build and lint clean): the remembered fill
 setting; the fill layout and the hidden page chrome (hide, never unmount); fullscreen of the dock
 row, tracked only for that element; fill and fullscreen buttons in the chat header and in a strip
 beside the player, with an exit in every chat state, Esc, and focus kept on a toggled button; chat
@@ -234,6 +237,11 @@ evaluate Twitch's visibility check):
 5. Text size changed from the pop-out's own strip, with the main window following.
 6. Fill mode in one window beside the pop-out in another, and a narrow video-only window filling.
 7. The Volume Meter extension on and off.
+8. Fullscreen both, then Twitch's own fullscreen button, then leaving Twitch's fullscreen, then
+   Esc. Nothing should flip or strand, and one Esc should not leave both fullscreen and fill.
+9. One window 800-950px wide with Chrome's font size (Settings > Appearance) set to Large and fill
+   remembered on with chat docked: the page chrome and the fill layout appear together, and the
+   fill toggle is there to leave by.
 
 ## Dependencies
 
