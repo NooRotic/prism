@@ -27,4 +27,8 @@ export const STORAGE_KEYS = {
   LOCAL_YOUTUBE_CACHE_PREFIX: 'prism_yt_cache_',
   /** Channel rail edge: 'left' or 'right'. */
   LOCAL_RAIL_POSITION: 'prism_rail_position',
+  /** Chat dock state: JSON `{ side: 'left' | 'right', hidden: boolean }`. */
+  LOCAL_CHAT_PLACEMENT: 'prism_chat_placement',
+  /** Last size and position of the chat pop-out window (JSON). */
+  LOCAL_CHAT_POPOUT_BOUNDS: 'prism_chat_popout_bounds',
 } as const
