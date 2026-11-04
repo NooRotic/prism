@@ -23,7 +23,16 @@ const renderPage = (bus: PopoutBus, channel = 'streamer') =>
     </MemoryRouter>,
   )
 
-function setWindowGeometry(g: { outerWidth: number; outerHeight: number; screenX: number; screenY: number }) {
+// `outer*` includes the window frame; `inner*` is the content area, which is what
+// window.open's width/height features mean.
+function setWindowGeometry(g: {
+  outerWidth: number
+  outerHeight: number
+  innerWidth: number
+  innerHeight: number
+  screenX: number
+  screenY: number
+}) {
   for (const [key, value] of Object.entries(g)) {
     Object.defineProperty(window, key, { value, configurable: true })
   }
@@ -32,7 +41,14 @@ function setWindowGeometry(g: { outerWidth: number; outerHeight: number; screenX
 describe('ChatPopoutPage', () => {
   beforeEach(() => {
     localStorage.clear()
-    setWindowGeometry({ outerWidth: 480, outerHeight: 760, screenX: 30, screenY: 40 })
+    setWindowGeometry({
+      outerWidth: 480,
+      outerHeight: 760,
+      innerWidth: 464,
+      innerHeight: 680,
+      screenX: 30,
+      screenY: 40,
+    })
   })
 
   afterEach(() => {
@@ -94,24 +110,54 @@ describe('ChatPopoutPage', () => {
     expect(close).toHaveBeenCalledOnce()
   })
 
-  it('pagehide posts closed and saves the window bounds', () => {
+  it('pagehide posts closed and saves the content size, not the outer size that includes the frame', () => {
     const { bus, posted } = createFakeBus()
     renderPage(bus)
 
     window.dispatchEvent(new Event('pagehide'))
 
     expect(posted).toContainEqual({ type: 'closed' })
-    expect(loadBounds()).toEqual({ width: 480, height: 760, left: 30, top: 40 })
+    // window.open's width/height are the content area, so saving the outer size
+    // would make the window grow by its frame every time it is reopened.
+    expect(loadBounds()).toEqual({ width: 464, height: 680, left: 30, top: 40 })
   })
 
-  it('resize saves the window bounds', () => {
+  it('resize saves the content size and position', () => {
     const { bus } = createFakeBus()
     renderPage(bus)
-    setWindowGeometry({ outerWidth: 600, outerHeight: 900, screenX: -1200, screenY: 10 })
+    setWindowGeometry({
+      outerWidth: 600,
+      outerHeight: 900,
+      innerWidth: 584,
+      innerHeight: 820,
+      screenX: -1200,
+      screenY: 10,
+    })
 
     window.dispatchEvent(new Event('resize'))
 
-    expect(loadBounds()).toEqual({ width: 600, height: 900, left: -1200, top: 10 })
+    expect(loadBounds()).toEqual({ width: 584, height: 820, left: -1200, top: 10 })
+  })
+
+  it('does not replace good saved bounds while the window reports a minimized position', () => {
+    const { bus } = createFakeBus()
+    renderPage(bus)
+    window.dispatchEvent(new Event('resize'))
+    const good = loadBounds()
+    expect(good).not.toBeNull()
+
+    setWindowGeometry({
+      outerWidth: 160,
+      outerHeight: 28,
+      innerWidth: 0,
+      innerHeight: 0,
+      screenX: -32000,
+      screenY: -32000,
+    })
+    window.dispatchEvent(new Event('resize'))
+    window.dispatchEvent(new Event('pagehide'))
+
+    expect(loadBounds()).toEqual(good)
   })
 
   it('samples the bounds every second, and writes only when they changed', () => {
@@ -130,7 +176,14 @@ describe('ChatPopoutPage', () => {
     })
     expect(setItem).toHaveBeenCalledTimes(1)
 
-    setWindowGeometry({ outerWidth: 480, outerHeight: 760, screenX: 900, screenY: 40 })
+    setWindowGeometry({
+      outerWidth: 480,
+      outerHeight: 760,
+      innerWidth: 464,
+      innerHeight: 680,
+      screenX: 900,
+      screenY: 40,
+    })
     act(() => {
       vi.advanceTimersByTime(1000)
     })

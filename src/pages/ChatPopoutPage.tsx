@@ -6,10 +6,11 @@ import type { PopoutBus, WindowBounds } from '../lib/chatPopout'
 
 const BOUNDS_SAMPLE_MS = 1000
 
+/** Content size (what window.open's features mean), not the outer size with the frame. */
 function readBounds(): WindowBounds {
   return {
-    width: window.outerWidth,
-    height: window.outerHeight,
+    width: window.innerWidth,
+    height: window.innerHeight,
     left: window.screenX,
     top: window.screenY,
   }

@@ -66,6 +66,12 @@ export function createPopoutBus(): PopoutBus {
   }
 }
 
+/**
+ * `width` and `height` are the window's CONTENT area, which is what
+ * `window.open`'s width/height features mean; saving the outer size (which
+ * includes the frame) would make the window grow by its frame on every reopen.
+ * `left` and `top` are the window's position on the screen.
+ */
 export interface WindowBounds {
   width: number
   height: number
@@ -75,6 +81,24 @@ export interface WindowBounds {
 
 const MIN_WINDOW_SIZE = 200
 const DEFAULT_WINDOW_SIZE = { width: 420, height: 720 }
+/** A minimized Windows window reports a position of about -32000 on both axes. */
+const MINIMIZED_POSITION_LIMIT = -30000
+
+/**
+ * Finite numbers, a size of at least 200px, and a position that is not the
+ * minimized sentinel. Zero and ordinary negative positions are valid (a second
+ * monitor can sit left of or above the main one).
+ */
+function isValidBounds(bounds: WindowBounds): boolean {
+  const { width, height, left, top } = bounds
+  return (
+    [width, height, left, top].every(Number.isFinite) &&
+    width >= MIN_WINDOW_SIZE &&
+    height >= MIN_WINDOW_SIZE &&
+    left > MINIMIZED_POSITION_LIMIT &&
+    top > MINIMIZED_POSITION_LIMIT
+  )
+}
 
 /**
  * The last size and position the viewer left the pop-out in, or null when none
@@ -97,15 +121,16 @@ export function loadBounds(): WindowBounds | null {
     ) {
       return null
     }
-    if (![width, height, left, top].every(Number.isFinite)) return null
-    if (width < MIN_WINDOW_SIZE || height < MIN_WINDOW_SIZE) return null
-    return { width, height, left, top }
+    const bounds = { width, height, left, top }
+    return isValidBounds(bounds) ? bounds : null
   } catch {
     return null
   }
 }
 
+/** Ignores bounds that are not valid, so a bad reading never replaces a good saved one. */
 export function saveBounds(bounds: WindowBounds): void {
+  if (!isValidBounds(bounds)) return
   try {
     localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_POPOUT_BOUNDS, JSON.stringify(bounds))
   } catch {

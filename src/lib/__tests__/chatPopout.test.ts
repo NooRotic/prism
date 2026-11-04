@@ -28,6 +28,7 @@ describe('loadBounds', () => {
     ['a NaN field (serialised as null)', JSON.stringify({ width: NaN, height: 700, left: 0, top: 0 })],
     ['a width below 200', '{"width":199,"height":700,"left":0,"top":0}'],
     ['a height below 200', '{"width":400,"height":0,"left":0,"top":0}'],
+    ['the position a minimized Windows window reports', '{"width":420,"height":720,"left":-32000,"top":-32000}'],
   ])('ignores %s', (_label, raw) => {
     localStorage.setItem(KEY, raw)
     expect(loadBounds()).toBeNull()
@@ -55,6 +56,27 @@ describe('saveBounds', () => {
     })
     expect(() => saveBounds({ width: 500, height: 800, left: 0, top: 0 })).not.toThrow()
     spy.mockRestore()
+  })
+
+  it.each([
+    ['zero-sized bounds', { width: 0, height: 0, left: 0, top: 0 }],
+    ['a width below 200', { width: 150, height: 700, left: 10, top: 10 }],
+    ['a NaN size', { width: NaN, height: 700, left: 10, top: 10 }],
+    ['an infinite position', { width: 420, height: 700, left: Infinity, top: 10 }],
+    ['the position a minimized Windows window reports', { width: 420, height: 720, left: -32000, top: -32000 }],
+  ])('does not overwrite good saved bounds with %s', (_label, bad) => {
+    const good = { width: 500, height: 800, left: 100, top: 50 }
+    saveBounds(good)
+
+    saveBounds(bad)
+
+    expect(loadBounds()).toEqual(good)
+  })
+
+  it('still saves a position on a monitor to the left of or above the main one', () => {
+    const bounds = { width: 420, height: 720, left: -1900, top: -300 }
+    saveBounds(bounds)
+    expect(loadBounds()).toEqual(bounds)
   })
 })
 
