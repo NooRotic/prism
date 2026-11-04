@@ -1,4 +1,14 @@
-import { ArrowLeft, ArrowRight, ExternalLink, GripVertical, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Expand,
+  ExternalLink,
+  GripVertical,
+  Maximize2,
+  Minimize2,
+  Shrink,
+  X,
+} from 'lucide-react'
 import type { HTMLAttributes } from 'react'
 import type { DockSide } from './chatPlacement'
 
@@ -7,11 +17,17 @@ interface ChatHeaderProps {
   onHide: () => void
   onSwapSide: () => void
   onPopOut: () => void
+  fill: boolean
+  onToggleFill: () => void
+  fullscreenSupported: boolean
+  isFullscreen: boolean
+  onToggleFullscreen: () => void
   /** Pointer handlers and style from useDockDrag, applied to the drag handle. */
   dragHandleProps: HTMLAttributes<HTMLElement>
 }
 
 const buttonClass = 'rounded-md p-1 transition-colors hover:bg-white/5'
+const toggleClass = `${buttonClass} aria-pressed:text-[color:var(--accent-green)]`
 
 /** Placement controls. Hidden below md, where the layout is always stacked. */
 export default function ChatHeader({
@@ -19,9 +35,16 @@ export default function ChatHeader({
   onHide,
   onSwapSide,
   onPopOut,
+  fill,
+  onToggleFill,
+  fullscreenSupported,
+  isFullscreen,
+  onToggleFullscreen,
   dragHandleProps,
 }: ChatHeaderProps) {
   const target: DockSide = side === 'left' ? 'right' : 'left'
+  const fillLabel = fill ? 'Exit fill mode' : 'Fill window'
+  const fullscreenLabel = isFullscreen ? 'Exit fullscreen' : 'Fullscreen chat and video'
   return (
     <div
       data-testid="chat-header"
@@ -37,6 +60,28 @@ export default function ChatHeader({
         Chat
       </span>
       <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onToggleFill}
+          aria-label={fillLabel}
+          title={fillLabel}
+          aria-pressed={fill}
+          className={toggleClass}
+        >
+          {fill ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+        {fullscreenSupported && (
+          <button
+            type="button"
+            onClick={onToggleFullscreen}
+            aria-label={fullscreenLabel}
+            title={fullscreenLabel}
+            aria-pressed={isFullscreen}
+            className={toggleClass}
+          >
+            {isFullscreen ? <Shrink size={14} /> : <Expand size={14} />}
+          </button>
+        )}
         <button
           type="button"
           onClick={onSwapSide}

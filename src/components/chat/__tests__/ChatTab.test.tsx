@@ -38,10 +38,13 @@ describe('ChatTab', () => {
     expect(tab()).not.toHaveClass('hover:bg-white/5')
   })
 
-  it('stays on its own side of the player and keeps its label', () => {
+  // The column, its width and its gap on the player side belong to ChatStrip now,
+  // so the tab can share the column with the fill and fullscreen buttons.
+  it('keeps its label and which side it is for, and leaves layout to the strip', () => {
     renderTab('left')
     expect(tab()).toHaveAttribute('data-side', 'left')
-    expect(tab()).toHaveClass('md:mr-2')
     expect(tab()).toHaveAttribute('title', 'Show chat')
+    expect(tab()).not.toHaveClass('md:mr-2')
+    expect(tab()).not.toHaveClass('md:w-8')
   })
 })

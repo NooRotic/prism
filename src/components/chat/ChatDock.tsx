@@ -1,10 +1,10 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ResizableHandle } from '../layout/ResizableHandle'
 import { STORAGE_KEYS } from '../../config/storageKeys'
 import ChatHeader from './ChatHeader'
 import ChatSource from './ChatSource'
-import ChatTab from './ChatTab'
+import ChatStrip from './ChatStrip'
 import { loadRatio, nextRatio } from './chatLayout'
 import { FILL_ATTRIBUTE, fillScopeFor } from './fillMode'
 import { useChatPlacement } from './useChatPlacement'
@@ -49,7 +49,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   // only on the Twitch player page, so no other page is ever affected.
   const containerRef = useRef<HTMLDivElement>(null)
   const fullscreen = useFullscreen(containerRef)
-  const { fill } = useFillMode()
+  const { fill, setFill, toggleFill } = useFillMode()
   const scope = fillScopeFor({
     fill,
     fullscreen: fullscreen.isFullscreen,
@@ -61,6 +61,19 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
     root.setAttribute(FILL_ATTRIBUTE, scope)
     return () => root.removeAttribute(FILL_ATTRIBUTE)
   }, [scope])
+
+  // Esc leaves fill mode. Best effort only: when focus is inside the chat iframe the
+  // page never sees the key, which is why every state also has a visible button. The
+  // browser uses Esc to leave fullscreen, so it is left alone while fullscreen.
+  useEffect(() => {
+    if (!fill) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || document.fullscreenElement) return
+      setFill(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [fill, setFill])
 
   const [playerRatio, setPlayerRatio] = useState(loadRatio)
 
@@ -114,10 +127,17 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
         {player}
       </div>
 
-      {popout.isOpen ? (
-        <ChatTab side={side} label="Return chat to the page" onClick={popout.close} />
-      ) : hidden ? (
-        <ChatTab side={side} label="Show chat" onClick={show} />
+      {!chatVisible ? (
+        <ChatStrip
+          side={side}
+          restoreLabel={popout.isOpen ? 'Return chat to the page' : 'Show chat'}
+          onRestore={popout.isOpen ? popout.close : show}
+          fill={fill}
+          onToggleFill={toggleFill}
+          fullscreenSupported={fullscreen.supported}
+          isFullscreen={fullscreen.isFullscreen}
+          onToggleFullscreen={fullscreen.toggle}
+        />
       ) : (
         <>
           {/* Resize handle — hidden on mobile */}
@@ -143,6 +163,11 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
               onHide={hide}
               onSwapSide={swapSide}
               onPopOut={popout.open}
+              fill={fill}
+              onToggleFill={toggleFill}
+              fullscreenSupported={fullscreen.supported}
+              isFullscreen={fullscreen.isFullscreen}
+              onToggleFullscreen={fullscreen.toggle}
               dragHandleProps={dragHandleProps}
             />
             {popout.blocked && (

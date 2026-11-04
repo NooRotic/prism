@@ -251,6 +251,198 @@ describe('ChatDock', () => {
       expect(rootFill()).toBe('all')
     })
 
+    const setPlacement = (hidden: boolean, side: 'left' | 'right' = 'right') =>
+      localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_PLACEMENT, JSON.stringify({ side, hidden }))
+
+    it('the header offers Fill window, and clicking it turns fill on and remembers it', () => {
+      renderDock()
+      fireEvent.click(screen.getByRole('button', { name: 'Fill window' }))
+
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toBeInTheDocument()
+      expect(rootFill()).toBe('md')
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('true')
+    })
+
+    it('the header fill button reflects the state with aria-pressed', () => {
+      renderDock()
+      const button = screen.getByRole('button', { name: 'Fill window' })
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(button)
+
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('shows the restore, fill and fullscreen buttons in the strip when chat is hidden', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ supported: true }))
+      setPlacement(true)
+      renderDock()
+
+      expect(screen.getByRole('button', { name: 'Show chat' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Fill window' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Fullscreen chat and video' })).toBeInTheDocument()
+    })
+
+    it('shows the return, fill and fullscreen buttons in the strip when chat is popped out', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ supported: true }))
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+
+      expect(screen.getByRole('button', { name: 'Return chat to the page' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Fill window' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Fullscreen chat and video' })).toBeInTheDocument()
+    })
+
+    it('has a visible exit-fill button with chat docked, hidden and popped out', () => {
+      remember()
+
+      const docked = renderDock()
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toBeInTheDocument()
+      docked.unmount()
+
+      setPlacement(true)
+      const hidden = renderDock()
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toBeInTheDocument()
+      hidden.unmount()
+
+      setPlacement(false)
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toBeInTheDocument()
+    })
+
+    it('exiting from the strip works with chat hidden', () => {
+      remember()
+      setPlacement(true)
+      renderDock()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Exit fill mode' }))
+
+      expect(rootFill()).toBeNull()
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('false')
+    })
+
+    it('keeps the same button element, and its focus, after it is clicked', () => {
+      renderDock()
+      const button = screen.getByRole('button', { name: 'Fill window' })
+      button.focus()
+
+      fireEvent.click(button)
+
+      const after = screen.getByRole('button', { name: 'Exit fill mode' })
+      expect(after).toBe(button)
+      expect(document.activeElement).toBe(button)
+    })
+
+    it('keeps the same strip button, and its focus, after it is clicked', () => {
+      setPlacement(true)
+      renderDock()
+      const button = screen.getByRole('button', { name: 'Fill window' })
+      button.focus()
+
+      fireEvent.click(button)
+
+      const after = screen.getByRole('button', { name: 'Exit fill mode' })
+      expect(after).toBe(button)
+      expect(document.activeElement).toBe(button)
+    })
+
+    it('has no fullscreen button when the browser cannot do fullscreen', () => {
+      renderDock()
+      expect(screen.queryByRole('button', { name: /fullscreen/i })).not.toBeInTheDocument()
+    })
+
+    it('the fullscreen button calls the hook, and reflects the state with aria-pressed', () => {
+      const toggle = vi.fn()
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ supported: true, toggle }))
+      const { rerender } = renderDock()
+      const button = screen.getByRole('button', { name: 'Fullscreen chat and video' })
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(button)
+      expect(toggle).toHaveBeenCalledOnce()
+
+      vi.mocked(useFullscreen).mockReturnValue(
+        fullscreenState({ supported: true, isFullscreen: true, toggle }),
+      )
+      rerender(<ChatDock channel="streamer" player={player} />)
+      expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    // Moving an iframe in the DOM reloads it, which restarts the stream and makes
+    // Twitch decide autoplay again. Flipping modes must only change classes.
+    it('keeps the very same player element when fill is flipped on and off', () => {
+      renderDock()
+      const player0 = screen.getByText('player')
+      const wrapper0 = screen.getByTestId('chat-player')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Fill window' }))
+      expect(screen.getByText('player')).toBe(player0)
+      expect(screen.getByTestId('chat-player')).toBe(wrapper0)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Exit fill mode' }))
+      expect(screen.getByText('player')).toBe(player0)
+      expect(screen.getByTestId('chat-player')).toBe(wrapper0)
+    })
+
+    it('keeps the very same player element when the chat is hidden and fill is flipped', () => {
+      renderDock()
+      const player0 = screen.getByText('player')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Fill window' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Hide chat' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Exit fill mode' }))
+
+      expect(screen.getByText('player')).toBe(player0)
+    })
+
+    it('Escape turns fill off', () => {
+      remember()
+      renderDock()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(rootFill()).toBeNull()
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('false')
+    })
+
+    it('ignores Escape while something is fullscreen, since the browser uses it to leave', () => {
+      remember()
+      renderDock()
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        get: () => document.body,
+      })
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(rootFill()).toBe('md')
+      Reflect.deleteProperty(document, 'fullscreenElement')
+    })
+
+    it('ignores other keys', () => {
+      remember()
+      renderDock()
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(rootFill()).toBe('md')
+    })
+
+    it('does nothing on Escape when fill is off', () => {
+      renderDock()
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBeNull()
+    })
+
+    it('stops listening for Escape once it is unmounted', () => {
+      remember()
+      const { unmount } = renderDock()
+      unmount()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('true')
+    })
+
     it('hands the dock row to the fullscreen hook', () => {
       renderDock()
       const ref = vi.mocked(useFullscreen).mock.calls[0][0]
