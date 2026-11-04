@@ -437,6 +437,81 @@ describe('TwitchEmbedPlayer', () => {
     )
   })
 
+  // In a background tab (or any window that is not painting) requestAnimationFrame
+  // never fires, so the embed cannot be created. That is not an engine failure:
+  // the 15s timer used to expire anyway and demote the player to the plain
+  // iframe (no autoplay). The embed should be created when painting resumes,
+  // with a fresh budget from that moment.
+  describe('when the page is not painting (requestAnimationFrame never fires)', () => {
+    let rafQueue: FrameRequestCallback[] = []
+
+    beforeEach(() => {
+      rafQueue = []
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+        rafQueue.push(cb)
+        return rafQueue.length
+      })
+    })
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    async function resumePainting() {
+      while (rafQueue.length) {
+        const pending = rafQueue.splice(0)
+        pending.forEach((cb) => cb(16))
+      }
+      await vi.advanceTimersByTimeAsync(0)
+    }
+
+    it('does not demote or create the embed while painting is stalled', async () => {
+      const onError = vi.fn()
+      render(
+        <TwitchEmbedPlayer
+          url={streamDetection.originalUrl}
+          detection={streamDetection}
+          onError={onError}
+        />,
+      )
+      await vi.advanceTimersByTimeAsync(20000)
+      expect(onError).not.toHaveBeenCalled()
+      expect(embedInstances).toHaveLength(0)
+    })
+
+    it('creates the embed once painting resumes and gives it a fresh 15s', async () => {
+      const onError = vi.fn()
+      render(
+        <TwitchEmbedPlayer
+          url={streamDetection.originalUrl}
+          detection={streamDetection}
+          onError={onError}
+        />,
+      )
+      await vi.advanceTimersByTimeAsync(20000)
+      await resumePainting()
+      expect(embedInstances).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(14000)
+      expect(onError).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(onError).toHaveBeenCalledWith(expect.stringContaining('timed out'))
+    })
+
+    it('still times out when the SDK script never loads (a stall that is not about painting)', async () => {
+      delete window.Twitch
+      const onError = vi.fn()
+      render(
+        <TwitchEmbedPlayer
+          url={streamDetection.originalUrl}
+          detection={streamDetection}
+          onError={onError}
+        />,
+      )
+      await vi.advanceTimersByTimeAsync(16000)
+      expect(onError).toHaveBeenCalledWith(expect.stringContaining('timed out'))
+    })
+  })
+
   it('does NOT fire onError after VIDEO_READY even if 20s elapses', async () => {
     const onError = vi.fn()
     const onReady = vi.fn()

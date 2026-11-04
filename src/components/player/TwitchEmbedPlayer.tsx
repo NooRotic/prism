@@ -163,16 +163,26 @@ export default function TwitchEmbedPlayer({
 
     // Start the timeout BEFORE async work so the budget covers the full
     // init path (script load + Embed construction + VIDEO_READY).
-    let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(
-      () => {
-        if (mountedRef.current) {
-          handleError(
-            `Twitch Embed timed out after ${EMBED_TIMEOUT_MS / 1000}s`,
-          )
+    //
+    // `scriptLoaded` / `painted` let it tell "the embed is stuck" from "this
+    // page is not painting": a background tab (or any non-rendering window)
+    // never fires requestAnimationFrame, so the embed cannot be created yet.
+    // That is not an engine failure, so we keep waiting instead of demoting to
+    // the plain iframe, and the budget restarts once painting resumes.
+    let scriptLoaded = false
+    let painted = false
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const armTimeout = () => {
+      timeoutId = setTimeout(() => {
+        if (!mountedRef.current) return
+        if (scriptLoaded && !painted) {
+          armTimeout()
+          return
         }
-      },
-      EMBED_TIMEOUT_MS,
-    )
+        handleError(`Twitch Embed timed out after ${EMBED_TIMEOUT_MS / 1000}s`)
+      }, EMBED_TIMEOUT_MS)
+    }
+    armTimeout()
     let iframeLoadGraceId: ReturnType<typeof setTimeout> | undefined
     let soundFallbackId: ReturnType<typeof setTimeout> | undefined
     // Set by the embed's own VIDEO_PLAY event (player-level events are not
@@ -212,11 +222,16 @@ export default function TwitchEmbedPlayer({
       }
 
       if (!mountedRef.current || !window.Twitch?.Embed) return
+      scriptLoaded = true
 
       // Give the container one paint cycle so Twitch's autoplay visibility
       // check sees real dimensions, not a zero-size pre-layout element.
       await waitForPaint()
       if (!mountedRef.current || !window.Twitch?.Embed) return
+      painted = true
+      // Fresh budget from the moment the embed can actually be created.
+      clearTimeoutSafe()
+      armTimeout()
 
       const Embed = window.Twitch.Embed
 
