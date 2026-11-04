@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import ChatSource from '../components/chat/ChatSource'
+import ChatTextSize from '../components/chat/ChatTextSize'
+import ScaledChat from '../components/chat/ScaledChat'
+import { useChatScale } from '../components/chat/useChatScale'
 import { createPopoutBus, saveBounds } from '../lib/chatPopout'
 import type { PopoutBus, WindowBounds } from '../lib/chatPopout'
 
@@ -22,10 +25,12 @@ interface ChatPopoutPageProps {
 }
 
 /**
- * The chat in a window of its own: only the chat, none of the page chrome (it
- * is routed outside AppLayout). It tells the main window it is alive, follows
- * the channel the main window is watching, closes when asked, and remembers
- * where the viewer put it so the next pop-out opens in the same place.
+ * The chat in a window of its own: the chat and a slim text-size strip, none of
+ * the page chrome (it is routed outside AppLayout). It tells the main window it
+ * is alive, follows the channel the main window is watching, closes when asked,
+ * and remembers where the viewer put it so the next pop-out opens in the same
+ * place. The text size is a plain saved preference, so it follows a change made
+ * in any window and is not part of the owner-scoped messages.
  */
 export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps) {
   const { channel = '' } = useParams<{ channel: string }>()
@@ -34,6 +39,7 @@ export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps
   const [searchParams] = useSearchParams()
   const owner = searchParams.get('owner') ?? ''
   const navigate = useNavigate()
+  const chatScale = useChatScale()
 
   // The bus effect below runs once; these keep it reading the latest values.
   const channelRef = useRef(channel)
@@ -103,8 +109,26 @@ export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps
   }, [injectedBus])
 
   return (
-    <div className="h-screen w-screen" style={{ backgroundColor: 'var(--bg)' }}>
-      <ChatSource channel={channel} />
+    <div className="h-screen w-screen flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
+      <div
+        data-testid="popout-text-size"
+        className="shrink-0 flex items-center justify-end px-2 py-1"
+        style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}
+      >
+        <ChatTextSize
+          scale={chatScale.scale}
+          canSmaller={chatScale.canSmaller}
+          canLarger={chatScale.canLarger}
+          onSmaller={chatScale.smaller}
+          onLarger={chatScale.larger}
+          onReset={chatScale.reset}
+        />
+      </div>
+      <div className="flex-1 min-h-0">
+        <ScaledChat scale={chatScale.scale} always>
+          <ChatSource channel={channel} />
+        </ScaledChat>
+      </div>
     </div>
   )
 }
