@@ -1,4 +1,5 @@
 import { render, cleanup } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TwitchEmbedPlayer from '../TwitchEmbedPlayer'
 import type { URLDetectionResult } from '../../../lib/urlDetection'
@@ -14,6 +15,7 @@ type Listener = () => void
 interface MockPlayer {
   pause: ReturnType<typeof vi.fn>
   play: ReturnType<typeof vi.fn>
+  setMuted: ReturnType<typeof vi.fn>
   addEventListener: ReturnType<typeof vi.fn>
   __fire: (event: string) => void
 }
@@ -35,6 +37,7 @@ function makeMockPlayer(): MockPlayer {
   return {
     pause: vi.fn(),
     play: vi.fn(),
+    setMuted: vi.fn(),
     addEventListener: vi.fn((event: string, cb: Listener) => {
       const arr = listeners.get(event) ?? []
       arr.push(cb)
@@ -156,7 +159,7 @@ describe('TwitchEmbedPlayer', () => {
     expect(embedInstances).toHaveLength(0)
   })
 
-  it('constructs Twitch.Embed with muted autoplay for stream detection', async () => {
+  it('constructs Twitch.Embed asking for unmuted (sound) autoplay for stream detection', async () => {
     render(
       <TwitchEmbedPlayer
         url={streamDetection.originalUrl}
@@ -168,7 +171,8 @@ describe('TwitchEmbedPlayer', () => {
     const opts = embedInstances[0].__options
     expect(opts.channel).toBe('ninja')
     expect(opts.autoplay).toBe(true)
-    expect(opts.muted).toBe(true)
+    // Sound first; the muted fallback below covers browsers that block it.
+    expect(opts.muted).toBe(false)
     expect(opts.parent).toEqual([window.location.hostname])
   })
 
@@ -286,6 +290,69 @@ describe('TwitchEmbedPlayer', () => {
     embed.__fire('video.ready')
     expect(onError).not.toHaveBeenCalled()
     expect(onReady).toHaveBeenCalledTimes(1)
+  })
+
+  // Sound-first autoplay: we ask for unmuted playback. Browsers only allow
+  // sound without a click once the site has earned engagement, so when playback
+  // has not started shortly after the player is ready we mute and play.
+  describe('sound-first autoplay with muted fallback', () => {
+    async function renderReady(
+      props: Partial<ComponentProps<typeof TwitchEmbedPlayer>> = {},
+      beforeReady?: (embed: MockEmbed) => void,
+    ) {
+      const utils = render(
+        <TwitchEmbedPlayer
+          url={streamDetection.originalUrl}
+          detection={streamDetection}
+          {...props}
+        />,
+      )
+      // Flush waitForPaint without tripping the 15s embed timeout.
+      await vi.advanceTimersByTimeAsync(100)
+      const embed = embedInstances[0]
+      beforeReady?.(embed)
+      embed.__fire('video.ready')
+      return { ...utils, embed }
+    }
+
+    it('mutes and plays when unmuted autoplay has not started 3s after ready', async () => {
+      const { embed } = await renderReady()
+      expect(embed.__player.play).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(3000)
+      expect(embed.__player.setMuted).toHaveBeenCalledWith(true)
+      expect(embed.__player.play).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves the sound on when playback starts in time', async () => {
+      const { embed } = await renderReady()
+      vi.advanceTimersByTime(1000)
+      embed.__fire('video.play')
+      vi.advanceTimersByTime(5000)
+      expect(embed.__player.setMuted).not.toHaveBeenCalled()
+      expect(embed.__player.play).not.toHaveBeenCalled()
+    })
+
+    it('stops waiting when the player unmounts first', async () => {
+      const { embed, unmount } = await renderReady()
+      unmount()
+      vi.advanceTimersByTime(5000)
+      expect(embed.__player.setMuted).not.toHaveBeenCalled()
+      expect(embed.__player.play).not.toHaveBeenCalled()
+    })
+
+    it('does not raise an error when the player has no setMuted', async () => {
+      const onError = vi.fn()
+      const play = vi.fn()
+      await renderReady({ onError }, (e) => {
+        e.getPlayer = vi.fn(() => ({
+          play,
+          pause: vi.fn(),
+        })) as unknown as typeof e.getPlayer
+      })
+      vi.advanceTimersByTime(3000)
+      expect(play).toHaveBeenCalledTimes(1)
+      expect(onError).not.toHaveBeenCalled()
+    })
   })
 
   it('fires onOffline / onOnline for stream detection only', async () => {
