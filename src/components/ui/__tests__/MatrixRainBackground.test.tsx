@@ -45,6 +45,11 @@ describe('MatrixRainBackground', () => {
     expect(queue).toHaveLength(1)
   })
 
+  it('marks its canvas fill-hide so fill mode can hide it', () => {
+    const { container } = render(<MatrixRainBackground />)
+    expect(container.querySelector('canvas')).toHaveClass('fill-hide')
+  })
+
   it('stops scheduling frames and keeps its last frame while paused, then resumes', () => {
     const { rerender } = render(<MatrixRainBackground paused />)
     runFrame()

@@ -102,7 +102,7 @@ export default function SlidedownPanel({
       aria-hidden={!isOpen}
       aria-label={ariaLabel}
       role="region"
-      className="brushed-metal fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
+      className="fill-hide brushed-metal fixed left-0 right-0 overflow-y-auto transition-transform duration-300 ease-out"
       style={{
         top: 'var(--header-height, 56px)',
         maxHeight: 'calc(100vh - var(--header-height, 56px))',

@@ -35,6 +35,11 @@ describe('SlidedownPanel', () => {
     expect(panel).toHaveStyle({ visibility: 'hidden' })
   })
 
+  it('is marked fill-hide so fill mode can hide it', () => {
+    const panel = renderPanel()
+    expect(panel).toHaveClass('fill-hide')
+  })
+
   it('becomes visible when opened', () => {
     const panel = renderPanel()
     act(() => {

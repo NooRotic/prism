@@ -1,8 +1,9 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { vi } from 'vitest'
 import App from '../../App'
 import ChatPopoutPage from '../ChatPopoutPage'
+import { STORAGE_KEYS } from '../../config/storageKeys'
 import { loadBounds } from '../../lib/chatPopout'
 import type { PopoutBus } from '../../lib/chatPopout'
 import { createFakePopoutBus } from '../../test/fakePopoutBus'
@@ -57,10 +58,94 @@ describe('ChatPopoutPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the channel chat and nothing else', () => {
+  it('renders the channel chat', () => {
     const { bus } = createFakeBus()
     renderPage(bus)
     expect(screen.getByTitle('streamer Twitch chat')).toBeInTheDocument()
+  })
+
+  describe('chat text size', () => {
+    const KEY = STORAGE_KEYS.LOCAL_CHAT_SCALE
+    const inner = () => screen.getByTestId('scaled-chat-inner')
+    const fromAnotherWindow = (newValue: string | null) =>
+      act(() => {
+        window.dispatchEvent(new StorageEvent('storage', { key: KEY, newValue }))
+      })
+
+    it('shows the three text-size buttons in a strip of its own', () => {
+      const { bus } = createFakeBus()
+      renderPage(bus)
+      const strip = screen.getByTestId('popout-text-size')
+      expect(strip).toContainElement(screen.getByRole('group', { name: 'Chat text size' }))
+      expect(screen.getByRole('button', { name: 'Smaller chat text' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Larger chat text' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Reset chat text size, 100%' })).toBeInTheDocument()
+    })
+
+    it('larger saves the size and updates the scale', () => {
+      const { bus } = createFakeBus()
+      renderPage(bus)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Larger chat text' }))
+
+      expect(localStorage.getItem(KEY)).toBe('1.15')
+      expect(inner().style.getPropertyValue('--chat-scale')).toBe('1.15')
+    })
+
+    it('shows the saved size at load', () => {
+      localStorage.setItem(KEY, '1.5')
+      const { bus } = createFakeBus()
+      renderPage(bus)
+      expect(inner().style.getPropertyValue('--chat-scale')).toBe('1.5')
+    })
+
+    it('follows a change made in another window', () => {
+      const { bus } = createFakeBus()
+      renderPage(bus)
+
+      fromAnotherWindow('1.75')
+
+      expect(inner().style.getPropertyValue('--chat-scale')).toBe('1.75')
+      expect(screen.getByRole('button', { name: 'Reset chat text size, 175%' })).toBeInTheDocument()
+    })
+
+    it('a pop-out loaded directly, with no owner, still follows the size', () => {
+      const { bus } = createFakeBus()
+      renderPage(bus, 'streamer', '')
+
+      fromAnotherWindow('1.3')
+
+      expect(inner().style.getPropertyValue('--chat-scale')).toBe('1.3')
+    })
+
+    it('never scales the strip that holds the buttons', () => {
+      localStorage.setItem(KEY, '1.5')
+      const { bus } = createFakeBus()
+      renderPage(bus)
+      expect(screen.getByTestId('scaled-chat')).not.toContainElement(
+        screen.getByTestId('popout-text-size'),
+      )
+      expect(inner()).toContainElement(screen.getByTitle('streamer Twitch chat'))
+    })
+
+    it('scales at every width, since there is no md breakpoint to wait for', () => {
+      localStorage.setItem(KEY, '1.5')
+      const { bus } = createFakeBus()
+      renderPage(bus)
+      expect(inner()).toHaveClass('[transform:scale(var(--chat-scale))]')
+      expect(inner()).not.toHaveClass('md:[transform:scale(var(--chat-scale))]')
+    })
+
+    it('does not reload the chat when the size changes', () => {
+      const { bus } = createFakeBus()
+      renderPage(bus)
+      const frame = screen.getByTitle('streamer Twitch chat')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Larger chat text' }))
+      fromAnotherWindow('2')
+
+      expect(screen.getByTitle('streamer Twitch chat')).toBe(frame)
+    })
   })
 
   it('posts hello with its owner and the channel on mount', () => {
@@ -251,11 +336,12 @@ describe('the /chat/:channel route', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('serves only the chat, with none of the page chrome', () => {
+  it('serves only the chat and its text-size strip, with none of the page chrome', () => {
     window.history.pushState({}, '', '/chat/somechannel')
     render(<App />)
 
     expect(screen.getByTitle('somechannel Twitch chat')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Chat text size' })).toBeInTheDocument()
     expect(screen.queryByRole('banner')).not.toBeInTheDocument()
     expect(screen.queryByTestId('channel-rail')).not.toBeInTheDocument()
   })

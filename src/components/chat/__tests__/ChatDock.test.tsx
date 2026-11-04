@@ -1,11 +1,20 @@
 import { createEvent, render, screen, fireEvent } from '@testing-library/react'
 import ChatDock from '../ChatDock'
 import { useChatPopout } from '../useChatPopout'
+import { useFullscreen } from '../useFullscreen'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
 
-// The pop-out's own behaviour is covered in useChatPopout.test.ts; here the dock
-// is only checked for how it reacts to the hook's state.
+// The pop-out's and fullscreen's own behaviour is covered in their hook tests; here
+// the dock is only checked for how it reacts to what the hooks report.
 vi.mock('../useChatPopout', () => ({ useChatPopout: vi.fn() }))
+vi.mock('../useFullscreen', () => ({ useFullscreen: vi.fn() }))
+
+const fullscreenState = (overrides: Partial<ReturnType<typeof useFullscreen>> = {}) => ({
+  supported: false,
+  isFullscreen: false,
+  toggle: vi.fn(),
+  ...overrides,
+})
 
 const popout = (overrides: Partial<ReturnType<typeof useChatPopout>> = {}) => ({
   isOpen: false,
@@ -26,6 +35,13 @@ describe('ChatDock', () => {
     localStorage.clear()
     vi.mocked(useChatPopout).mockReset()
     vi.mocked(useChatPopout).mockReturnValue(popout())
+    vi.mocked(useFullscreen).mockReset()
+    vi.mocked(useFullscreen).mockReturnValue(fullscreenState())
+  })
+
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-fill')
+    vi.restoreAllMocks()
   })
 
   it('docks the chat on the right by default', () => {
@@ -206,6 +222,468 @@ describe('ChatDock', () => {
   it('shows no status message when nothing was blocked', () => {
     renderDock()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  describe('chat text size', () => {
+    const scaledInner = () => screen.getByTestId('scaled-chat-inner')
+
+    it('puts the text-size controls in the chat header, which is hidden below md', () => {
+      renderDock()
+      const header = screen.getByTestId('chat-header')
+      expect(header).toHaveClass('hidden', 'md:flex')
+      expect(header).toContainElement(screen.getByRole('group', { name: 'Chat text size' }))
+    })
+
+    it('lets the header wrap instead of clipping its buttons in a narrow chat', () => {
+      renderDock()
+      expect(screen.getByTestId('chat-header')).toHaveClass('flex-wrap')
+    })
+
+    it('shows 100% and applies no scale by default', () => {
+      renderDock()
+      expect(screen.getByRole('button', { name: 'Reset chat text size, 100%' })).toBeInTheDocument()
+      expect(scaledInner().className).not.toMatch(/transform/)
+    })
+
+    it('applies a saved size at load', () => {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_SCALE, '1.5')
+      renderDock()
+      expect(scaledInner().style.getPropertyValue('--chat-scale')).toBe('1.5')
+      expect(screen.getByRole('button', { name: 'Reset chat text size, 150%' })).toBeInTheDocument()
+    })
+
+    it('larger raises the percentage and the scale, and saves it', () => {
+      renderDock()
+      fireEvent.click(screen.getByRole('button', { name: 'Larger chat text' }))
+
+      expect(screen.getByRole('button', { name: 'Reset chat text size, 115%' })).toBeInTheDocument()
+      expect(scaledInner().style.getPropertyValue('--chat-scale')).toBe('1.15')
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_CHAT_SCALE)).toBe('1.15')
+    })
+
+    it('smaller and reset work too', () => {
+      renderDock()
+      fireEvent.click(screen.getByRole('button', { name: 'Smaller chat text' }))
+      expect(scaledInner().style.getPropertyValue('--chat-scale')).toBe('0.85')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reset chat text size, 85%' }))
+      expect(scaledInner().style.getPropertyValue('--chat-scale')).toBe('1')
+    })
+
+    it('scales the chat iframe but never the header that holds the buttons', () => {
+      renderDock()
+      expect(scaledInner()).toContainElement(chatFrame()!)
+      expect(screen.getByTestId('scaled-chat')).not.toContainElement(screen.getByTestId('chat-header'))
+    })
+
+    it('does not reload the chat iframe when the size changes', () => {
+      renderDock()
+      const frame = chatFrame()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Larger chat text' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Larger chat text' }))
+
+      expect(chatFrame()).toBe(frame)
+    })
+
+    it('keeps focus on the text-size button that was clicked', () => {
+      renderDock()
+      const larger = screen.getByRole('button', { name: 'Larger chat text' })
+      larger.focus()
+
+      fireEvent.click(larger)
+
+      expect(document.activeElement).toBe(larger)
+    })
+
+    it('still shows No channel unscaled when there is no channel', () => {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_SCALE, '1.5')
+      render(<ChatDock channel={undefined} player={player} />)
+      expect(screen.getByText('No channel')).toBeInTheDocument()
+    })
+  })
+
+  describe('fill mode', () => {
+    const remember = (fill = true) => localStorage.setItem(STORAGE_KEYS.LOCAL_FILL_MODE, String(fill))
+    const rootFill = () => document.documentElement.getAttribute('data-fill')
+
+    it('sets data-fill="md" on the page root when fill is remembered and chat is docked', () => {
+      remember()
+      renderDock()
+      expect(rootFill()).toBe('md')
+    })
+
+    it('sets data-fill="all" when fill is remembered and chat is hidden', () => {
+      remember()
+      localStorage.setItem(
+        STORAGE_KEYS.LOCAL_CHAT_PLACEMENT,
+        JSON.stringify({ side: 'right', hidden: true }),
+      )
+      renderDock()
+      expect(rootFill()).toBe('all')
+    })
+
+    it('sets data-fill="all" when fill is remembered and chat is popped out', () => {
+      remember()
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+      expect(rootFill()).toBe('all')
+    })
+
+    const setPlacement = (hidden: boolean, side: 'left' | 'right' = 'right') =>
+      localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_PLACEMENT, JSON.stringify({ side, hidden }))
+
+    it('the header offers Fill video & chat, and clicking it turns fill on and remembers it', () => {
+      renderDock()
+      fireEvent.click(screen.getByRole('button', { name: 'Fill video & chat' }))
+
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toBeInTheDocument()
+      expect(rootFill()).toBe('md')
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('true')
+    })
+
+    // The two buttons fill different things: with chat docked it is the video and
+    // the chat, with chat hidden or popped out it is the video alone.
+    it('names the fill button for what it fills: video & chat in the header, the window in the strip', () => {
+      const docked = renderDock()
+      expect(screen.getByRole('button', { name: 'Fill video & chat' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Fill window' })).not.toBeInTheDocument()
+      docked.unmount()
+
+      setPlacement(true)
+      renderDock()
+      expect(screen.getByRole('button', { name: 'Fill window' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Fill video & chat' })).not.toBeInTheDocument()
+    })
+
+    it('the header fill button reflects the state with aria-pressed', () => {
+      renderDock()
+      const button = screen.getByRole('button', { name: 'Fill video & chat' })
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(button)
+
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('shows the restore, fill and fullscreen buttons in the strip when chat is hidden', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ supported: true }))
+      setPlacement(true)
+      renderDock()
+
+      expect(screen.getByRole('button', { name: 'Show chat' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Fill window' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Fullscreen chat and video' })).toBeInTheDocument()
+    })
+
+    it('shows the return, fill and fullscreen buttons in the strip when chat is popped out', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ supported: true }))
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+
+      expect(screen.getByRole('button', { name: 'Return chat to the page' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Fill window' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Fullscreen chat and video' })).toBeInTheDocument()
+    })
+
+    it('has a visible exit-fill button with chat docked, hidden and popped out', () => {
+      remember()
+
+      const docked = renderDock()
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toBeInTheDocument()
+      docked.unmount()
+
+      setPlacement(true)
+      const hidden = renderDock()
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toBeInTheDocument()
+      hidden.unmount()
+
+      setPlacement(false)
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+      expect(screen.getByRole('button', { name: 'Exit fill mode' })).toBeInTheDocument()
+    })
+
+    it('exiting from the strip works with chat hidden', () => {
+      remember()
+      setPlacement(true)
+      renderDock()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Exit fill mode' }))
+
+      expect(rootFill()).toBeNull()
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('false')
+    })
+
+    it('keeps the same button element, and its focus, after it is clicked', () => {
+      renderDock()
+      const button = screen.getByRole('button', { name: 'Fill video & chat' })
+      button.focus()
+
+      fireEvent.click(button)
+
+      const after = screen.getByRole('button', { name: 'Exit fill mode' })
+      expect(after).toBe(button)
+      expect(document.activeElement).toBe(button)
+    })
+
+    it('keeps the same strip button, and its focus, after it is clicked', () => {
+      setPlacement(true)
+      renderDock()
+      const button = screen.getByRole('button', { name: 'Fill window' })
+      button.focus()
+
+      fireEvent.click(button)
+
+      const after = screen.getByRole('button', { name: 'Exit fill mode' })
+      expect(after).toBe(button)
+      expect(document.activeElement).toBe(button)
+    })
+
+    it('has no fullscreen button when the browser cannot do fullscreen', () => {
+      renderDock()
+      expect(screen.queryByRole('button', { name: /fullscreen/i })).not.toBeInTheDocument()
+    })
+
+    it('the fullscreen button calls the hook, and reflects the state with aria-pressed', () => {
+      const toggle = vi.fn()
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ supported: true, toggle }))
+      const { rerender } = renderDock()
+      const button = screen.getByRole('button', { name: 'Fullscreen chat and video' })
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(button)
+      expect(toggle).toHaveBeenCalledOnce()
+
+      vi.mocked(useFullscreen).mockReturnValue(
+        fullscreenState({ supported: true, isFullscreen: true, toggle }),
+      )
+      rerender(<ChatDock channel="streamer" player={player} />)
+      expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    // Moving an iframe in the DOM reloads it, which restarts the stream and makes
+    // Twitch decide autoplay again. Flipping modes must only change classes.
+    it('keeps the very same player element when fill is flipped on and off', () => {
+      renderDock()
+      const player0 = screen.getByText('player')
+      const wrapper0 = screen.getByTestId('chat-player')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Fill video & chat' }))
+      expect(screen.getByText('player')).toBe(player0)
+      expect(screen.getByTestId('chat-player')).toBe(wrapper0)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Exit fill mode' }))
+      expect(screen.getByText('player')).toBe(player0)
+      expect(screen.getByTestId('chat-player')).toBe(wrapper0)
+    })
+
+    it('keeps the very same player element when the chat is hidden and fill is flipped', () => {
+      renderDock()
+      const player0 = screen.getByText('player')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Fill video & chat' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Hide chat' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Exit fill mode' }))
+
+      expect(screen.getByText('player')).toBe(player0)
+    })
+
+    it('Escape turns fill off', () => {
+      remember()
+      renderDock()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(rootFill()).toBeNull()
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('false')
+    })
+
+    it('ignores Escape while something is fullscreen, since the browser uses it to leave', () => {
+      remember()
+      renderDock()
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        get: () => document.body,
+      })
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(rootFill()).toBe('md')
+      Reflect.deleteProperty(document, 'fullscreenElement')
+    })
+
+    it('ignores other keys', () => {
+      remember()
+      renderDock()
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(rootFill()).toBe('md')
+    })
+
+    it('does nothing on Escape when fill is off', () => {
+      renderDock()
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBeNull()
+    })
+
+    it('stops listening for Escape once it is unmounted', () => {
+      remember()
+      const { unmount } = renderDock()
+      unmount()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('true')
+    })
+
+    it('hands the dock row to the fullscreen hook', () => {
+      renderDock()
+      const ref = vi.mocked(useFullscreen).mock.calls[0][0]
+      expect(ref.current).toBe(screen.getByTestId('chat-dock'))
+    })
+
+    it('uses the fill layout and data-fill while fullscreen, even when fill is off', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: true }))
+      renderDock()
+      expect(rootFill()).toBe('md')
+      expect(screen.getByTestId('chat-dock')).toHaveClass('md:fixed', 'md:inset-0')
+    })
+
+    it('does not write the remembered fill setting while fullscreen', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: true }))
+      renderDock()
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBeNull()
+    })
+
+    it('gives data-fill="all" when fullscreen with chat hidden, and the video alone fills', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: true }))
+      localStorage.setItem(
+        STORAGE_KEYS.LOCAL_CHAT_PLACEMENT,
+        JSON.stringify({ side: 'right', hidden: true }),
+      )
+      renderDock()
+      expect(rootFill()).toBe('all')
+      expect(screen.getByTestId('chat-dock')).toHaveClass('fixed', 'inset-0')
+    })
+
+    it('goes back to the layout it started in when fullscreen ends', () => {
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: true }))
+      const { rerender } = renderDock()
+      expect(rootFill()).toBe('md')
+
+      vi.mocked(useFullscreen).mockReturnValue(fullscreenState({ isFullscreen: false }))
+      rerender(<ChatDock channel="streamer" player={player} />)
+
+      expect(rootFill()).toBeNull()
+      expect(screen.getByTestId('chat-dock')).not.toHaveClass('md:fixed')
+    })
+
+    it('sets no data-fill when fill is off', () => {
+      renderDock()
+      expect(rootFill()).toBeNull()
+    })
+
+    it('treats a garbage saved fill value as off', () => {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_FILL_MODE, 'banana')
+      renderDock()
+      expect(rootFill()).toBeNull()
+    })
+
+    it('removes data-fill when the dock unmounts, so other pages are untouched', () => {
+      remember()
+      const { unmount } = renderDock()
+      expect(rootFill()).toBe('md')
+
+      unmount()
+
+      expect(rootFill()).toBeNull()
+    })
+
+    it('gives the row md-only fill classes when chat is docked', () => {
+      remember()
+      renderDock()
+      const row = screen.getByTestId('chat-dock')
+      expect(row).toHaveClass('md:fixed', 'md:inset-0', 'md:z-50')
+      expect(row).not.toHaveClass('fixed')
+    })
+
+    it('gives the row all-width fill classes when chat is not docked', () => {
+      remember()
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+      const row = screen.getByTestId('chat-dock')
+      expect(row).toHaveClass('fixed', 'inset-0', 'z-50')
+      expect(row).not.toHaveClass('max-w-[1600px]')
+    })
+
+    it('has no fill classes when fill is off', () => {
+      renderDock()
+      const row = screen.getByTestId('chat-dock')
+      expect(row).not.toHaveClass('fixed')
+      expect(row).not.toHaveClass('md:fixed')
+      expect(row).toHaveClass('max-w-[1600px]')
+    })
+
+    it('keeps the 16:9 box below md while chat is docked, and drops it at md and wider', () => {
+      remember()
+      renderDock()
+      const wrapper = screen.getByTestId('chat-player')
+      expect(wrapper).toHaveClass('aspect-video', 'md:aspect-auto')
+    })
+
+    it('drops the 16:9 box at every width when chat is not docked', () => {
+      remember()
+      vi.mocked(useChatPopout).mockReturnValue(popout({ isOpen: true }))
+      renderDock()
+      const wrapper = screen.getByTestId('chat-player')
+      expect(wrapper).toHaveClass('aspect-auto')
+      expect(wrapper).not.toHaveClass('aspect-video')
+    })
+
+    it('keeps the 16:9 box when fill is off', () => {
+      renderDock()
+      const wrapper = screen.getByTestId('chat-player')
+      expect(wrapper).toHaveClass('aspect-video')
+      expect(wrapper).not.toHaveClass('md:aspect-auto')
+    })
+
+    it('puts nothing from the dock inside the player wrapper in fill mode', () => {
+      remember()
+      renderDock()
+      const wrapper = screen.getByTestId('chat-player')
+      expect(wrapper).toContainElement(screen.getByText('player'))
+      expect(wrapper).not.toContainElement(screen.getByTestId('chat-panel'))
+    })
+
+    it('puts no transition or animation on the row or the player wrapper', () => {
+      for (const on of [false, true]) {
+        localStorage.clear()
+        remember(on)
+        const { unmount } = renderDock()
+        expect(screen.getByTestId('chat-dock').className).not.toMatch(/transition|animate/)
+        expect(screen.getByTestId('chat-player').className).not.toMatch(/transition|animate/)
+        unmount()
+      }
+    })
+
+    // 80% player + the 8px handle + 20% chat is 8px more than the row. In a row that
+    // fills the window that clips the chat's right edge off-screen, so the chat
+    // shrinks by the handle's width instead.
+    it('lets the chat panel shrink so the handle never pushes it past the window edge', () => {
+      renderDock()
+      expect(screen.getByTestId('chat-panel')).toHaveStyle({ flexShrink: '1' })
+    })
+
+    it('does not throw when saving the split ratio fails', () => {
+      renderDock()
+      const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw new DOMException('QuotaExceededError')
+      })
+
+      expect(() => fireEvent.pointerUp(screen.getByRole('separator'))).not.toThrow()
+
+      spy.mockRestore()
+    })
   })
 
   it('keeps the Show chat tab visible at every width, so a hidden chat can always be restored', () => {

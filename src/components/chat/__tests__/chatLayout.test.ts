@@ -10,6 +10,7 @@ import { STORAGE_KEYS } from '../../../config/storageKeys'
 
 describe('loadRatio', () => {
   beforeEach(() => localStorage.clear())
+  afterEach(() => vi.restoreAllMocks())
 
   it('exposes the existing split bounds', () => {
     expect([DEFAULT_RATIO, MIN_RATIO, MAX_RATIO]).toEqual([0.8, 0.5, 0.92])
@@ -23,6 +24,14 @@ describe('loadRatio', () => {
   ])('falls back to the default when %s', (_label, stored) => {
     if (stored !== null) localStorage.setItem(STORAGE_KEYS.LOCAL_PANEL_RATIO, stored)
     expect(loadRatio()).toBe(0.8)
+  })
+
+  it('falls back to the default when reading storage throws', () => {
+    const spy = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+      throw new DOMException('SecurityError')
+    })
+    expect(loadRatio()).toBe(0.8)
+    spy.mockRestore()
   })
 
   it('returns a valid stored ratio', () => {

@@ -19,5 +19,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Vitest blanks every imported stylesheet. Let index.css through so a test can
+    // read its source with `?raw` (fillHideCss.test.ts pins a media query that jsdom
+    // cannot evaluate). Nothing renders it, so no other test is affected.
+    css: { include: [/src\/index\.css/] },
   },
 })

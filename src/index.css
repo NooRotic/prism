@@ -51,6 +51,22 @@
   --rail-reserve-right: 0px;
 }
 
+/* Fill mode. ChatDock sets data-fill on the page root while it is in effect; anything
+   marked fill-hide is hidden (never unmounted, so state survives). `md` applies from
+   Tailwind's md breakpoint up; `all` at every width (chat hidden or popped out).
+   The breakpoint must be Tailwind's own, not a pixel width: the md: classes that make
+   the fill layout and the fill toggle compile to 48rem, which is not 768px when the
+   browser's default font size is changed, and the two must switch on together or the
+   chrome can be hidden with no toggle left to bring it back. */
+:root[data-fill='all'] .fill-hide {
+  display: none !important;
+}
+@media (width >= theme(--breakpoint-md)) {
+  :root[data-fill='md'] .fill-hide {
+    display: none !important;
+  }
+}
+
 /* ─── Brushed metal surface ──────────────────────────────────────────
    A distinctive, anti-slop card/panel material (Law 9: "one memorable
    thing" — unusual surface texture).

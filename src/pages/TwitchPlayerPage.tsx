@@ -70,22 +70,22 @@ export default function TwitchPlayerPage() {
       />
 
       {/* Profile sidebar — full width below player+chat */}
-      <div className="max-w-[1600px] mx-auto w-full">
+      <div className="fill-hide max-w-[1600px] mx-auto w-full">
         <ProfileSidebar />
       </div>
 
       {/* Stats row */}
-      <div className="max-w-[1600px] mx-auto w-full">
+      <div className="fill-hide max-w-[1600px] mx-auto w-full">
         <StatsRow />
       </div>
 
       {/* Debug panel */}
-      <div className="max-w-[1600px] mx-auto w-full">
+      <div className="fill-hide max-w-[1600px] mx-auto w-full">
         <DebugPanel />
       </div>
 
       {/* Bottom row: Clips + VODs */}
-      <div className="flex flex-col lg:flex-row gap-4 w-full max-w-[1600px] mx-auto">
+      <div className="fill-hide flex flex-col lg:flex-row gap-4 w-full max-w-[1600px] mx-auto">
         <div className="w-full lg:w-1/2">
           <ClipGrid />
         </div>
