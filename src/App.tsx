@@ -19,6 +19,7 @@ import ProtocolPage from './pages/ProtocolPage'
 import TwitchPlayerPage from './pages/TwitchPlayerPage'
 import YoutubePlayerPage from './pages/YoutubePlayerPage'
 import HlsDashPlayerPage from './pages/HlsDashPlayerPage'
+import ChatPopoutPage from './pages/ChatPopoutPage'
 
 const ONBOARDING_SEEN_KEY = STORAGE_KEYS.LOCAL_ONBOARDING_SEEN
 
@@ -129,6 +130,9 @@ function App() {
     <BrowserRouter>
       <AppProvider>
         <Routes>
+          {/* The chat pop-out is a window of its own, so it sits outside AppLayout
+              and carries none of the page chrome. */}
+          <Route path="chat/:channel" element={<ChatPopoutPage />} />
           <Route element={<AppLayout />}>
             <Route index element={<HubPage />} />
             <Route path="twitch" element={<ProtocolPage protocol="twitch" />} />
