@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { AppProvider, useApp } from '../../../contexts/AppContext'
+import { detectURLType } from '../../../lib/urlDetection'
 import ProfileSidebar from '../ProfileSidebar'
 import type {
   TwitchUser,
@@ -140,6 +141,90 @@ describe('ProfileSidebar live row', () => {
     renderSidebar(makeStream({ type: '' }))
 
     expect(screen.queryByLabelText(/^Live for/)).not.toBeInTheDocument()
+  })
+})
+
+// Clicking a clip or VOD swaps what the embed plays but leaves the route on
+// /twitch/<channel>, so nothing else on the page leads back to the stream.
+// The sidebar carries the way back.
+describe('ProfileSidebar back to live', () => {
+  const CLIP = 'https://clips.twitch.tv/SomeClip'
+  const VOD = 'https://www.twitch.tv/videos/123456789'
+  const LIVE = 'https://twitch.tv/audrareins'
+
+  function Play({ url }: { url: string }) {
+    const { dispatch } = useApp()
+    useEffect(() => {
+      dispatch({ type: 'PLAY_URL', url, detection: detectURLType(url) })
+    }, [dispatch, url])
+    return null
+  }
+
+  function PlayerProbe() {
+    const { state } = useApp()
+    return (
+      <div data-testid="probe">
+        {state.player.currentUrl}|{state.player.detection?.platform}
+      </div>
+    )
+  }
+
+  function renderPlaying(
+    url: string,
+    stream: TwitchStream | null = makeStream(),
+  ) {
+    return render(
+      <AppProvider>
+        <Seed stream={stream} />
+        <Play url={url} />
+        <PlayerProbe />
+        <ProfileSidebar />
+      </AppProvider>,
+    )
+  }
+
+  const backButton = () => screen.queryByRole('button', { name: /back to live/i })
+
+  it('offers a way back to the live stream while a clip is playing', () => {
+    renderPlaying(CLIP)
+    expect(backButton()).toBeInTheDocument()
+  })
+
+  it('offers a way back to the live stream while a VOD is playing', () => {
+    renderPlaying(VOD)
+    expect(backButton()).toBeInTheDocument()
+  })
+
+  it('does not offer it while the live stream is already playing', () => {
+    renderPlaying(LIVE)
+    expect(backButton()).not.toBeInTheDocument()
+  })
+
+  it('does not offer it when the channel is offline, as there is no live stream to go back to', () => {
+    renderPlaying(CLIP, null)
+    expect(backButton()).not.toBeInTheDocument()
+  })
+
+  it('plays the channel\'s live stream again when clicked', () => {
+    renderPlaying(CLIP)
+    fireEvent.click(backButton()!)
+    expect(screen.getByTestId('probe')).toHaveTextContent(
+      `${LIVE}|twitch-stream`,
+    )
+  })
+
+  it('goes away once the live stream is playing again', () => {
+    renderPlaying(CLIP)
+    fireEvent.click(backButton()!)
+    expect(backButton()).not.toBeInTheDocument()
+  })
+
+  it('brings the streamer layout back with the live stream', () => {
+    renderPlaying(CLIP)
+    // A clip puts the app in standalone video mode, which hides these tiles.
+    expect(screen.queryByText('Emotes')).not.toBeInTheDocument()
+    fireEvent.click(backButton()!)
+    expect(screen.getByText('Emotes')).toBeInTheDocument()
   })
 })
 

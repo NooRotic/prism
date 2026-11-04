@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import { Eye, Calendar, Gamepad2, Smile, Shield, Lock } from 'lucide-react'
+import { Eye, Calendar, Gamepad2, Smile, Shield, Lock, Radio } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import { detectURLType } from '../../lib/urlDetection'
 import ConnectTwitchButton from '../ui/ConnectTwitchButton'
 import StreamUptime from './StreamUptime'
 
@@ -166,6 +167,18 @@ export default function ProfileSidebar() {
     ? profile.broadcaster_type.toUpperCase()
     : null
 
+  // Playing a clip or VOD swaps the embed but leaves the route on
+  // /twitch/<channel>, so no link on the page leads back to the stream. This
+  // is that link. Only offered while the channel is live: offline, the stream
+  // is just an offline screen and there is nothing to go back to.
+  const viewingRecording =
+    detection?.platform === 'twitch-clip' ||
+    detection?.platform === 'twitch-video'
+  const backToLive = () => {
+    const url = `https://twitch.tv/${profile.login}`
+    dispatch({ type: 'PLAY_URL', url, detection: detectURLType(url) })
+  }
+
   return (
     <div
       className="flex flex-col gap-4 p-4 rounded-lg h-full overflow-y-auto"
@@ -240,6 +253,22 @@ export default function ProfileSidebar() {
           </div>
           <StreamUptime startedAt={stream.started_at} />
         </div>
+      )}
+
+      {isLive && stream && viewingRecording && (
+        <button
+          type="button"
+          onClick={backToLive}
+          title="Switch the player back to the live stream"
+          className="flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20"
+          style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+          }}
+        >
+          <Radio size={14} />
+          Back to live
+        </button>
       )}
 
       {/* Stream tags — neutral green tint, no purple (reserved for affiliation) */}

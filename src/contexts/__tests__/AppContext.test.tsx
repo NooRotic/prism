@@ -1,6 +1,7 @@
 import { render, screen, renderHook, act } from '@testing-library/react'
 import { AppProvider, useApp } from '../AppContext'
 import type { ReactNode } from 'react'
+import type { TwitchChannel } from '../../types/twitch'
 
 function wrapper({ children }: { children: ReactNode }) {
   return <AppProvider>{children}</AppProvider>
@@ -131,6 +132,124 @@ describe('AppContext', () => {
 
       // From idle, jumps to 'streamer' so ChannelLayout renders immediately
       expect(result.current.state.displayMode).toBe('streamer')
+    })
+
+    describe('PLAY_URL back to the loaded channel', () => {
+      const streamOf = (channelName: string) => ({
+        type: 'twitch' as const,
+        platform: 'twitch-stream' as const,
+        originalUrl: `https://twitch.tv/${channelName}`,
+        playableUrl: `https://twitch.tv/${channelName}`,
+        metadata: { channelName },
+      })
+      const clip = {
+        type: 'twitch' as const,
+        platform: 'twitch-clip' as const,
+        originalUrl: 'https://clips.twitch.tv/TestClip',
+        playableUrl: 'https://clips.twitch.tv/TestClip',
+        metadata: { clipId: 'TestClip' },
+      }
+
+      // Loads `login` as the channel, then plays one of its clips, which puts
+      // the app in standalone video mode.
+      function loadChannelThenPlayClip(
+        login: string,
+        broadcasterType: 'partner' | '' = 'partner',
+      ) {
+        const hook = renderHook(() => useApp(), { wrapper })
+        act(() => {
+          hook.result.current.dispatch({
+            type: 'LOAD_CHANNEL_SUCCESS',
+            payload: {
+              profile: {
+                id: '1',
+                login,
+                display_name: login,
+                type: '',
+                broadcaster_type: broadcasterType,
+                description: '',
+                profile_image_url: '',
+                offline_image_url: '',
+                view_count: 0,
+                created_at: '2020-01-01T00:00:00Z',
+              },
+              channelInfo: {} as TwitchChannel,
+              stream: null,
+              clips: [],
+              videos: [],
+              emotes: [],
+              badges: [],
+              games: new Map(),
+            },
+          })
+        })
+        act(() => {
+          hook.result.current.dispatch({
+            type: 'PLAY_URL',
+            url: clip.originalUrl,
+            detection: clip,
+          })
+        })
+        expect(hook.result.current.state.displayMode).toBe('video')
+        return hook
+      }
+
+      it('leaves video mode when the loaded channel\'s own stream plays again', () => {
+        const { result } = loadChannelThenPlayClip('xqc')
+
+        act(() => {
+          result.current.dispatch({
+            type: 'PLAY_URL',
+            url: 'https://twitch.tv/xqc',
+            detection: streamOf('xqc'),
+          })
+        })
+
+        expect(result.current.state.displayMode).toBe('streamer')
+      })
+
+      it('matches the channel name regardless of case', () => {
+        const { result } = loadChannelThenPlayClip('xqc')
+
+        act(() => {
+          result.current.dispatch({
+            type: 'PLAY_URL',
+            url: 'https://twitch.tv/XQC',
+            detection: streamOf('XQC'),
+          })
+        })
+
+        expect(result.current.state.displayMode).toBe('streamer')
+      })
+
+      it('restores chatter mode for a non-broadcaster channel', () => {
+        const { result } = loadChannelThenPlayClip('someviewer', '')
+
+        act(() => {
+          result.current.dispatch({
+            type: 'PLAY_URL',
+            url: 'https://twitch.tv/someviewer',
+            detection: streamOf('someviewer'),
+          })
+        })
+
+        expect(result.current.state.displayMode).toBe('chatter')
+      })
+
+      it('does not borrow another channel\'s layout for a different stream', () => {
+        const { result } = loadChannelThenPlayClip('xqc')
+
+        act(() => {
+          result.current.dispatch({
+            type: 'PLAY_URL',
+            url: 'https://twitch.tv/someoneelse',
+            detection: streamOf('someoneelse'),
+          })
+        })
+
+        // Unchanged: the new channel's own load sets its mode.
+        expect(result.current.state.displayMode).toBe('video')
+      })
     })
 
     it('LOAD_CHANNEL_START sets loading true and clears error', () => {
