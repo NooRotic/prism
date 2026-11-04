@@ -5,10 +5,12 @@ import { STORAGE_KEYS } from '../../config/storageKeys'
 import ChatHeader from './ChatHeader'
 import ChatSource from './ChatSource'
 import ChatStrip from './ChatStrip'
+import ScaledChat from './ScaledChat'
 import { loadRatio, nextRatio } from './chatLayout'
 import { FILL_ATTRIBUTE, fillScopeFor } from './fillMode'
 import { useChatPlacement } from './useChatPlacement'
 import { useChatPopout } from './useChatPopout'
+import { useChatScale } from './useChatScale'
 import { useDockDrag } from './useDockDrag'
 import { useFillMode } from './useFillMode'
 import { useFullscreen } from './useFullscreen'
@@ -41,6 +43,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   const { side, hidden } = placement
   const { handleProps: dragHandleProps } = useDockDrag(setSide)
   const popout = useChatPopout(channel)
+  const chatScale = useChatScale()
   // What the viewer sees: popped out, else hidden, else docked on `side`.
   const chatVisible = !hidden && !popout.isOpen
 
@@ -168,6 +171,14 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
               fullscreenSupported={fullscreen.supported}
               isFullscreen={fullscreen.isFullscreen}
               onToggleFullscreen={fullscreen.toggle}
+              textSize={{
+                scale: chatScale.scale,
+                canSmaller: chatScale.canSmaller,
+                canLarger: chatScale.canLarger,
+                onSmaller: chatScale.smaller,
+                onLarger: chatScale.larger,
+                onReset: chatScale.reset,
+              }}
               dragHandleProps={dragHandleProps}
             />
             {popout.blocked && (
@@ -181,7 +192,9 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
             )}
             <div className="flex-1 min-h-0">
               {channel ? (
-                <ChatSource channel={channel} />
+                <ScaledChat scale={chatScale.scale}>
+                  <ChatSource channel={channel} />
+                </ScaledChat>
               ) : (
                 <div
                   className="flex items-center justify-center w-full h-full"

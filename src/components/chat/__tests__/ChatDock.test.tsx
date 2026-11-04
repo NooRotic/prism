@@ -224,6 +224,85 @@ describe('ChatDock', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
+  describe('chat text size', () => {
+    const scaledInner = () => screen.getByTestId('scaled-chat-inner')
+
+    it('puts the text-size controls in the chat header, which is hidden below md', () => {
+      renderDock()
+      const header = screen.getByTestId('chat-header')
+      expect(header).toHaveClass('hidden', 'md:flex')
+      expect(header).toContainElement(screen.getByRole('group', { name: 'Chat text size' }))
+    })
+
+    it('lets the header wrap instead of clipping its buttons in a narrow chat', () => {
+      renderDock()
+      expect(screen.getByTestId('chat-header')).toHaveClass('flex-wrap')
+    })
+
+    it('shows 100% and applies no scale by default', () => {
+      renderDock()
+      expect(screen.getByRole('button', { name: 'Reset chat text size, 100%' })).toBeInTheDocument()
+      expect(scaledInner().className).not.toMatch(/transform/)
+    })
+
+    it('applies a saved size at load', () => {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_SCALE, '1.5')
+      renderDock()
+      expect(scaledInner().style.getPropertyValue('--chat-scale')).toBe('1.5')
+      expect(screen.getByRole('button', { name: 'Reset chat text size, 150%' })).toBeInTheDocument()
+    })
+
+    it('larger raises the percentage and the scale, and saves it', () => {
+      renderDock()
+      fireEvent.click(screen.getByRole('button', { name: 'Larger chat text' }))
+
+      expect(screen.getByRole('button', { name: 'Reset chat text size, 115%' })).toBeInTheDocument()
+      expect(scaledInner().style.getPropertyValue('--chat-scale')).toBe('1.15')
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_CHAT_SCALE)).toBe('1.15')
+    })
+
+    it('smaller and reset work too', () => {
+      renderDock()
+      fireEvent.click(screen.getByRole('button', { name: 'Smaller chat text' }))
+      expect(scaledInner().style.getPropertyValue('--chat-scale')).toBe('0.85')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reset chat text size, 85%' }))
+      expect(scaledInner().style.getPropertyValue('--chat-scale')).toBe('1')
+    })
+
+    it('scales the chat iframe but never the header that holds the buttons', () => {
+      renderDock()
+      expect(scaledInner()).toContainElement(chatFrame()!)
+      expect(screen.getByTestId('scaled-chat')).not.toContainElement(screen.getByTestId('chat-header'))
+    })
+
+    it('does not reload the chat iframe when the size changes', () => {
+      renderDock()
+      const frame = chatFrame()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Larger chat text' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Larger chat text' }))
+
+      expect(chatFrame()).toBe(frame)
+    })
+
+    it('keeps focus on the text-size button that was clicked', () => {
+      renderDock()
+      const larger = screen.getByRole('button', { name: 'Larger chat text' })
+      larger.focus()
+
+      fireEvent.click(larger)
+
+      expect(document.activeElement).toBe(larger)
+    })
+
+    it('still shows No channel unscaled when there is no channel', () => {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_SCALE, '1.5')
+      render(<ChatDock channel={undefined} player={player} />)
+      expect(screen.getByText('No channel')).toBeInTheDocument()
+    })
+  })
+
   describe('fill mode', () => {
     const remember = (fill = true) => localStorage.setItem(STORAGE_KEYS.LOCAL_FILL_MODE, String(fill))
     const rootFill = () => document.documentElement.getAttribute('data-fill')
