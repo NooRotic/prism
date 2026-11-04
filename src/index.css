@@ -43,6 +43,12 @@
      needs to position itself below the header (e.g. FollowingPanel slide-
      down animation). Change in one place to keep layout in sync. */
   --header-height: 56px;
+
+  /* Page-edge width the channel rail currently covers. ChannelRail overrides
+     one of these on :root while it is on screen; RailGutter pads player pages
+     by them so the strip never sits over the embed. */
+  --rail-reserve-left: 0px;
+  --rail-reserve-right: 0px;
 }
 
 /* ─── Brushed metal surface ──────────────────────────────────────────

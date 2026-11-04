@@ -6,6 +6,7 @@ import FollowingPanel from './components/layout/FollowingPanel'
 import YourStatsPanel from './components/layout/YourStatsPanel'
 import CategoryPanel from './components/layout/CategoryPanel'
 import ChannelRail from './components/rail/ChannelRail'
+import RailGutter from './components/rail/RailGutter'
 import MatrixRainBackground from './components/ui/MatrixRainBackground'
 import { OnboardingIntro } from './components/intro/OnboardingIntro'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
@@ -114,8 +115,11 @@ function AppLayout() {
           player page so follows are reachable on every route. */}
       <ChannelRail />
 
-      {/* Route content */}
-      <Outlet />
+      {/* Route content. On player pages the rail's collapsed strip is
+          reserved, so it never sits over the embed (see RailGutter). */}
+      <RailGutter active={isPlayerPage}>
+        <Outlet />
+      </RailGutter>
     </div>
   )
 }

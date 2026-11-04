@@ -9,6 +9,7 @@ import { useRailAvatars } from '../../hooks/useRailAvatars'
 import ConnectTwitchPrompt from '../ui/ConnectTwitchPrompt'
 import RailSection, { RAIL_SECTION_CAP } from './RailSection'
 import { useRailPosition } from './useRailPosition'
+import { RAIL_RESERVE_LEFT_VAR, RAIL_RESERVE_RIGHT_VAR } from './RailGutter'
 import type { RailEntry } from './types'
 
 /** Sweeping past a stack of avatars must not strobe panels open. */
@@ -186,7 +187,24 @@ export default function ChannelRail() {
   // occluding video for no reason. A loading rail is not "nothing to show" —
   // it stays mounted so the placeholders above can render.
   const hasContent = followEntries.length > 0 || categoryEntries.length > 0
-  if (isAuthenticated && !hasContent && !showFollowsLoading) return null
+  const rendered = !isAuthenticated || hasContent || showFollowsLoading
+
+  // Tell the page how much of its edge the collapsed strip covers, so player
+  // pages can keep the embed clear of it (see RailGutter). Only while the
+  // rail is actually on screen, and always the collapsed width: expanding is
+  // a temporary overlay, not a reflow. Declared above the early return so
+  // hook order never changes.
+  useEffect(() => {
+    if (!rendered) return
+    const property = position === 'left' ? RAIL_RESERVE_LEFT_VAR : RAIL_RESERVE_RIGHT_VAR
+    const rootStyle = document.documentElement.style
+    rootStyle.setProperty(property, `${COLLAPSED_WIDTH}px`)
+    return () => {
+      rootStyle.removeProperty(property)
+    }
+  }, [rendered, position])
+
+  if (!rendered) return null
 
   const edge = position === 'left' ? { left: 0 } : { right: 0 }
 
