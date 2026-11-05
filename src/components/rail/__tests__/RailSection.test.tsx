@@ -75,6 +75,12 @@ describe('RailSection', () => {
     expect(screen.getAllByRole('link')).toHaveLength(RAIL_SECTION_CAP)
   })
 
+  it('lets a section set its own cap, and counts the overflow from it', () => {
+    renderSection({ entries: entries(20), cap: 12, onOverflowClick: vi.fn() })
+    expect(screen.getAllByRole('link')).toHaveLength(12)
+    expect(screen.getByRole('button', { name: /\+8/ })).toBeInTheDocument()
+  })
+
   it('shows a +N control counting everything hidden', () => {
     renderSection({ entries: entries(20), onOverflowClick: vi.fn() })
     expect(screen.getByRole('button', { name: /\+12/ })).toBeInTheDocument()

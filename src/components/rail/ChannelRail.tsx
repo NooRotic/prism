@@ -7,7 +7,7 @@ import { useFollowedChannels } from '../../hooks/useFollowedChannels'
 import { useCategoryRail } from '../../hooks/useCategoryRail'
 import { useRailAvatars } from '../../hooks/useRailAvatars'
 import ConnectTwitchPrompt from '../ui/ConnectTwitchPrompt'
-import RailSection, { RAIL_SECTION_CAP } from './RailSection'
+import RailSection, { RAIL_FOLLOWS_CAP } from './RailSection'
 import { useRailPosition } from './useRailPosition'
 import { RAIL_RESERVE_LEFT_VAR, RAIL_RESERVE_RIGHT_VAR } from './RailGutter'
 import type { RailEntry } from './types'
@@ -30,16 +30,10 @@ const LOADING_PLACEHOLDER_SIZE = 40
 export default function ChannelRail() {
   const { state, dispatch } = useApp()
   const { login, handleAuthError } = useTwitchAuth()
-  // `useTwitchAuth`'s `isAuthenticated` is per-instance `useState` seeded at
-  // mount — fine for every previous caller, which was page-scoped and
-  // remounted on navigation. The rail mounts once in AppLayout and never
-  // unmounts, so a logout from the Header (a *different* useTwitchAuth
-  // instance) would never reach it. Read the value LOGOUT actually clears
-  // instead: AppContext. Accepted tradeoff: state.auth.isAuthenticated
-  // starts `false` and only flips `true` once useTwitchAuth's mount effect
-  // dispatches LOGIN, so a returning signed-in user sees one render of the
-  // collapsed signed-out strip. Invisible at the 56px collapsed width, but
-  // real — documented here rather than rediscovered later.
+  // Signed-in state lives in AppContext, which useTwitchAuth also reads, so a
+  // login or logout anywhere (Header, an expired session) reaches the rail.
+  // AppProvider seeds it from the stored token, so a returning signed-in user
+  // does not see a signed-out frame first.
   const isAuthenticated = state.auth.isAuthenticated
   const { position, flip } = useRailPosition()
   const location = useLocation()
@@ -135,7 +129,7 @@ export default function ChannelRail() {
 
   const avatarIds = useMemo(
     () => [
-      ...liveFollows.slice(0, RAIL_SECTION_CAP).map((f) => f.broadcaster_id),
+      ...liveFollows.slice(0, RAIL_FOLLOWS_CAP).map((f) => f.broadcaster_id),
       ...recommendations.map((s) => s.user_id),
     ],
     [liveFollows, recommendations],
@@ -277,6 +271,7 @@ export default function ChannelRail() {
               icon={<Heart size={16} style={{ color: 'var(--accent-green)' }} />}
               entries={followEntries}
               expanded={expanded}
+              cap={RAIL_FOLLOWS_CAP}
               totalCount={followEntries.length}
               onOverflowClick={openFollowingPanel}
             />

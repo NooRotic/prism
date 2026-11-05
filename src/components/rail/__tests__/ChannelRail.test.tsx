@@ -1,7 +1,8 @@
-import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, act, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import ChannelRail from '../ChannelRail'
+import { RAIL_FOLLOWS_CAP } from '../RailSection'
 import { useFollowedChannels } from '../../../hooks/useFollowedChannels'
 import { useCategoryRail } from '../../../hooks/useCategoryRail'
 import { useRailAvatars } from '../../../hooks/useRailAvatars'
@@ -342,15 +343,33 @@ describe('ChannelRail — content and states', () => {
 
   it('opens the Following panel from the +N control', async () => {
     const user = userEvent.setup()
-    setup({ follows: Array.from({ length: 12 }, (_, i) => live(i)) })
+    setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
     fireEvent.focusIn(rail())
 
-    await user.click(screen.getByRole('button', { name: /\+4/ }))
+    await user.click(screen.getByRole('button', { name: new RegExp(`\\+${20 - RAIL_FOLLOWS_CAP}`) }))
 
     expect(dispatch).toHaveBeenCalledWith({
       type: 'OPEN_NAV_PANEL',
       panel: 'following',
     })
+  })
+
+  // 8 turned out to be too few in use: with a few dozen live follows the rail
+  // showed the same handful. The Following section has its own, larger cap.
+  it('shows up to RAIL_FOLLOWS_CAP of the live follows', () => {
+    setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
+    fireEvent.focusIn(rail())
+
+    const region = screen.getByRole('region', { name: /following/i })
+    expect(within(region).getAllByRole('link')).toHaveLength(RAIL_FOLLOWS_CAP)
+  })
+
+  it('asks for an avatar for every follow it shows, and no more', () => {
+    setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
+
+    const requested = mockAvatars.mock.calls.at(-1)?.[0] ?? []
+    expect(requested).toHaveLength(RAIL_FOLLOWS_CAP)
+    expect(requested).toEqual(Array.from({ length: RAIL_FOLLOWS_CAP }, (_, i) => `${i}`))
   })
 
   it('excludes the current channel from recommendations', () => {
