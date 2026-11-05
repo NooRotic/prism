@@ -364,6 +364,43 @@ describe('ChannelRail — content and states', () => {
     expect(within(region).getAllByRole('link')).toHaveLength(RAIL_FOLLOWS_CAP)
   })
 
+  it('lists live follows with the newest to go live first', () => {
+    setup({
+      follows: [
+        { ...live(0), startedAt: '2026-11-05T08:00:00Z' },
+        { ...live(1), startedAt: '2026-11-05T12:00:00Z' },
+        { ...live(2), startedAt: '2026-11-05T10:00:00Z' },
+      ],
+    })
+    fireEvent.focusIn(rail())
+
+    const region = screen.getByRole('region', { name: /following/i })
+    expect(within(region).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+      '/twitch/chan1',
+      '/twitch/chan2',
+      '/twitch/chan0',
+    ])
+  })
+
+  // Twitch returns follows newest-followed first, so without this the rail
+  // showed the same dozen no matter who had just gone live.
+  it('shows the newest to go live when there are more than fit, and requests exactly their avatars', () => {
+    const follows = Array.from({ length: 20 }, (_, i) => ({
+      ...live(i),
+      startedAt: new Date(Date.UTC(2026, 10, 5, 0, i)).toISOString(), // higher i = went live later
+    }))
+    setup({ follows })
+    fireEvent.focusIn(rail())
+
+    const region = screen.getByRole('region', { name: /following/i })
+    expect(within(region).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(
+      Array.from({ length: RAIL_FOLLOWS_CAP }, (_, k) => `/twitch/chan${19 - k}`),
+    )
+    expect(mockAvatars.mock.calls.at(-1)?.[0]).toEqual(
+      Array.from({ length: RAIL_FOLLOWS_CAP }, (_, k) => `${19 - k}`),
+    )
+  })
+
   it('asks for an avatar for every follow it shows, and no more', () => {
     setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
 

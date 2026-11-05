@@ -9,6 +9,7 @@ import { useRailAvatars } from '../../hooks/useRailAvatars'
 import ConnectTwitchPrompt from '../ui/ConnectTwitchPrompt'
 import RailSection, { RAIL_FOLLOWS_CAP } from './RailSection'
 import { useRailPosition } from './useRailPosition'
+import { sortNewestLiveFirst } from './sortLiveFollows'
 import { RAIL_RESERVE_LEFT_VAR, RAIL_RESERVE_RIGHT_VAR } from './RailGutter'
 import type { RailEntry } from './types'
 
@@ -119,7 +120,7 @@ export default function ChannelRail() {
   // A failing section hides itself and leaves its siblings intact. This is
   // the invariant that makes a second platform safe to add.
   const liveFollows = useMemo(
-    () => (follows.error ? [] : follows.data.filter((f) => f.isLive)),
+    () => (follows.error ? [] : sortNewestLiveFirst(follows.data.filter((f) => f.isLive))),
     [follows.error, follows.data],
   )
   const recommendations = useMemo(
