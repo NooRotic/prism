@@ -49,19 +49,19 @@ each hand-roll the same Lock icon + copy + gradient "connect twitch" button.
 - Not done during the logged-out defect fix on purpose — unrelated refactoring
   inside a defect PR.
 
-### `useTwitchAuth` holds auth in per-instance state
-The hook keeps `token`/`isAuthenticated` in its own `useState` per caller, so
-every consumer has an independent copy. There are now six callers. They agree
-on mount (each initialises from `localStorage`), but an auth change that does
-not remount the tree — notably `logout()` — updates only the calling instance
-plus AppContext, leaving other instances stale.
-- Not resolved by reading `state.auth.isAuthenticated` instead: AppContext
-  initialises auth to `false` (`AppContext.tsx:132`) and only flips after an
-  effect dispatches `LOGIN`, which would flash the signed-out UI on every page
-  load for signed-in users.
-- Fix: initialise AppContext auth from `getStoredToken()` so context is correct
-  on first render, then have consumers read context and retire the per-instance
-  state.
+### ~~`useTwitchAuth` holds auth in per-instance state~~ - RESOLVED (PR #60)
+The hook kept `token`/`isAuthenticated` in its own `useState` per caller, so every
+consumer had an independent copy; a login or logout that did not remount the tree
+left the others stale (seen as "Connect Twitch" still showing after signing in
+until a refresh).
+- Fixed as proposed here: `AppContext` now initialises auth from
+  `getStoredToken()` (no signed-out flash on load), and `useTwitchAuth` reads
+  `state.auth` and dispatches `LOGIN` / `LOGOUT`, so a session that expires
+  (`TOKEN_EXPIRED`, dispatched from `useChannelData`) reaches every caller too.
+  Tests with a parent and a child under the real provider are in
+  `src/hooks/__tests__/useTwitchAuth.test.tsx`.
+- The same shape of bug (a private copy per caller) was fixed for the followed
+  channels in PR #64: one store per user in `src/lib/followsStore.ts`.
 
 ### ~~localStorage key sprawl~~ - RESOLVED (PR #45)
 All 9 keys now registered in `src/config/storageKeys.ts` as `STORAGE_KEYS`.
