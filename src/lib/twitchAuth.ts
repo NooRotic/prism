@@ -56,13 +56,24 @@ function getRedirectUri(): string {
   return window.location.origin + base
 }
 
+/**
+ * A fresh OAuth `state` value: 128 bits from the browser's secure random source,
+ * hex-encoded so it is safe to put in a URL. It is the CSRF token for the login
+ * round trip, so it must not be guessable, which `Math.random()` output is.
+ */
+function createOAuthState(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 export function loginWithTwitch() {
   if (!CLIENT_ID) {
     logger.error('VITE_TWITCH_CLIENT_ID is not set. Create a .env file from .env.example.')
     return
   }
 
-  const state = Math.random().toString(36).substring(2)
+  const state = createOAuthState()
   sessionStorage.setItem(STORAGE_KEYS.SESSION_TWITCH_OAUTH_STATE, state)
 
   const params = new URLSearchParams({
