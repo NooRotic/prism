@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video window test (throwaway)</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; background: #111; color: #eee; margin: 0; padding: 20px; max-width: 920px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 28px 0 6px; }
+  button { font: inherit; padding: 8px 14px; margin: 4px 6px 4px 0; cursor: pointer; }
+  input[type=text] { font: inherit; padding: 6px 8px; width: 14em; }
+  pre { background: #000; border: 1px solid #333; padding: 10px; white-space: pre-wrap; max-height: 45vh; overflow: auto; font-size: 13px; }
+  .ok { color: #6f6; } .bad { color: #f66; } .dim { color: #999; }
+  #inline { position: relative; width: 640px; max-width: 100%; aspect-ratio: 16 / 9; background: #000; }
+</style>
+</head>
+<body>
+<h1>Video window test <span class="dim">(throwaway, never ships)</span></h1>
+<p id="support"></p>
+<p>Channel: <input id="channel" type="text"> <label><input id="muted" type="checkbox"> start muted</label>
+  <span class="dim">(default is a 24/7 music channel; type any channel that is live right now if it is offline)</span></p>
+
+<h2>Part A: the floating window</h2>
+<p class="dim">Click one button. A small window should float above your other apps and play the stream.</p>
+<p>
+  <button id="btn-iframe">A1. Floating window, plain Twitch player</button>
+  <button id="btn-sdk">A2. Floating window, Twitch SDK player (what PRISM uses)</button>
+  <button id="btn-close">Close the floating window</button>
+</p>
+
+<h2>Part B: does covering the player pause it? (the rail problem)</h2>
+<p class="dim">Load the player, let it play, then toggle the cover. Watch whether it pauses, and whether it resumes when uncovered.</p>
+<div id="inline"></div>
+<p>
+  <button id="btn-inline">B1. Load the player here</button>
+  <button id="btn-cover">B2. Cover a third of it (toggle)</button>
+</p>
+
+<h2>Log</h2>
+<p><button id="btn-copy">Copy log</button> <button id="btn-clear">Clear log</button></p>
+<pre id="log"></pre>
+
+<script>
+'use strict'
+const $ = (id) => document.getElementById(id)
+const logEl = $('log')
+const t0 = performance.now()
+function log(msg) {
+  logEl.textContent += ((performance.now() - t0) / 1000).toFixed(1).padStart(7) + 's  ' + msg + '\n'
+  logEl.scrollTop = logEl.scrollHeight
+}
+
+const supported = 'documentPictureInPicture' in window
+$('channel').value = new URLSearchParams(location.search).get('channel') || 'monstercat'
+$('support').textContent = supported
+  ? 'This browser can open a floating window for a web page.'
+  : 'This browser cannot open a floating page window (needs Chrome or Edge 116+, on https or localhost).'
+$('support').className = supported ? 'ok' : 'bad'
+log('browser: ' + navigator.userAgent)
+log('secure context: ' + isSecureContext + ', host: ' + location.hostname)
+log('floating window available: ' + supported)
+document.addEventListener('visibilitychange', () => log('main tab is now ' + document.visibilityState))
+
+function playerUrl(channel, muted) {
+  return 'https://player.twitch.tv/?channel=' + encodeURIComponent(channel) +
+    '&parent=' + encodeURIComponent(location.hostname) +
+    '&autoplay=true&muted=' + (muted ? 'true' : 'false')
+}
+
+/** Watch an element the way Twitch does: IntersectionObserver v2, reading isVisible. */
+function watch(win, el, label) {
+  const state = { visible: 'unknown', observer: null }
+  let last = ''
+  state.observer = new win.IntersectionObserver((entries) => {
+    const e = entries[entries.length - 1]
+    state.visible = e.isVisible
+    const key = e.isVisible + '/' + e.intersectionRatio.toFixed(2)
+    if (key !== last) {
+      last = key
+      log(label + ' check: isVisible=' + e.isVisible + ', ratio=' + e.intersectionRatio.toFixed(2))
+    }
+  }, { threshold: [0, 0.25, 0.5, 0.75, 1], trackVisibility: true, delay: 100 })
+  state.observer.observe(el)
+  return state
+}
+
+// ---- Part A: the floating window -------------------------------------------
+let pip = null
+let pipWatch = null
+let beat = null
+
+function cleanupPip() {
+  if (beat) clearInterval(beat)
+  beat = null
+  if (pipWatch && pipWatch.observer) pipWatch.observer.disconnect()
+  pipWatch = null
+  pip = null
+}
+
+async function openPip(mode) {
+  if (!supported) return log('Not supported here.')
+  if (pip) return log('A floating window is already open. Close it first.')
+  const channel = $('channel').value.trim()
+  if (!channel) return log('Type a channel name first.')
+  const muted = $('muted').checked
+
+  let win
+  try {
+    win = await documentPictureInPicture.requestWindow({ width: 480, height: 270 })
+  } catch (e) {
+    return log('could not open the floating window: ' + e)
+  }
+  pip = win
+  let where
+  try { where = win.location.origin } catch (e) { where = 'unreadable' }
+  log('floating window opened (' + mode + '), its origin: ' + where)
+  win.addEventListener('pagehide', () => { log('floating window closed'); cleanupPip() })
+  let resizeTimer
+  win.addEventListener('resize', () => {
+    clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => log('floating window size ' + win.innerWidth + 'x' + win.innerHeight), 300)
+  })
+
+  const doc = win.document
+  doc.title = 'Video test'
+  const style = doc.createElement('style')
+  style.textContent = 'html,body{margin:0;height:100%;background:#000;overflow:hidden}' +
+    '#v{position:fixed;inset:0}#v iframe{width:100%;height:100%;border:0;display:block}'
+  doc.head.append(style)
+  const holder = doc.createElement('div')
+  holder.id = 'v'
+  doc.body.append(holder)
+
+  let frame = null
+  if (mode === 'iframe') {
+    frame = doc.createElement('iframe')
+    frame.src = playerUrl(channel, muted)
+    frame.allow = 'autoplay; fullscreen'
+    frame.allowFullscreen = true
+    holder.append(frame)
+  } else {
+    try {
+      await new Promise((resolve, reject) => {
+        const s = doc.createElement('script')
+        s.src = 'https://embed.twitch.tv/embed/v1.js'
+        s.onload = resolve
+        s.onerror = () => reject(new Error('the SDK script did not load in the floating window'))
+        doc.head.append(s)
+      })
+      const E = win.Twitch.Embed
+      const embed = new E('v', {
+        width: '100%', height: '100%', channel, parent: [location.hostname],
+        autoplay: true, muted, layout: 'video',
+      })
+      embed.addEventListener(E.VIDEO_READY, () => log('SDK: video ready'))
+      embed.addEventListener(E.VIDEO_PLAY, () => log('SDK: video playing'))
+      embed.addEventListener(E.ONLINE, () => log('SDK: channel online'))
+      embed.addEventListener(E.OFFLINE, () => log('SDK: channel offline'))
+    } catch (e) {
+      log('SDK mode failed: ' + e)
+    }
+    for (let i = 0; i < 50 && !frame; i++) {
+      frame = holder.querySelector('iframe')
+      if (!frame) await new Promise((r) => setTimeout(r, 100))
+    }
+    if (!frame) return log('no player appeared in the floating window')
+  }
+
+  pipWatch = watch(win, frame, 'floating window')
+  beat = setInterval(() => {
+    if (!pip) return
+    log('heartbeat: main tab ' + document.visibilityState + ', floating window ' + pip.document.visibilityState +
+      ', its check isVisible=' + (pipWatch ? pipWatch.visible : 'n/a') +
+      ', size ' + pip.innerWidth + 'x' + pip.innerHeight)
+  }, 10000)
+}
+
+$('btn-iframe').onclick = () => openPip('plain player')
+$('btn-sdk').onclick = () => openPip('SDK player')
+$('btn-close').onclick = () => { if (pip) pip.close(); else log('no floating window is open') }
+
+// ---- Part B: covering the player --------------------------------------------
+let inlineWatch = null
+let cover = null
+
+$('btn-inline').onclick = () => {
+  const channel = $('channel').value.trim()
+  if (!channel) return log('Type a channel name first.')
+  const box = $('inline')
+  const old = box.querySelector('iframe')
+  if (old) old.remove()
+  if (inlineWatch) inlineWatch.observer.disconnect()
+  const f = document.createElement('iframe')
+  f.src = playerUrl(channel, $('muted').checked)
+  f.allow = 'autoplay; fullscreen'
+  f.allowFullscreen = true
+  f.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0'
+  box.prepend(f)
+  inlineWatch = watch(window, f, 'inline player')
+  log('inline player loading')
+}
+
+$('btn-cover').onclick = () => {
+  if (cover) { cover.remove(); cover = null; log('cover OFF'); return }
+  cover = document.createElement('div')
+  cover.style.cssText = 'position:absolute;left:0;top:0;bottom:0;width:33%;background:rgba(20,20,20,.88);z-index:5'
+  $('inline').append(cover)
+  log('cover ON (a third of the player is covered, like the open rail)')
+}
+
+// ---- Log tools ---------------------------------------------------------------
+$('btn-copy').onclick = async () => {
+  try { await navigator.clipboard.writeText(logEl.textContent); log('log copied') }
+  catch (e) { log('copy failed: ' + e) }
+}
+$('btn-clear').onclick = () => { logEl.textContent = '' }
+</script>
+</body>
+</html>
