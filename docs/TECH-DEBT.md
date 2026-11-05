@@ -13,8 +13,10 @@ check only when *both* were present, so omitting `state` (or a cleared
 `sessionStorage`) skipped CSRF validation and the token was accepted. One test
 per former fail-open path lives in `src/lib/__tests__/twitchAuth.test.ts`.
 - Found during review of PR #45 (2026-09-21). Pre-existing, not introduced there.
-- Still open nearby: `loginWithTwitch()` mints `state` with `Math.random()`.
-  `crypto.getRandomValues` is the right source for a CSRF token.
+- The related weakness is fixed too: `loginWithTwitch()` used to mint `state`
+  with `Math.random()`, which is predictable. It now draws 128 bits from
+  `crypto.getRandomValues` (`createOAuthState` in `src/lib/twitchAuth.ts`), with
+  tests in `src/lib/__tests__/twitchAuth.login.test.ts`.
 
 ### Silent error swallowing - user-facing half still open
 PR #45 replaced the three `.catch(() => {})` bodies with `logger.warn`, but
