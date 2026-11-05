@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { X, ExternalLink, Loader2 } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import {
@@ -33,13 +33,20 @@ export default function FollowingPanel() {
     [handleAuthErrorCallback],
   )
 
-  // Only run the fetch when the panel is actually opened AND the auth user
-  // is loaded. Keeps the API call lazy until the user expresses interest.
-  const fetchUserId = isOpen ? authUserId : null
-  const { data, totalCount, loadedCount, liveCount, loading, loadingMore, error, cursor, loadMore } = useFollowedChannels(
-    fetchUserId,
+  // Read the shared follows whether or not the panel is open. They are the
+  // same copy the rail shows and are kept fresh in the background, so this
+  // costs no extra requests, and the panel opens with data already in hand
+  // instead of refetching and showing a spinner each time (which is why
+  // clicking the Following link used to be the only way to refresh).
+  const { data, totalCount, loadedCount, liveCount, loading, loadingMore, error, cursor, loadMore, refreshLive } = useFollowedChannels(
+    authUserId,
     fetchOptions,
   )
+
+  // Opening the panel shows who is live right now, not up to a minute ago.
+  useEffect(() => {
+    if (isOpen) refreshLive()
+  }, [isOpen, refreshLive])
 
   const sortedData = useMemo(() => sortFollows(data, sort), [data, sort])
 
