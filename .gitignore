@@ -30,5 +30,8 @@ dist-ssr
 # Superpowers brainstorm sessions
 .superpowers/
 
+# Claude Code's per-machine permission list (the shared .claude/ files stay tracked)
+.claude/settings.local.json
+
 # Loose résumé/personal text (keep out of this public repo)
 resume_clause.txt
