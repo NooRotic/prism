@@ -176,7 +176,9 @@ export async function getStreamsByUserIds(
     localStorage.removeItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN)
     throw new SessionExpiredError()
   }
-  if (!res.ok) return []
+  // A failed request is not "nobody is live". Returning [] here made one
+  // rate-limit or server error read as every followed channel going offline.
+  if (!res.ok) throw new Error(`Twitch /streams request failed (HTTP ${res.status})`)
   const data = await res.json()
   return data.data ?? []
 }

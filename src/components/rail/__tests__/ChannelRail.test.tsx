@@ -1,7 +1,8 @@
-import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, act, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import ChannelRail from '../ChannelRail'
+import { RAIL_FOLLOWS_CAP } from '../RailSection'
 import { useFollowedChannels } from '../../../hooks/useFollowedChannels'
 import { useCategoryRail } from '../../../hooks/useCategoryRail'
 import { useRailAvatars } from '../../../hooks/useRailAvatars'
@@ -342,15 +343,70 @@ describe('ChannelRail — content and states', () => {
 
   it('opens the Following panel from the +N control', async () => {
     const user = userEvent.setup()
-    setup({ follows: Array.from({ length: 12 }, (_, i) => live(i)) })
+    setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
     fireEvent.focusIn(rail())
 
-    await user.click(screen.getByRole('button', { name: /\+4/ }))
+    await user.click(screen.getByRole('button', { name: new RegExp(`\\+${20 - RAIL_FOLLOWS_CAP}`) }))
 
     expect(dispatch).toHaveBeenCalledWith({
       type: 'OPEN_NAV_PANEL',
       panel: 'following',
     })
+  })
+
+  // 8 turned out to be too few in use: with a few dozen live follows the rail
+  // showed the same handful. The Following section has its own, larger cap.
+  it('shows up to RAIL_FOLLOWS_CAP of the live follows', () => {
+    setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
+    fireEvent.focusIn(rail())
+
+    const region = screen.getByRole('region', { name: /following/i })
+    expect(within(region).getAllByRole('link')).toHaveLength(RAIL_FOLLOWS_CAP)
+  })
+
+  it('lists live follows with the newest to go live first', () => {
+    setup({
+      follows: [
+        { ...live(0), startedAt: '2026-11-05T08:00:00Z' },
+        { ...live(1), startedAt: '2026-11-05T12:00:00Z' },
+        { ...live(2), startedAt: '2026-11-05T10:00:00Z' },
+      ],
+    })
+    fireEvent.focusIn(rail())
+
+    const region = screen.getByRole('region', { name: /following/i })
+    expect(within(region).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+      '/twitch/chan1',
+      '/twitch/chan2',
+      '/twitch/chan0',
+    ])
+  })
+
+  // Twitch returns follows newest-followed first, so without this the rail
+  // showed the same dozen no matter who had just gone live.
+  it('shows the newest to go live when there are more than fit, and requests exactly their avatars', () => {
+    const follows = Array.from({ length: 20 }, (_, i) => ({
+      ...live(i),
+      startedAt: new Date(Date.UTC(2026, 10, 5, 0, i)).toISOString(), // higher i = went live later
+    }))
+    setup({ follows })
+    fireEvent.focusIn(rail())
+
+    const region = screen.getByRole('region', { name: /following/i })
+    expect(within(region).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(
+      Array.from({ length: RAIL_FOLLOWS_CAP }, (_, k) => `/twitch/chan${19 - k}`),
+    )
+    expect(mockAvatars.mock.calls.at(-1)?.[0]).toEqual(
+      Array.from({ length: RAIL_FOLLOWS_CAP }, (_, k) => `${19 - k}`),
+    )
+  })
+
+  it('asks for an avatar for every follow it shows, and no more', () => {
+    setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
+
+    const requested = mockAvatars.mock.calls.at(-1)?.[0] ?? []
+    expect(requested).toHaveLength(RAIL_FOLLOWS_CAP)
+    expect(requested).toEqual(Array.from({ length: RAIL_FOLLOWS_CAP }, (_, i) => `${i}`))
   })
 
   it('excludes the current channel from recommendations', () => {

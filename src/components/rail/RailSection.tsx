@@ -13,11 +13,21 @@ import type { RailEntry } from './types'
  */
 export const RAIL_SECTION_CAP = 8
 
+/**
+ * The Following section's own cap. 8 proved too few in use: with a few dozen
+ * live follows the rail kept showing the same handful, so this section shows
+ * more while the recommendations section keeps the default. Still a fixed
+ * number, for the reasons above.
+ */
+export const RAIL_FOLLOWS_CAP = 12
+
 interface RailSectionProps {
   label: string
   icon: ReactNode
   entries: RailEntry[]
   expanded: boolean
+  /** Most entries to show; the rest collapse into the `+N` control. Defaults to RAIL_SECTION_CAP. */
+  cap?: number
   /**
    * Total available, when the caller has more than it passed in `entries`
    * (the follows section passes its live subset but knows the full count).
@@ -40,13 +50,14 @@ export default function RailSection({
   icon,
   entries,
   expanded,
+  cap = RAIL_SECTION_CAP,
   totalCount,
   onOverflowClick,
 }: RailSectionProps) {
   if (entries.length === 0) return null
 
-  const visible = entries.slice(0, RAIL_SECTION_CAP)
-  const hidden = Math.max(0, (totalCount ?? entries.length) - RAIL_SECTION_CAP)
+  const visible = entries.slice(0, cap)
+  const hidden = Math.max(0, (totalCount ?? entries.length) - cap)
 
   return (
     <section aria-label={label} className="flex flex-col gap-1">
