@@ -226,3 +226,5 @@ and maximum saved size; how the start screen and the slim bar are styled; whethe
 8. **On the deployed site**, after the merge: Twitch accepts the real domain in the window.
 9. Opening the window from inside fullscreen (the control sits in the dock row that goes fullscreen).
 10. After shrinking the window until Twitch pauses, does enlarging it resume playback by itself?
+11. An offline channel stays open in the window past 15 seconds, showing Twitch's own offline screen (the
+    window closes itself only if the player shows no sign of life at all).
