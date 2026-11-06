@@ -26,6 +26,7 @@
 <p>
   <button id="btn-iframe">A1. Floating window, plain Twitch player</button>
   <button id="btn-sdk">A2. Floating window, Twitch SDK player (what PRISM uses)</button>
+  <button id="btn-click">A3. Same, but you click once inside the window to start it (for sound)</button>
   <button id="btn-close">Close the floating window</button>
 </p>
 
@@ -132,6 +133,19 @@ async function openPip(mode) {
   holder.id = 'v'
   doc.body.append(holder)
 
+  if (mode === 'click') {
+    // Give the floating window its own user click BEFORE the player exists, so the
+    // browser treats the player's sound as user-approved.
+    await new Promise((resolve) => {
+      const b = doc.createElement('button')
+      b.textContent = 'Click here to start with sound'
+      b.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;font:20px system-ui,sans-serif;' +
+        'background:#222;color:#fff;border:0;cursor:pointer'
+      b.onclick = () => { b.remove(); log('start button clicked inside the floating window'); resolve() }
+      holder.append(b)
+    })
+  }
+
   let frame = null
   if (mode === 'iframe') {
     frame = doc.createElement('iframe')
@@ -154,7 +168,18 @@ async function openPip(mode) {
         autoplay: true, muted, layout: 'video',
       })
       embed.addEventListener(E.VIDEO_READY, () => log('SDK: video ready'))
-      embed.addEventListener(E.VIDEO_PLAY, () => log('SDK: video playing'))
+      const reportAudio = (when) => {
+        try {
+          const p = embed.getPlayer()
+          log('SDK: ' + when + ', player says muted=' + (p.getMuted ? p.getMuted() : 'n/a') +
+            ', volume=' + (p.getVolume ? p.getVolume() : 'n/a'))
+        } catch (e) { log('SDK: could not read audio state: ' + e) }
+      }
+      embed.addEventListener(E.VIDEO_PLAY, () => {
+        log('SDK: video playing')
+        reportAudio('right after play')
+        setTimeout(() => reportAudio('3 seconds later'), 3000)
+      })
       embed.addEventListener(E.ONLINE, () => log('SDK: channel online'))
       embed.addEventListener(E.OFFLINE, () => log('SDK: channel offline'))
     } catch (e) {
@@ -178,6 +203,7 @@ async function openPip(mode) {
 
 $('btn-iframe').onclick = () => openPip('iframe')
 $('btn-sdk').onclick = () => openPip('sdk')
+$('btn-click').onclick = () => openPip('click')
 $('btn-close').onclick = () => { if (pip) pip.close(); else log('no floating window is open') }
 
 // ---- Part B: covering the player --------------------------------------------
