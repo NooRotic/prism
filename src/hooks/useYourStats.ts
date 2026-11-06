@@ -4,7 +4,6 @@ import {
   getBroadcasterGoals,
   getBroadcasterVIPs,
   getBroadcasterFollowerCount,
-  getHypeTrainEvents,
   getBroadcasterPolls,
   getBroadcasterPredictions,
   getBitsLeaderboard,
@@ -15,7 +14,6 @@ import type {
   TwitchBroadcasterSubscription,
   TwitchGoal,
   TwitchVIP,
-  TwitchHypeTrainEvent,
   TwitchPoll,
   TwitchPrediction,
   TwitchBitsLeader,
@@ -44,7 +42,6 @@ export interface YourStatsData {
   }>
   goals: SectionState<TwitchGoal[]>
   vips: SectionState<TwitchVIP[]>
-  hypeTrains: SectionState<TwitchHypeTrainEvent[]>
   polls: SectionState<TwitchPoll[]>
   predictions: SectionState<TwitchPrediction[]>
   bits: SectionState<TwitchBitsLeader[]>
@@ -60,7 +57,6 @@ function initialData(): YourStatsData {
     subscribers: emptySection(),
     goals: emptySection(),
     vips: emptySection(),
-    hypeTrains: emptySection(),
     polls: emptySection(),
     predictions: emptySection(),
     bits: emptySection(),
@@ -119,7 +115,7 @@ async function runSection<T>(
 /**
  * Fetch a broadcaster's stats panel data. `broadcasterId` comes from
  * the authenticated user's own profile; `isStreamer` gates the
- * streamer-only sections (subs, goals, VIPs, hype train, polls,
+ * streamer-only sections (subs, goals, VIPs, polls,
  * predictions, bits) so non-affiliate/partner users don't hit
  * endpoints that will always 400 for them.
  *
@@ -153,7 +149,6 @@ export function useYourStats(
           base.subscribers.loading = true
           base.goals.loading = true
           base.vips.loading = true
-          base.hypeTrains.loading = true
           base.polls.loading = true
           base.predictions.loading = true
           base.bits.loading = true
@@ -253,13 +248,6 @@ export function useYourStats(
               }
             }
           })(),
-        )
-
-        promises.push(
-          runSection(() => getHypeTrainEvents(id, 5), authError).then(
-            (section) =>
-              setStats((prev) => ({ ...prev, hypeTrains: section })),
-          ),
         )
 
         // Polls — inline async block to capture pagination cursor

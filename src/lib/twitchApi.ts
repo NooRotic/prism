@@ -11,7 +11,6 @@ import type {
   TwitchBroadcasterSubscriptionsResponse,
   TwitchGoal,
   TwitchVIP,
-  TwitchHypeTrainEvent,
   TwitchPoll,
   TwitchPrediction,
   TwitchBitsLeader,
@@ -410,18 +409,6 @@ export async function getBroadcasterFollowerCount(
     first: '1',
   })
   return data.total ?? 0
-}
-
-/** Recent hype train events (up to `first`, most recent first). */
-export async function getHypeTrainEvents(
-  broadcasterId: string,
-  first: number = 10,
-): Promise<TwitchHypeTrainEvent[]> {
-  const data = await twitchApiFetch<{ data: TwitchHypeTrainEvent[] }>(
-    'hypetrain/events',
-    { broadcaster_id: broadcasterId, first: String(first) },
-  )
-  return data.data ?? []
 }
 
 /** Poll history (completed + active), newest first. Accepts optional cursor for pagination. */
