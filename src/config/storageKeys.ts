@@ -35,6 +35,8 @@ export const STORAGE_KEYS = {
   LOCAL_FILL_MODE: 'prism_fill_mode',
   /** Chat text size: one of the CHAT_SCALE_STEPS values, e.g. '1.5'. Every window follows it. */
   LOCAL_CHAT_SCALE: 'prism_chat_scale',
+  /** Last content size of the floating video window (JSON `{ width, height }`). Raised to 480x270 on load. */
+  LOCAL_VIDEO_POPOUT_SIZE: 'prism_video_popout_size',
   /** Id of this browser tab, so a chat pop-out knows which tab owns it. Survives a reload. */
   SESSION_TAB_ID: 'prism_tab_id',
 } as const

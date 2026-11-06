@@ -7,6 +7,7 @@ import YourStatsPanel from './components/layout/YourStatsPanel'
 import CategoryPanel from './components/layout/CategoryPanel'
 import ChannelRail from './components/rail/ChannelRail'
 import RailGutter from './components/rail/RailGutter'
+import FloatingVideoProvider from './components/chat/FloatingVideoProvider'
 import MatrixRainBackground from './components/ui/MatrixRainBackground'
 import { OnboardingIntro } from './components/intro/OnboardingIntro'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
@@ -91,40 +92,42 @@ function AppLayout() {
   const rainSpeed = isPlayerPage ? 0.5 : 1
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)]">
-      {/* Frozen on player pages: an animating full-viewport canvas stops
-          Twitch's embed from autoplaying (verified in Chrome 2026-11-03). */}
-      <MatrixRainBackground opacity={rainOpacity} speed={rainSpeed} paused={isPlayerPage} />
+    <FloatingVideoProvider>
+      <div className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)]">
+        {/* Frozen on player pages: an animating full-viewport canvas stops
+            Twitch's embed from autoplaying (verified in Chrome 2026-11-03). */}
+        <MatrixRainBackground opacity={rainOpacity} speed={rainSpeed} paused={isPlayerPage} />
 
-      {showOnboarding && !isAuthenticated && (
-        <OnboardingIntro
-          onComplete={handleOnboardingComplete}
-          onSkip={handleOnboardingComplete}
-          onConnectTwitch={handleOnboardingConnect}
-        />
-      )}
+        {showOnboarding && !isAuthenticated && (
+          <OnboardingIntro
+            onComplete={handleOnboardingComplete}
+            onSkip={handleOnboardingComplete}
+            onConnectTwitch={handleOnboardingConnect}
+          />
+        )}
 
-      <Header />
+        <Header />
 
-      {/* Slide-down panels — position:fixed below header at z-30 */}
-      <FollowingPanel />
-      <YourStatsPanel />
-      <CategoryPanel />
+        {/* Slide-down panels — position:fixed below header at z-30 */}
+        <FollowingPanel />
+        <YourStatsPanel />
+        <CategoryPanel />
 
-      {/* Channel rail — fixed overlay at z-25, above the player, below the
-          panels its +N control opens. Mounted here rather than on the Twitch
-          player page so follows are reachable on every route. */}
-      <ChannelRail />
+        {/* Channel rail — fixed overlay at z-25, above the player, below the
+            panels its +N control opens. Mounted here rather than on the Twitch
+            player page so follows are reachable on every route. */}
+        <ChannelRail />
 
-      {/* Route content. On player pages the rail's collapsed strip is
-          reserved, so it never sits over the embed; on the protocol listing
-          pages it is reserved too, as their nav sidebar sits flush against the
-          left edge and the rail would hide the front of every label (see
-          RailGutter). */}
-      <RailGutter active={isPlayerPage || isProtocolPage}>
-        <Outlet />
-      </RailGutter>
-    </div>
+        {/* Route content. On player pages the rail's collapsed strip is
+            reserved, so it never sits over the embed; on the protocol listing
+            pages it is reserved too, as their nav sidebar sits flush against the
+            left edge and the rail would hide the front of every label (see
+            RailGutter). */}
+        <RailGutter active={isPlayerPage || isProtocolPage}>
+          <Outlet />
+        </RailGutter>
+      </div>
+    </FloatingVideoProvider>
   )
 }
 
