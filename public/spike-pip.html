@@ -176,8 +176,8 @@ async function openPip(mode) {
   }, 10000)
 }
 
-$('btn-iframe').onclick = () => openPip('plain player')
-$('btn-sdk').onclick = () => openPip('SDK player')
+$('btn-iframe').onclick = () => openPip('iframe')
+$('btn-sdk').onclick = () => openPip('sdk')
 $('btn-close').onclick = () => { if (pip) pip.close(); else log('no floating window is open') }
 
 // ---- Part B: covering the player --------------------------------------------
