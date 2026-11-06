@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Heart, Compass, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Heart, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { useFollowedChannels } from '../../hooks/useFollowedChannels'
-import { useCategoryRail } from '../../hooks/useCategoryRail'
 import { useRailAvatars } from '../../hooks/useRailAvatars'
 import ConnectTwitchPrompt from '../ui/ConnectTwitchPrompt'
-import RailSection, { RAIL_FOLLOWS_CAP } from './RailSection'
+import RailSection from './RailSection'
+import RailOfflineLink from './RailOfflineLink'
 import { useRailPosition } from './useRailPosition'
 import { isPlayerPagePath } from '../../lib/routes'
 import { sortNewestLiveFirst } from './sortLiveFollows'
@@ -107,7 +107,7 @@ export default function ChannelRail() {
   }, [expanded, closeNow])
 
   // --- Data ---------------------------------------------------------------
-  // Signed out, both hooks are handed null and become no-ops. The rail makes
+  // Signed out, the hook is handed null and becomes a no-op. The rail makes
   // no API calls at all in that state.
   const userId = isAuthenticated ? (state.auth.user?.id ?? null) : null
   const authOptions = useMemo(
@@ -116,37 +116,21 @@ export default function ChannelRail() {
   )
   const follows = useFollowedChannels(userId, authOptions)
 
-  // `state.channel.stream` is never cleared on navigation — the only
-  // action that clears it is GO_HOME, which nothing in the app dispatches
-  // — so it is not a valid proxy for "on a Twitch channel route." Derive
-  // that from the URL instead, mirroring the isPlayerPage pattern in
-  // App.tsx, so recommendations don't follow the user off the channel page.
-  const isTwitchChannelRoute = /^\/twitch\//.test(location.pathname)
-  const gameId =
-    isAuthenticated && isTwitchChannelRoute
-      ? (state.channel.stream?.game_id ?? null)
-      : null
-  const currentUserId = isAuthenticated ? (state.channel.stream?.user_id ?? null) : null
-  const category = useCategoryRail(gameId, currentUserId)
-
   // A failing section hides itself and leaves its siblings intact. This is
   // the invariant that makes a second platform safe to add.
   const liveFollows = useMemo(
     () => (follows.error ? [] : sortNewestLiveFirst(follows.data.filter((f) => f.isLive))),
     [follows.error, follows.data],
   )
-  const recommendations = useMemo(
-    () => (category.error ? [] : category.streams),
-    [category.error, category.streams],
+  // Everyone followed who is not live, for the "N offline" entry that ends the list.
+  const offlineCount = useMemo(
+    () => (follows.error ? 0 : follows.data.filter((f) => !f.isLive).length),
+    [follows.error, follows.data],
   )
 
-  const avatarIds = useMemo(
-    () => [
-      ...liveFollows.slice(0, RAIL_FOLLOWS_CAP).map((f) => f.broadcaster_id),
-      ...recommendations.map((s) => s.user_id),
-    ],
-    [liveFollows, recommendations],
-  )
+  // Every live follow, so every one needs an avatar; getUsersByIds splits them into
+  // Helix-sized requests itself.
+  const avatarIds = useMemo(() => liveFollows.map((f) => f.broadcaster_id), [liveFollows])
   const avatars = useRailAvatars(avatarIds)
 
   const followEntries: RailEntry[] = useMemo(
@@ -165,35 +149,19 @@ export default function ChannelRail() {
     [liveFollows, avatars],
   )
 
-  const categoryEntries: RailEntry[] = useMemo(
-    () =>
-      recommendations.map((s) => ({
-        id: `twitch:${s.user_id}`,
-        displayName: s.user_name,
-        avatarUrl: avatars.get(s.user_id) ?? '',
-        href: `/twitch/${s.user_login}`,
-        isLive: true,
-        viewerCount: s.viewer_count ?? null,
-        streamTitle: s.title ?? null,
-        gameName: s.game_name ?? null,
-        startedAt: s.started_at ?? null,
-      })),
-    [recommendations, avatars],
-  )
-
   const openFollowingPanel = useCallback(() => {
     dispatch({ type: 'OPEN_NAV_PANEL', panel: 'following' })
   }, [dispatch])
 
   // The follows section shows dimmed placeholders instead of its RailSection
-  // while its first fetch is in flight. Recommendations load and fail
-  // independently of follows, so this never gates the category section.
+  // while its first fetch is in flight.
   const showFollowsLoading = isAuthenticated && follows.loading && followEntries.length === 0
 
-  // Signed in with nothing to show: unmount rather than leave an empty strip
-  // occluding video for no reason. A loading rail is not "nothing to show" —
-  // it stays mounted so the placeholders above can render.
-  const hasContent = followEntries.length > 0 || categoryEntries.length > 0
+  // Signed in with nobody live: unmount rather than leave an empty strip
+  // occluding video for no reason. (The "N offline" entry alone does not keep it
+  // up: Following in the top nav lists everyone.) A loading rail is not "nothing
+  // to show" — it stays mounted so the placeholders above can render.
+  const hasContent = followEntries.length > 0
   const rendered = !isAuthenticated || hasContent || showFollowsLoading
 
   // Tell the page how much of its edge the rail covers, so player pages can
@@ -298,17 +266,17 @@ export default function ChannelRail() {
               icon={<Heart size={16} style={{ color: 'var(--accent-green)' }} />}
               entries={followEntries}
               expanded={expanded}
-              cap={RAIL_FOLLOWS_CAP}
-              totalCount={followEntries.length}
-              onOverflowClick={openFollowingPanel}
             />
           )}
-          <RailSection
-            label="Category"
-            icon={<Compass size={16} style={{ color: 'var(--accent-twitch)' }} />}
-            entries={categoryEntries}
-            expanded={expanded}
-          />
+          {offlineCount > 0 && followEntries.length > 0 && (
+            <RailOfflineLink
+              count={offlineCount}
+              // A cursor means the store has not loaded every follow, so the count is a floor.
+              more={follows.cursor !== null}
+              expanded={expanded}
+              onClick={openFollowingPanel}
+            />
+          )}
         </>
       )}
 
