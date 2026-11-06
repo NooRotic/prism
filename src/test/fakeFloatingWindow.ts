@@ -60,12 +60,19 @@ export interface FakeEmbedInstance {
 
 export function createFakeTwitch({
   playerHasSetChannel = true,
-}: { playerHasSetChannel?: boolean } = {}) {
+  getPlayerMode = 'normal',
+}: {
+  playerHasSetChannel?: boolean
+  /** The live SDK's player is not always usable: `getPlayer()` may throw or return nothing. */
+  getPlayerMode?: 'normal' | 'throws' | 'undefined'
+} = {}) {
   const instances: FakeEmbedInstance[] = []
 
   class Embed implements FakeEmbedInstance {
     static VIDEO_READY = 'video.ready'
     static VIDEO_PLAY = 'video.play'
+    static ONLINE = 'video.online'
+    static OFFLINE = 'video.offline'
 
     id: string
     options: Record<string, unknown>
@@ -85,6 +92,8 @@ export function createFakeTwitch({
     }
 
     getPlayer() {
+      if (getPlayerMode === 'throws') throw new Error('The player is not ready')
+      if (getPlayerMode === 'undefined') return undefined
       return this.player
     }
 

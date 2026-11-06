@@ -36,13 +36,17 @@ export interface OpenFloatingOptions {
 /** The slice of the Twitch embed this module touches. */
 interface TwitchEmbedLike {
   addEventListener(event: string, callback: () => void): void
-  getPlayer(): { setChannel?: (channel: string) => void }
+  /** The live SDK's player proxy is not always usable yet, so this may throw or return nothing. */
+  getPlayer(): { setChannel?: (channel: string) => void } | undefined
   destroy?: () => void
 }
 
 interface TwitchEmbedClass {
   new (elementId: string, options: Record<string, unknown>): TwitchEmbedLike
   VIDEO_READY: string
+  VIDEO_PLAY?: string
+  ONLINE?: string
+  OFFLINE?: string
 }
 
 function embedClassOf(win: Window): TwitchEmbedClass | undefined {
@@ -146,8 +150,16 @@ function buildSession(
       muted: false,
       layout: 'video',
     })
-    instance.addEventListener(Embed.VIDEO_READY, clearReadyTimer)
+    // Any sign of life means the player started. VIDEO_READY alone is not enough: Twitch can
+    // withhold it behind its own visibility checks, and an offline channel never plays.
+    for (const event of [Embed.VIDEO_READY, Embed.VIDEO_PLAY, Embed.ONLINE, Embed.OFFLINE]) {
+      if (event) instance.addEventListener(event, clearReadyTimer)
+    }
     embed = instance
+  }
+
+  /** The window gives up on a player that shows no sign of life, script loading included. */
+  const armReadyTimer = () => {
     clearReadyTimer()
     readyTimer = win.setTimeout(fail, READY_TIMEOUT_MS)
   }
@@ -156,9 +168,11 @@ function buildSession(
     if (started || closed) return
     started = true
     startButton.remove()
+    // Armed before the script is fetched, so a request that stalls fails too.
+    armReadyTimer()
     try {
       await loadScript(win)
-      if (closed) return
+      if (closed || failed) return
       createEmbed()
     } catch {
       fail()
@@ -191,15 +205,22 @@ function buildSession(
       currentChannel = next
       // Not started yet: the latest channel is the one that starts on the click.
       if (!embed) return
-      const player = embed.getPlayer()
-      if (typeof player.setChannel === 'function') {
-        player.setChannel(next)
-        return
+      // This runs from a React effect, so nothing may throw out of it: a player that cannot
+      // switch is rebuilt instead.
+      try {
+        const player = embed.getPlayer()
+        if (typeof player?.setChannel === 'function') {
+          player.setChannel(next)
+          return
+        }
+      } catch {
+        // the SDK's player was not usable: fall through and rebuild
       }
       try {
         embed.destroy?.()
         while (holder.firstChild) holder.removeChild(holder.firstChild)
         createEmbed()
+        armReadyTimer()
       } catch {
         fail()
       }

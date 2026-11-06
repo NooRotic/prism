@@ -153,6 +153,60 @@ describe('openFloatingWindow: starting the player', () => {
 
     expect(callbacks.onFailed).not.toHaveBeenCalled()
   })
+
+  // Twitch can withhold VIDEO_READY (it gates it on its own visibility checks), and an offline
+  // channel never plays. Any sign of life from the player means it started, so it must stay open.
+  it.each([
+    ['starts playing', 'VIDEO_PLAY'],
+    ['reports the channel online', 'ONLINE'],
+    ['reports the channel offline', 'OFFLINE'],
+  ] as const)('does not report a failure once the player %s', async (_label, event) => {
+    vi.useFakeTimers()
+    const { callbacks, twitch } = await openAndStart()
+
+    twitch.instances[0].fire(twitch.Embed[event])
+    vi.advanceTimersByTime(READY_TIMEOUT_MS * 2)
+
+    expect(callbacks.onFailed).not.toHaveBeenCalled()
+  })
+
+  it('reports a failure when the Twitch script stalls and never loads', async () => {
+    vi.useFakeTimers()
+    const { options, fake, twitch, callbacks } = setup()
+    twitch.loadScript.mockImplementationOnce(() => new Promise<void>(() => {}))
+    await openFloatingWindow(options)
+
+    startButton(fake.win).click()
+    await flush()
+    vi.advanceTimersByTime(READY_TIMEOUT_MS)
+
+    expect(callbacks.onFailed).toHaveBeenCalledOnce()
+  })
+
+  it('does not build a player from a script that arrives after the window gave up', async () => {
+    vi.useFakeTimers()
+    const { options, fake, twitch, callbacks } = setup()
+    let arrive: () => void = () => {}
+    twitch.loadScript.mockImplementationOnce(
+      (win) =>
+        new Promise<void>((resolve) => {
+          arrive = () => {
+            ;(win as unknown as { Twitch?: unknown }).Twitch = { Embed: twitch.Embed }
+            resolve()
+          }
+        }),
+    )
+    await openFloatingWindow(options)
+    startButton(fake.win).click()
+    await flush()
+    vi.advanceTimersByTime(READY_TIMEOUT_MS)
+    expect(callbacks.onFailed).toHaveBeenCalledOnce()
+
+    arrive()
+    await flush()
+
+    expect(twitch.instances).toHaveLength(0)
+  })
 })
 
 describe('openFloatingWindow: changing channel', () => {
@@ -176,6 +230,21 @@ describe('openFloatingWindow: changing channel', () => {
     expect(twitch.instances[1].options.channel).toBe('other')
     expect(twitch.instances[0].destroy).toHaveBeenCalled()
   })
+
+  // The live SDK's player is not always usable (the repo's own TwitchEmbedPlayer documents a
+  // proxy that does not match the API), and a throw from here would surface from a React effect.
+  it.each([['throws', 'throws'], ['returns nothing', 'undefined']] as const)(
+    'rebuilds the player instead of throwing when getPlayer %s',
+    async (_label, getPlayerMode) => {
+      const { session, twitch, callbacks } = await openAndStart({ getPlayerMode })
+
+      expect(() => session.setChannel('other')).not.toThrow()
+
+      expect(twitch.instances).toHaveLength(2)
+      expect(twitch.instances[1].options.channel).toBe('other')
+      expect(callbacks.onFailed).not.toHaveBeenCalled()
+    },
+  )
 
   it('does nothing after the window has closed', async () => {
     const { session, twitch } = await openAndStart()
