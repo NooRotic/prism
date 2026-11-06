@@ -257,6 +257,80 @@ describe('openFloatingWindow: changing channel', () => {
   })
 })
 
+// Twitch pauses a player in a window that is too small and does not resume it when the window
+// grows back (seen in the owner's Chrome), so the window asks the player to play again.
+describe('openFloatingWindow: resuming after the window was too small', () => {
+  /** Drags the window to a size and lets the resize settle. */
+  const resizeTo = (fake: ReturnType<typeof createFakeFloatingWindow>, width: number, height: number) => {
+    fake.setSize(width, height)
+    fake.emit('resize')
+    vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS)
+  }
+
+  it('asks the player to play again when the window grows back from below 480x270', async () => {
+    vi.useFakeTimers()
+    const { fake, twitch } = await openAndStart()
+
+    resizeTo(fake, 300, 170)
+    expect(twitch.instances[0].player.play).not.toHaveBeenCalled()
+
+    resizeTo(fake, 500, 290)
+    expect(twitch.instances[0].player.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves a window that never went below 480x270 alone', async () => {
+    vi.useFakeTimers()
+    const { fake, twitch } = await openAndStart()
+
+    resizeTo(fake, 700, 400)
+    resizeTo(fake, 500, 300)
+    resizeTo(fake, 900, 500)
+
+    expect(twitch.instances[0].player.play).not.toHaveBeenCalled()
+  })
+
+  it('keeps asking while the window grows but is still too small, and stops once it is big enough', async () => {
+    vi.useFakeTimers()
+    const { fake, twitch } = await openAndStart()
+    const { play } = twitch.instances[0].player
+
+    resizeTo(fake, 300, 170)
+    resizeTo(fake, 400, 225)
+    expect(play).toHaveBeenCalledTimes(1)
+    resizeTo(fake, 350, 200) // shrinking again: nothing to resume
+    expect(play).toHaveBeenCalledTimes(1)
+    resizeTo(fake, 440, 250)
+    expect(play).toHaveBeenCalledTimes(2)
+    resizeTo(fake, 500, 290) // reaches the floor
+    expect(play).toHaveBeenCalledTimes(3)
+    resizeTo(fake, 600, 340) // no longer below it
+    expect(play).toHaveBeenCalledTimes(3)
+  })
+
+  it('does nothing, and does not throw, before the player has started', async () => {
+    vi.useFakeTimers()
+    const { options, fake, twitch } = setup()
+    await openFloatingWindow(options)
+
+    expect(() => {
+      resizeTo(fake, 300, 170)
+      resizeTo(fake, 500, 290)
+    }).not.toThrow()
+    expect(twitch.instances).toHaveLength(0)
+  })
+
+  it('does not throw out of the resize handler when the player is unusable', async () => {
+    vi.useFakeTimers()
+    const { fake, callbacks } = await openAndStart({ getPlayerMode: 'throws' })
+
+    expect(() => {
+      resizeTo(fake, 300, 170)
+      resizeTo(fake, 500, 290)
+    }).not.toThrow()
+    expect(callbacks.onFailed).not.toHaveBeenCalled()
+  })
+})
+
 describe('openFloatingWindow: the window going away and resizing', () => {
   it('tells the caller once when the window goes away, however it closed', async () => {
     const { options, fake, callbacks } = setup()

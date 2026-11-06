@@ -1,3 +1,4 @@
+import { FLOAT_DEFAULT_SIZE } from './floatingVideo'
 import type { FloatSize } from './floatingVideo'
 
 export const START_BUTTON_TEXT = 'Click here to start with sound'
@@ -37,7 +38,7 @@ export interface OpenFloatingOptions {
 interface TwitchEmbedLike {
   addEventListener(event: string, callback: () => void): void
   /** The live SDK's player proxy is not always usable yet, so this may throw or return nothing. */
-  getPlayer(): { setChannel?: (channel: string) => void } | undefined
+  getPlayer(): { setChannel?: (channel: string) => void; play?: () => void } | undefined
   destroy?: () => void
 }
 
@@ -191,11 +192,36 @@ function buildSession(
   }
   win.addEventListener('pagehide', handleClosed)
 
+  // Twitch pauses a player in a window that is too small and does not resume it when the window
+  // grows back, so a window that grows while it is (or was) below the floor asks the player to
+  // play again. A video the viewer had paused on purpose resumes too: enlarging the window to
+  // look at it is taken as wanting to watch it.
+  let wasTooSmall = false
+  let lastArea = win.innerWidth * win.innerHeight
+  const resumePlayback = () => {
+    if (!embed) return
+    try {
+      embed.getPlayer()?.play?.()
+    } catch {
+      // the player is not usable right now; the viewer can still press play in it
+    }
+  }
+  const settleSize = (size: FloatSize) => {
+    const area = size.width * size.height
+    const tooSmall =
+      size.width < FLOAT_DEFAULT_SIZE.width || size.height < FLOAT_DEFAULT_SIZE.height
+    if ((wasTooSmall || tooSmall) && area > lastArea) resumePlayback()
+    wasTooSmall = tooSmall
+    lastArea = area
+  }
+
   win.addEventListener('resize', () => {
     if (closed) return
     win.clearTimeout(resizeTimer)
     resizeTimer = win.setTimeout(() => {
-      onResize?.({ width: win.innerWidth, height: win.innerHeight })
+      const size = { width: win.innerWidth, height: win.innerHeight }
+      onResize?.(size)
+      settleSize(size)
     }, RESIZE_DEBOUNCE_MS)
   })
 
