@@ -16,7 +16,9 @@ const REDIRECT_URI_OVERRIDE = import.meta.env.VITE_TWITCH_REDIRECT_URI || ''
  * - moderator:read:followers — streamer's own follower total
  * - channel:read:subscriptions — streamer's subscriber list + tier points
  * - channel:read:goals — active broadcast goals
- * - channel:read:hype_train — recent hype train events
+ * - channel:read:hype_train — kept on purpose: nothing calls a hype train
+ *   endpoint today (the old events one was retired), but its replacement
+ *   needs this scope and adding a scope later forces everyone to re-auth
  * - channel:read:vips — VIP list
  * - channel:read:polls — poll history
  * - channel:read:predictions — prediction history
