@@ -7,7 +7,7 @@
   - Header style notification that auto-start is blocked and user must press play
   - Review possible fix to auto-play
   - local-storage stat keeping: show easier paths to common streamers watched
-  - 'Page not found' screen: an unknown address shows a blank page today (no catch-all route), so add a not-found page with a way home. Do this before YouTube Live and Kick work begins
+  - 'Page not found' screen: DONE. An unknown address used to show a blank page; it now shows a not-found page with a way home, inside the layout. (Done before YouTube Live and Kick work begins.)
 * Begin Planning add Kick platform
 * YouTube Live support with chat
 

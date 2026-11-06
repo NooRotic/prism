@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
+import { BrowserRouter, Outlet, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './contexts/AppContext'
 import { Header } from './components/layout/Header'
 import FollowingPanel from './components/layout/FollowingPanel'
@@ -14,13 +14,7 @@ import { useTwitchAuth } from './hooks/useTwitchAuth'
 import { getAuthenticatedUser, SessionExpiredError } from './lib/twitchApi'
 import { STORAGE_KEYS } from './config/storageKeys'
 
-// Pages (lazy-load for code splitting)
-import HubPage from './pages/HubPage'
-import ProtocolPage from './pages/ProtocolPage'
-import TwitchPlayerPage from './pages/TwitchPlayerPage'
-import YoutubePlayerPage from './pages/YoutubePlayerPage'
-import HlsDashPlayerPage from './pages/HlsDashPlayerPage'
-import ChatPopoutPage from './pages/ChatPopoutPage'
+import AppRoutes from './AppRoutes'
 
 const ONBOARDING_SEEN_KEY = STORAGE_KEYS.LOCAL_ONBOARDING_SEEN
 
@@ -135,20 +129,7 @@ function App() {
   return (
     <BrowserRouter>
       <AppProvider>
-        <Routes>
-          {/* The chat pop-out is a window of its own, so it sits outside AppLayout
-              and carries none of the page chrome. */}
-          <Route path="chat/:channel" element={<ChatPopoutPage />} />
-          <Route element={<AppLayout />}>
-            <Route index element={<HubPage />} />
-            <Route path="twitch" element={<ProtocolPage protocol="twitch" />} />
-            <Route path="twitch/:channel" element={<TwitchPlayerPage />} />
-            <Route path="youtube" element={<ProtocolPage protocol="youtube" />} />
-            <Route path="youtube/:videoId" element={<YoutubePlayerPage />} />
-            <Route path="hls-dash" element={<ProtocolPage protocol="hls-dash" />} />
-            <Route path="hls-dash/:streamId" element={<HlsDashPlayerPage />} />
-          </Route>
-        </Routes>
+        <AppRoutes layout={<AppLayout />} />
       </AppProvider>
     </BrowserRouter>
   )
