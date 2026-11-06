@@ -85,9 +85,10 @@ the rail and slide-down panels cannot pause it (see "Non-goals" for the rail its
 that request succeeds does the page switch: its own player is removed (its stream stops), the chat
 widens into the freed space, and the floating window shows the start screen. Clicking it creates the
 player in that window, autoplaying with sound. If Chrome refuses (no click, a window already open),
-nothing changes and a short notice appears next to the control that was used (under the chat header,
-in the slim bar, or beside the strip), never over the player. The wording is its own, not "Pop-up
-blocked".
+nothing changes and a short notice appears directly above the player-and-chat row, never over the
+player ("Couldn't open the floating window. Click the button again."). One place for every entry point,
+because the strip is too narrow to hold text. In fill mode the row covers the whole window and so
+covers the notice; that is accepted, since a refusal is rare.
 
 **Following.** The floating state belongs to the app, not to a page. A change of `:channel` keeps the
 same `TwitchPlayerPage` and `ChatDock` mounted, but leaving the dock page for a page with no video
