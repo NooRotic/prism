@@ -1,5 +1,7 @@
 import { Expand, Maximize2, Minimize2, Shrink } from 'lucide-react'
 import ChatTab, { STRIP_BUTTON_LOOK } from './ChatTab'
+import VideoPopoutButton from './VideoPopoutButton'
+import type { VideoControl } from './VideoPopoutButton'
 import type { DockSide } from './chatPlacement'
 
 interface ChatStripProps {
@@ -12,6 +14,8 @@ interface ChatStripProps {
   fullscreenSupported: boolean
   isFullscreen: boolean
   onToggleFullscreen: () => void
+  /** Pop out / bring back the video. Omitted or null when the video cannot be popped out here. */
+  videoControl?: VideoControl | null
 }
 
 const SMALL_BUTTON = `${STRIP_BUTTON_LOOK} shrink-0 w-9 h-9 md:w-8 md:h-8`
@@ -32,6 +36,7 @@ export default function ChatStrip({
   fullscreenSupported,
   isFullscreen,
   onToggleFullscreen,
+  videoControl = null,
 }: ChatStripProps) {
   const fillLabel = fill ? 'Exit fill mode' : 'Fill window'
   const fullscreenLabel = isFullscreen ? 'Exit fullscreen' : 'Fullscreen chat and video'
@@ -63,6 +68,14 @@ export default function ChatStrip({
         >
           {isFullscreen ? <Shrink size={16} /> : <Expand size={16} />}
         </button>
+      )}
+      {videoControl && (
+        <VideoPopoutButton
+          floating={videoControl.floating}
+          onClick={videoControl.onClick}
+          className={SMALL_BUTTON}
+          size={16}
+        />
       )}
       <ChatTab side={side} label={restoreLabel} onClick={onRestore} />
     </div>

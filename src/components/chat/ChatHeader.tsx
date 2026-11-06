@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import type { ComponentProps, HTMLAttributes } from 'react'
 import ChatTextSize from './ChatTextSize'
+import VideoPopoutButton from './VideoPopoutButton'
+import type { VideoControl } from './VideoPopoutButton'
 import type { DockSide } from './chatPlacement'
 
 interface ChatHeaderProps {
@@ -26,6 +28,13 @@ interface ChatHeaderProps {
   textSize: ComponentProps<typeof ChatTextSize>
   /** Pointer handlers and style from useDockDrag, applied to the drag handle. */
   dragHandleProps: HTMLAttributes<HTMLElement>
+  /** Pop out / bring back the video. Omitted or null when the video cannot be popped out here. */
+  videoControl?: VideoControl | null
+  /**
+   * False while the video floats: with no player beside it the chat has no side to
+   * swap to, so the swap button and the drag hint go. Defaults to true.
+   */
+  dockControls?: boolean
 }
 
 const buttonClass = 'rounded-md p-1 transition-colors hover:bg-white/5'
@@ -44,6 +53,8 @@ export default function ChatHeader({
   onToggleFullscreen,
   textSize,
   dragHandleProps,
+  videoControl = null,
+  dockControls = true,
 }: ChatHeaderProps) {
   const target: DockSide = side === 'left' ? 'right' : 'left'
   // The header exists only while chat is docked, so filling here fills the video
@@ -58,7 +69,7 @@ export default function ChatHeader({
     >
       <span
         {...dragHandleProps}
-        title="Drag to dock the chat on the other side"
+        title={dockControls ? 'Drag to dock the chat on the other side' : undefined}
         className="flex items-center gap-1 text-xs select-none"
       >
         <GripVertical size={14} />
@@ -88,15 +99,24 @@ export default function ChatHeader({
             {isFullscreen ? <Shrink size={14} /> : <Expand size={14} />}
           </button>
         )}
-        <button
-          type="button"
-          onClick={onSwapSide}
-          aria-label={`Move chat to the ${target}`}
-          title={`Move chat to the ${target}`}
-          className={buttonClass}
-        >
-          {target === 'left' ? <ArrowLeft size={14} /> : <ArrowRight size={14} />}
-        </button>
+        {dockControls && (
+          <button
+            type="button"
+            onClick={onSwapSide}
+            aria-label={`Move chat to the ${target}`}
+            title={`Move chat to the ${target}`}
+            className={buttonClass}
+          >
+            {target === 'left' ? <ArrowLeft size={14} /> : <ArrowRight size={14} />}
+          </button>
+        )}
+        {videoControl && (
+          <VideoPopoutButton
+            floating={videoControl.floating}
+            onClick={videoControl.onClick}
+            className={buttonClass}
+          />
+        )}
         <button
           type="button"
           onClick={onPopOut}
