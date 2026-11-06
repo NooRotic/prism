@@ -53,7 +53,7 @@ export interface FakeEmbedInstance {
   options: Record<string, unknown>
   destroy: ReturnType<typeof vi.fn>
   /** `setChannel` is absent when the fake was made with `playerHasSetChannel: false`. */
-  player: { setChannel?: ReturnType<typeof vi.fn> }
+  player: { setChannel?: ReturnType<typeof vi.fn>; play: ReturnType<typeof vi.fn> }
   /** Plays a Twitch embed event in (e.g. `Embed.VIDEO_READY`). */
   fire: (event: string) => void
 }
@@ -77,13 +77,15 @@ export function createFakeTwitch({
     id: string
     options: Record<string, unknown>
     destroy = vi.fn()
-    player: { setChannel?: ReturnType<typeof vi.fn> }
+    player: { setChannel?: ReturnType<typeof vi.fn>; play: ReturnType<typeof vi.fn> }
     private handlers = new Map<string, Array<() => void>>()
 
     constructor(id: string, options: Record<string, unknown>) {
       this.id = id
       this.options = options
-      this.player = playerHasSetChannel ? { setChannel: vi.fn() } : {}
+      this.player = playerHasSetChannel
+        ? { setChannel: vi.fn(), play: vi.fn() }
+        : { play: vi.fn() }
       instances.push(this)
     }
 
