@@ -1,7 +1,7 @@
 # Video Pop-out (floating video window) — Design
 
-**Status:** Approved by the owner 2026-11-06 and implemented on `feat/video-popout` (not pushed); the
-checks in the owner's Chrome are still to do (see the end). A fresh reviewer read it as the builder;
+**Status:** Approved by the owner 2026-11-06, implemented (PRs #67 and #68) and confirmed working by the
+owner in their Chrome and on the live site. A fresh reviewer read it as the builder;
 its answers are folded in below (the calls and the corrected claims). The riskiest unknowns were
 tested in the owner's Chrome on localhost (see "Evidence"); three more were settled by a second
 test (see "Settled by a second test"), and what only the deployed site can show is under "Owed in
@@ -228,7 +228,8 @@ and maximum saved size; how the start screen and the slim bar are styled; whethe
    going to a YouTube page ends it.
 7. Chat hidden, or popped out, while floating: the panel and its button appear and work; below `md`,
    the slim bar's button works.
-8. **On the deployed site**, after the merge: Twitch accepts the real domain in the window.
+8. **On the deployed site**, after the merge: Twitch accepts the real domain in the window. (Confirmed by the
+   owner on prism.nooroticx.tv, 2026-11-06.)
 9. Opening the window from inside fullscreen (the control sits in the dock row that goes fullscreen).
 10. After shrinking the window until Twitch pauses, enlarging it resumes playback. (Checked 2026-11-06: it
     did not by itself, and the nudge did not visibly change that. Twitch's pause is inconsistent and depends
