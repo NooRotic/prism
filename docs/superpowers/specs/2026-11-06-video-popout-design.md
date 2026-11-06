@@ -58,10 +58,13 @@ the rail and slide-down panels cannot pause it (see "Non-goals" for the rail its
    200px minimum) are a different thing and are not reused. The page cannot choose where the window
    appears; Chrome decides. **Twitch pauses a player in a window that is too small** (seen in the
    second test), so a remembered size below the known-good 480×270 is never restored: it is raised
-   to 480×270 when the window opens. The viewer can still shrink a live window. Twitch then pauses the
-   player and does not resume it by itself (seen in the owner's Chrome), so when the window grows
-   while it is, or was, below 480×270, the player is asked to play again. A video the viewer had
-   paused on purpose resumes too: enlarging the window is taken as wanting to watch it.
+   to 480×270 when the window opens. The viewer can still shrink a live window. Twitch's pause is
+   inconsistent (in the owner's Chrome it sometimes paused and sometimes did not, depending on how the
+   window was shrunk: lowering the height before the width did not pause it) and it does not resume
+   by itself. So when the window grows while it is, or was, below 480×270, the player is asked to play
+   again. This is a best-effort nudge: in the owner's re-test the player did not visibly resume, so the
+   viewer may still need to press play in it. The owner judged that acceptable. A video the viewer had
+   paused on purpose is asked to play too.
 8. **Layout while floating.** The row keeps the height it had with the video, so the page below does
    not jump, and the chat takes the full width of the row. The dock-side swap, the drag handle and the
    resize bar are hidden (there is no player to be beside); the remembered side and split are kept
@@ -227,7 +230,8 @@ and maximum saved size; how the start screen and the slim bar are styled; whethe
    the slim bar's button works.
 8. **On the deployed site**, after the merge: Twitch accepts the real domain in the window.
 9. Opening the window from inside fullscreen (the control sits in the dock row that goes fullscreen).
-10. After shrinking the window until Twitch pauses, enlarging it resumes playback. (It did not by itself:
-    the first check failed on 2026-11-06, and the window now asks the player to play; to be re-checked.)
+10. After shrinking the window until Twitch pauses, enlarging it resumes playback. (Checked 2026-11-06: it
+    did not by itself, and the nudge did not visibly change that. Twitch's pause is inconsistent and depends
+    on how the window is shrunk. The owner accepted it: the viewer presses play in the player.)
 11. An offline channel stays open in the window past 15 seconds, showing Twitch's own offline screen (the
     window closes itself only if the player shows no sign of life at all).
