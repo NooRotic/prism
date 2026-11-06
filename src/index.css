@@ -15,10 +15,12 @@
   --border: #1a1a24;
   --border-accent: #2a2a3a;
 
-  /* Text — high contrast extremes */
+  /* Text — three tiers, every one readable (4.5:1 or better on every surface above;
+     src/__tests__/contrast.test.ts holds the line). Muted used to be #55556a, about
+     2.7:1, which made hints and the chat header buttons hard to read. */
   --text-primary: #eeeef0;
-  --text-secondary: #8888a0;
-  --text-muted: #55556a;
+  --text-secondary: #a6a6bc;
+  --text-muted: #7d7d96;
 
   /* Accents — bold dominant + sharp */
   --accent-green: #39FF14;

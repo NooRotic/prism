@@ -14,7 +14,7 @@ export default function FloatingBar({ floating, onClick }: FloatingBarProps) {
     <div
       data-testid="floating-bar"
       className="md:hidden flex items-center gap-2 px-2 py-1 text-xs"
-      style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}
+      style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)' }}
     >
       {floating && <span>The video is in a floating window</span>}
       <VideoPopoutButton
