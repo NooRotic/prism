@@ -1,6 +1,7 @@
 # Video Pop-out (floating video window) — Design
 
-**Status:** Draft for the owner's review. Nothing is built. A fresh reviewer read it as the builder;
+**Status:** Approved by the owner 2026-11-06 and implemented on `feat/video-popout` (not pushed); the
+checks in the owner's Chrome are still to do (see the end). A fresh reviewer read it as the builder;
 its answers are folded in below (the calls and the corrected claims). The riskiest unknowns were
 tested in the owner's Chrome on localhost (see "Evidence"); three more were settled by a second
 test (see "Settled by a second test"), and what only the deployed site can show is under "Owed in
