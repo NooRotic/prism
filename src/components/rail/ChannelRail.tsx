@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Heart, Compass, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
@@ -9,12 +9,18 @@ import { useRailAvatars } from '../../hooks/useRailAvatars'
 import ConnectTwitchPrompt from '../ui/ConnectTwitchPrompt'
 import RailSection, { RAIL_FOLLOWS_CAP } from './RailSection'
 import { useRailPosition } from './useRailPosition'
+import { isPlayerPagePath } from '../../lib/routes'
 import { sortNewestLiveFirst } from './sortLiveFollows'
 import { RAIL_RESERVE_LEFT_VAR, RAIL_RESERVE_RIGHT_VAR } from './RailGutter'
 import type { RailEntry } from './types'
 
 /** Sweeping past a stack of avatars must not strobe panels open. */
 const OPEN_DELAY_MS = 120
+/**
+ * On a player page opening the rail slides the page over, so it waits longer: a mouse
+ * that only passes the edge on its way elsewhere must not shift the video and the chat.
+ */
+const PLAYER_PAGE_OPEN_DELAY_MS = 350
 /** Diagonal travel from avatar to panel must not dismiss it mid-move. */
 const CLOSE_DELAY_MS = 200
 
@@ -38,6 +44,9 @@ export default function ChannelRail() {
   const isAuthenticated = state.auth.isAuthenticated
   const { position, flip } = useRailPosition()
   const location = useLocation()
+  // Where a video may be playing. Twitch pauses an embed that anything covers, so on these
+  // pages an open rail makes room for itself instead of overlaying the player.
+  const onPlayerPage = isPlayerPagePath(location.pathname)
 
   const [expanded, setExpanded] = useState(false)
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -53,8 +62,11 @@ export default function ChannelRail() {
 
   const openAfterDelay = useCallback(() => {
     clearTimers()
-    openTimer.current = setTimeout(() => setExpanded(true), OPEN_DELAY_MS)
-  }, [clearTimers])
+    openTimer.current = setTimeout(
+      () => setExpanded(true),
+      onPlayerPage ? PLAYER_PAGE_OPEN_DELAY_MS : OPEN_DELAY_MS,
+    )
+  }, [clearTimers, onPlayerPage])
 
   const closeAfterDelay = useCallback(() => {
     clearTimers()
@@ -184,20 +196,34 @@ export default function ChannelRail() {
   const hasContent = followEntries.length > 0 || categoryEntries.length > 0
   const rendered = !isAuthenticated || hasContent || showFollowsLoading
 
-  // Tell the page how much of its edge the collapsed strip covers, so player
-  // pages can keep the embed clear of it (see RailGutter). Only while the
-  // rail is actually on screen, and always the collapsed width: expanding is
-  // a temporary overlay, not a reflow. Declared above the early return so
-  // hook order never changes.
-  useEffect(() => {
+  // Tell the page how much of its edge the rail covers, so player pages can
+  // keep the embed clear of it (see RailGutter). Only while the rail is
+  // actually on screen. On a player page the open rail reports its full width,
+  // so the page slides over to make room; anywhere else expanding is a
+  // temporary overlay and only the collapsed strip is reserved. Declared above
+  // the early return so hook order never changes.
+  const reserve = expanded && onPlayerPage ? EXPANDED_WIDTH : COLLAPSED_WIDTH
+  const firstReserveRef = useRef(true)
+  useLayoutEffect(() => {
     if (!rendered) return
     const property = position === 'left' ? RAIL_RESERVE_LEFT_VAR : RAIL_RESERVE_RIGHT_VAR
-    const rootStyle = document.documentElement.style
-    rootStyle.setProperty(property, `${COLLAPSED_WIDTH}px`)
-    return () => {
-      rootStyle.removeProperty(property)
+    const root = document.documentElement
+    if (firstReserveRef.current) {
+      // The page is already on screen with 0 reserved, and index.css eases every change of
+      // this value. Apply the first one with the easing off, or the page would slide in
+      // from 0 on every load. Later changes (the rail opening or closing) do ease.
+      root.style.setProperty('transition', 'none')
+      root.style.setProperty(property, `${reserve}px`)
+      void root.offsetWidth // flush the style while the easing is off
+      root.style.removeProperty('transition')
+      firstReserveRef.current = false
+    } else {
+      root.style.setProperty(property, `${reserve}px`)
     }
-  }, [rendered, position])
+    return () => {
+      root.style.removeProperty(property)
+    }
+  }, [rendered, position, reserve])
 
   if (!rendered) return null
 

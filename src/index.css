@@ -49,6 +49,26 @@
      by them so the strip never sits over the embed. */
   --rail-reserve-left: 0px;
   --rail-reserve-right: 0px;
+  /* The reserved edge eases over the same 150ms as the rail's own width, so on a player
+     page the page slides over in step with the rail instead of jumping. */
+  transition:
+    --rail-reserve-left 150ms,
+    --rail-reserve-right 150ms;
+}
+
+/* Registered so the browser can interpolate them; a browser without @property just snaps.
+   The padding that uses them (RailGutter) is not itself transitioned, so only a change of
+   the reserved width, the rail opening or closing, animates: not entering a player page. */
+@property --rail-reserve-left {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --rail-reserve-right {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
 }
 
 /* Fill mode. ChatDock sets data-fill on the page root while it is in effect; anything

@@ -19,7 +19,7 @@
  *     anything is drawn over (verified 2026-11-03: a 28px button was enough).
  *     Everywhere else the rail still overlays and nothing reflows.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import App from '../../../App'
@@ -216,6 +216,104 @@ describe('ChannelRail reserves its collapsed width for the page', () => {
     expect(screen.queryByTestId('channel-rail')).not.toBeInTheDocument()
     expect(reserved(LEFT)).toBe('')
     expect(reserved(RIGHT)).toBe('')
+  })
+})
+
+// Twitch pauses a playing embed that anything covers (an open rail covering 200px of the video
+// paused it, confirmed in the owner's Chrome 2026-11-06), so on a player page an open rail makes
+// room for itself: the reserved edge grows and the page slides over, and nothing covers the video.
+describe('ChannelRail slides the page over on player pages instead of covering the player', () => {
+  const LEFT = '--rail-reserve-left'
+  const RIGHT = '--rail-reserve-right'
+  const reserved = (name: string) => document.documentElement.style.getPropertyValue(name)
+  const rail = () => screen.getByTestId('channel-rail')
+  const renderRailAt = (path: string) =>
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <ChannelRail />
+      </MemoryRouter>,
+    )
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.clearAllMocks()
+    localStorage.clear()
+    setup()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    document.documentElement.style.removeProperty(LEFT)
+    document.documentElement.style.removeProperty(RIGHT)
+  })
+
+  it('reserves the expanded width while open on a channel page, and the collapsed width again once closed', () => {
+    renderRailAt('/twitch/streamer')
+    expect(reserved(LEFT)).toBe('56px')
+
+    fireEvent.focusIn(rail())
+    expect(reserved(LEFT)).toBe('260px')
+
+    fireEvent.focusOut(rail())
+    act(() => void vi.advanceTimersByTime(300))
+    expect(reserved(LEFT)).toBe('56px')
+  })
+
+  it.each(['/youtube/abc', '/hls-dash/some-stream'])('does the same on %s', (path) => {
+    renderRailAt(path)
+
+    fireEvent.focusIn(rail())
+
+    expect(reserved(LEFT)).toBe('260px')
+  })
+
+  // The first value is applied with the page's easing switched off, so the page does not slide in
+  // from 0 on load. It must switch the easing back on, or no later open or close would ever animate.
+  it('leaves the easing of the reserved edge switched on once the first value is applied', () => {
+    renderRailAt('/twitch/streamer')
+
+    expect(reserved(LEFT)).toBe('56px')
+    expect(document.documentElement.style.getPropertyValue('transition')).toBe('')
+  })
+
+  it('reserves the expanded width on the right when the rail is on the right', () => {
+    renderRailAt('/twitch/streamer')
+    fireEvent.click(screen.getByLabelText('Move rail to the right'))
+
+    fireEvent.focusIn(rail())
+
+    expect(reserved(RIGHT)).toBe('260px')
+    expect(reserved(LEFT)).toBe('')
+  })
+
+  it('keeps overlaying, reserving only the collapsed width, on pages with no player', () => {
+    renderRailAt('/')
+
+    fireEvent.focusIn(rail())
+
+    expect(reserved(LEFT)).toBe('56px')
+  })
+
+  it('waits longer before opening on a player page, because opening moves the page', () => {
+    renderRailAt('/twitch/streamer')
+
+    fireEvent.mouseEnter(rail())
+    act(() => void vi.advanceTimersByTime(200))
+    expect(reserved(LEFT)).toBe('56px')
+
+    act(() => void vi.advanceTimersByTime(250))
+    expect(reserved(LEFT)).toBe('260px')
+  })
+
+  it('never shifts the page for a mouse that only passes over the rail', () => {
+    renderRailAt('/twitch/streamer')
+
+    fireEvent.mouseEnter(rail())
+    act(() => void vi.advanceTimersByTime(100))
+    fireEvent.mouseLeave(rail())
+    act(() => void vi.advanceTimersByTime(1000))
+
+    expect(reserved(LEFT)).toBe('56px')
   })
 })
 
