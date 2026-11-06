@@ -181,10 +181,19 @@ describe('ChannelRail — expansion', () => {
     expect(screen.queryByText('Chan0')).not.toBeInTheDocument()
   })
 
-  it('expands on hover once the open delay elapses', () => {
-    setup()
+  // setup() defaults to a channel page, where opening slides the page over and so waits longer
+  // (see ChannelRail.layout.test.tsx). Pages with no player keep the short delay.
+  it('expands on hover once the open delay elapses on a page with no player', () => {
+    setup({ path: '/' })
     fireEvent.mouseEnter(rail())
     act(() => void vi.advanceTimersByTime(200))
+    expect(screen.getByText('Chan0')).toBeInTheDocument()
+  })
+
+  it('expands on hover once the longer open delay elapses on a channel page', () => {
+    setup()
+    fireEvent.mouseEnter(rail())
+    act(() => void vi.advanceTimersByTime(500))
     expect(screen.getByText('Chan0')).toBeInTheDocument()
   })
 
@@ -203,7 +212,7 @@ describe('ChannelRail — expansion', () => {
   it('does not collapse before the close delay elapses', () => {
     setup()
     fireEvent.mouseEnter(rail())
-    act(() => void vi.advanceTimersByTime(200))
+    act(() => void vi.advanceTimersByTime(500))
 
     fireEvent.mouseLeave(rail())
     act(() => void vi.advanceTimersByTime(100))
@@ -214,7 +223,7 @@ describe('ChannelRail — expansion', () => {
   it('collapses on mouse leave once the close delay elapses', () => {
     setup()
     fireEvent.mouseEnter(rail())
-    act(() => void vi.advanceTimersByTime(200))
+    act(() => void vi.advanceTimersByTime(500))
 
     fireEvent.mouseLeave(rail())
     act(() => void vi.advanceTimersByTime(300))

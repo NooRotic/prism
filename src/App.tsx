@@ -13,6 +13,7 @@ import { OnboardingIntro } from './components/intro/OnboardingIntro'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
 import { getAuthenticatedUser, SessionExpiredError } from './lib/twitchApi'
 import { STORAGE_KEYS } from './config/storageKeys'
+import { isPlayerPagePath } from './lib/routes'
 
 import AppRoutes from './AppRoutes'
 
@@ -80,7 +81,7 @@ function AppLayout() {
 
   // Per-page matrix rain tuning (Section 3 of design spec)
   const location = useLocation()
-  const isPlayerPage = /^\/(twitch|youtube|hls-dash)\//.test(location.pathname)
+  const isPlayerPage = isPlayerPagePath(location.pathname)
   const isProtocolPage = ['/twitch', '/youtube', '/hls-dash'].includes(location.pathname)
   const rainOpacity = isPlayerPage ? 0.03 : isProtocolPage ? 0.08 : 0.07
   const rainSpeed = isPlayerPage ? 0.5 : 1

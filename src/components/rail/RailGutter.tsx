@@ -25,10 +25,13 @@ interface RailGutterProps {
  * 28px button was enough, verified 2026-11-03), so the rail's collapsed strip
  * can't be allowed to cover the video's edge.
  *
- * Only the rail's own edge pays: the other side stays at 0. Expanding the
- * rail (hover/focus/tap) still overlays rather than reflowing the page; an
- * embed that is covered by that stays visible to Twitch again, and starts
- * playing, as soon as the rail collapses.
+ * Only the rail's own edge pays: the other side stays at 0. On a player page
+ * the rail reports its full width while it is open (hover/focus/tap), so this
+ * padding grows and the page slides over: a rail that overlaid the embed would
+ * pause it (confirmed 2026-11-06) and Twitch does not resume a covered embed by
+ * itself. The reserved width eases over the same 150ms as the rail's own width
+ * (see index.css), so the two never overlap. Elsewhere the open rail still just
+ * overlays.
  */
 export default function RailGutter({ active, children }: RailGutterProps) {
   return (
