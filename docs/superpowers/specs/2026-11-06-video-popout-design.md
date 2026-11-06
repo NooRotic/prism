@@ -1,8 +1,10 @@
 # Video Pop-out (floating video window) — Design
 
-**Status:** Draft for the owner's review. Nothing is built. The riskiest unknowns were settled by a
-throwaway test in the owner's Chrome (see "Evidence"); what is still unproven is listed under
-"Owed in the owner's Chrome".
+**Status:** Draft for the owner's review. Nothing is built. A fresh reviewer read it as the builder;
+its answers are folded in below (the calls and the corrected claims). The riskiest unknowns were
+tested in the owner's Chrome on localhost (see "Evidence"); three more are settled by a second
+test before building (see "Settled by a second test"), and what only the deployed site can show is
+under "Owed in the owner's Chrome".
 **Date:** 2026-11-06
 
 ---
@@ -19,7 +21,7 @@ can resize it, and the page decides what it contains (here, only the player).
 
 Two side benefits. A video that lives in its own window never scrolls out of view, which was the
 parked "video pauses when I scroll away" problem. And nothing the main window draws can cover it, so
-the rail and slide-down panels can no longer pause it (see "Non-goals" for the rail itself).
+the rail and slide-down panels cannot pause it (see "Non-goals" for the rail itself).
 
 ## Decided by the owner (2026-11-05/06)
 
@@ -33,9 +35,13 @@ the rail and slide-down panels can no longer pause it (see "Non-goals" for the r
 1. **Where the control lives:** next to "Pop out chat" in the chat header, and in the strip beside the
    player when chat is hidden or popped out. Never over the video. One button whose label flips
    between "Pop out video" and "Bring video back", as the fill and fullscreen buttons already do.
+   The chat header is hidden below the `md` breakpoint, so below it the same control must live in a
+   slim bar above the chat: "Bring video back" has to be reachable at every width.
 2. **Twitch live channels only, for now.** YouTube, HLS and DASH pages, clips and VODs are not
-   floated. Starting a clip or VOD from the page while the live video floats **brings the video back
-   to the page** and plays the clip inline, because the page's player area is empty while floating.
+   floated. The control is hidden while the page is playing a clip or VOD, has no channel, or the
+   browser lacks the API. Starting a clip or VOD from the page while the live video floats (the
+   clip and VOD cards, the profile sidebar and the URL box all do it through `PLAY_URL`) **ends the
+   floating window and plays the clip inline**, because the page's player area is empty while floating.
 3. **The plain `/view/<channel>` window** (an ordinary tiled window, no always-on-top) is **not part of
    this work**. The owner's old fill-mode note called it the next step; this replaces it for now.
 4. **Chrome and Edge only.** Where the browser has no picture-in-picture window API, or the page is
@@ -44,39 +50,53 @@ the rail and slide-down panels can no longer pause it (see "Non-goals" for the r
    re-attaches after a reload; the video cannot, because the browser ties this window to the tab
    that opened it. The page simply loads normally.
 6. **Every open starts with a start screen** ("Click here to start with sound"), because that click is
-   what lets Chrome play sound. The stream starts when it is clicked.
-7. **Size:** opens at 480×270 (16:9), and the last size the viewer left it at is remembered. The
-   page cannot choose where the window appears; Chrome decides.
-8. **While floating, the dock-side swap and the drag handle are hidden** (there is no player to be
-   beside). The remembered side and player/chat split are kept for when the video returns. Fill mode
-   and fullscreen keep working and act on the chat-only row.
+   what lets Chrome play sound. The stream starts when it is clicked. If the channel changes before the
+   click, the latest channel is the one that starts.
+7. **Size:** opens at 480×270 (16:9), and the last size the viewer left it at is remembered under a
+   new storage key, as width and height only. The chat's saved bounds (which hold a position and a
+   200px minimum) are a different thing and are not reused. The page cannot choose where the window
+   appears; Chrome decides.
+8. **Layout while floating.** The row keeps the height it had with the video, so the page below does
+   not jump, and the chat takes the full width of the row. The dock-side swap, the drag handle and the
+   resize bar are hidden (there is no player to be beside); the remembered side and split are kept
+   for when the video returns. Fill mode and fullscreen keep working and act on the chat-only row.
+   The chat must not reload when the video floats or returns, so its place in the render tree stays
+   fixed.
 9. **If chat is hidden or popped out while the video floats**, the player area shows a plain panel,
    "The video is in a floating window", with the same "Bring video back" button.
-10. **From a page with no dock** (the hub, search, a YouTube page) the window just keeps playing its
-    last channel; the viewer closes it with its own close button or Chrome's back-to-tab button.
+10. **Pages that play their own video end the floating window** (YouTube, HLS/DASH, a Twitch clip or
+    VOD), so two things never play at once. Pages with no video (the hub, search, the protocol
+    listings) leave it playing its last channel; the viewer closes it with its own close button or
+    Chrome's back-to-tab button. Opening another live Twitch channel switches it to that channel.
+11. **If the player inside the window fails** (the Twitch script is blocked, the embed will not start,
+    or it never becomes ready), the window closes and the video returns to the page, where the existing
+    fallback chain deals with it. No second recovery path is built for the window.
+12. **After a channel switch the aim is no second click.** The switching mechanism is chosen by the
+    second test below. If a switch would lose the sound, the window shows the start screen again
+    (one click) rather than playing silent.
 
 ## Behaviour
 
-**Opening.** The control runs inside the viewer's click and asks Chrome for the window. At once the
-page's own player is removed (its stream stops), the chat widens into the freed space, and the
-floating window shows the start screen. Clicking it creates the player in that window, autoplaying
-with sound.
+**Opening.** The control runs inside the viewer's click and asks Chrome for the window. Only when
+that request succeeds does the page switch: its own player is removed (its stream stops), the chat
+widens into the freed space, and the floating window shows the start screen. Clicking it creates the
+player in that window, autoplaying with sound. If Chrome refuses (no click, a window already open),
+nothing changes and a short notice appears next to the control that was used (under the chat header,
+in the slim bar, or beside the strip), never over the player. The wording is its own, not "Pop-up
+blocked".
 
-**Following.** The floating state belongs to the app, not to one page, so moving between
-`/twitch/:channel` pages does not close or orphan the window. When the channel in the address
-changes while floating, the floating player switches to it, with the chat beside it in the page
-following as it does today. Opening a channel while floating plays only in the floating window; the
-page never mounts a second player, so there is no second stream or double audio.
+**Following.** The floating state belongs to the app, not to a page. A change of `:channel` keeps the
+same `TwitchPlayerPage` and `ChatDock` mounted, but leaving the dock page for a page with no video
+(call 10) unmounts them, and the window must survive that. Opening a channel while floating plays
+only in the floating window; the page never mounts a second player, so there is no second stream
+or double audio.
 
 **Returning.** Whatever ends the window (its close button, Chrome's back-to-tab button, the page's
-"Bring video back", the opening tab closing or reloading, a clip being started) switches the page
-back: the player returns to its wrapper, the chat gives the space back, and the stream restarts in the
-page with its normal autoplay. "Floating" is derived from the window actually existing, so a
-closed window can never leave the page stuck on the chat-only layout (the same rule the chat pop-out
-follows).
-
-**Failures.** If Chrome refuses the window (no click, a window already open), show a short notice in
-the same place and style as the chat pop-out's "Pop-up blocked" notice, and change nothing else.
+"Bring video back", the opening tab closing or reloading, a clip being started, a failing player)
+switches the page back: the player returns to its wrapper, the chat gives the space back, and the
+stream restarts in the page with its normal autoplay. "Floating" is derived from the window actually
+existing, so a closed window can never leave the page stuck on the chat-only layout (the rule the
+chat pop-out follows).
 
 **Offline channel.** The floating player shows Twitch's own offline screen; nothing extra is built.
 
@@ -88,18 +108,22 @@ the same place and style as the chat pop-out's "Pop-up blocked" notice, and chan
   stream restarts (about two seconds in the test).
 - **Sound:** Chrome only allows sound after a click in the page. A new window has had none, so a player
   created at once plays muted. Creating the player only after a click inside the window gives sound.
-  The click belongs to the window's document, so later channel changes in the same window should
-  not need another (to be confirmed, see "Owed").
 - **The window has its own `window`, `document` and Twitch global.** The Twitch script must be loaded
   into it, and the embed's `parent` must be the main page's hostname, passed explicitly (the window's
-  own origin reads "null"). PRISM's existing `TwitchEmbedPlayer` assumes the page's own `window` and
-  `document`, so it cannot be dropped in unchanged.
+  own origin reads "null"). PRISM's `TwitchEmbedPlayer` assumes the page's own `window` and
+  `document`, so it cannot be dropped in unchanged. It also waits on the page's
+  `requestAnimationFrame`, and a hidden opening tab never fires one: the viewer may switch tabs
+  before clicking start, so anything the window's player waits on (frames, timers) must be the
+  window's own.
 - The window has no PRISM styles. It holds only the start screen and the player, so inline styles or a
   tiny stylesheet are enough. Nothing is ever drawn over the player in it either (Twitch refuses to
   play an embed that anything covers).
 - Playback continues while the opening tab is in the background (confirmed).
+- The repo has no type definitions for the API; a local declaration is needed.
 - jsdom has no such API, so tests need an injected fake of the window opener, as the chat pop-out
-  does with `fakePopoutBus`.
+  does with `fakePopoutBus`. The fake needs a real second `Document`, `pagehide` and `close()`.
+- Twitch is reported to want embeds of at least about 400×300 for reliable playback; the default
+  480×270 and a viewer-shrinkable window are below that height (see "Settled by a second test").
 
 ## Non-goals
 
@@ -109,6 +133,7 @@ the same place and style as the chat pop-out's "Pop-up blocked" notice, and chan
 - Fixing the rail pausing the video on the page. That is a separate small change: the expanded rail
   overlays about 200px of the player and Twitch pauses a covered, playing embed. A floating video
   makes it moot while floating, but the page still needs its own fix.
+- The debug panel showing the floating player (it will show nothing while floating).
 - Combined chat, restyling Twitch's player, mobile layouts.
 
 ## Anti-goals (a failure even if it technically works)
@@ -116,12 +141,14 @@ the same place and style as the chat pop-out's "Pop-up blocked" notice, and chan
 - Anything drawn over the player, in the page or the window.
 - The page left stuck in the chat-only layout after the window is gone.
 - Two players playing at once, or sound doubled.
-- The window going silent or asking for a click on every channel change.
+- The window going silent, or asking for a click on every channel change (call 12 is the accepted
+  fallback only if the test shows there is no way around it).
+- The chat reloading when the video floats or returns.
 
 ## Evidence so far
 
 A throwaway page (`public/spike-pip.html`, on the local-only `spike/video-pip` branch, never merged)
-ran in the owner's Chrome 156 on Windows on 2026-11-06:
+ran in the owner's Chrome 156 on Windows on 2026-11-06, **on localhost only**:
 
 - The window opened, and Twitch's SDK player created inside it fired ready within a second and was
   playing about two seconds after opening, with Twitch's visibility check true for the three minutes
@@ -134,33 +161,61 @@ ran in the owner's Chrome 156 on Windows on 2026-11-06:
 - The plain-iframe player was not tested in the window (a bug in the page, since fixed, ran the SDK
   player twice). It does not matter: the SDK player is what PRISM uses.
 
+**Not yet seen on the real domain.** Twitch is lenient with `localhost`; whether it accepts
+`prism.nooroticx.tv` when the embedding document is the window's own is unproven, and the site only
+deploys from `main`, so it can only be seen after a merge. If it fails there, the fallback is a small
+PRISM-owned page loaded inside the window (as the chat pop-out does with `/chat/:channel`), so Twitch
+sees a real PRISM origin.
+
+## Settled by a second test before building
+
+A second throwaway page (`public/spike-pip2.html`) answers three questions the design depends on;
+its results are folded in here once run, and may change calls 8 and 12:
+
+1. **Channel switch:** does the sound survive switching the floating player to another channel, by
+   `setChannel` on the existing player, or by recreating the player in the same window?
+2. **Fullscreen:** the dock row goes fullscreen in this app. Does Chrome keep the floating window
+   open when the opener goes fullscreen, and does it allow opening one from inside fullscreen? If not,
+   the fullscreen button is hidden while floating (or leaves fullscreen before opening).
+3. **Small size:** does the player keep playing, with sound, when the window is shrunk well below
+   400×300?
+
 ## Existing pieces to build on
 
-- `ChatDock` lays out the player wrapper and chat row, and already renders a chat-only or
-  player-only row; it is mounted only on the Twitch player page.
-- `ChatHeader` and `ChatStrip` carry the existing controls; `useChatPopout` is the pattern for "state
-  derived from the window actually existing", for the blocked notice, and for saved bounds
-  (`loadBounds` / `saveBounds` in `lib/chatPopout.ts`, keys in `config/storageKeys.ts`).
-- `TwitchPlayerPage` renders `PlayerHost` into the dock and owns the channel route param.
+- `ChatDock` renders the player wrapper plus either the chat or the strip. **It has no chat-only
+  layout today**: the row's height comes from the player wrapper (`aspect-video`), and the wrapper is
+  always rendered, so the chat-only row of call 8 is new layout work. It is mounted only on the Twitch
+  player page.
+- `ChatHeader` (hidden below `md`) and `ChatStrip` carry the existing controls. `useChatPopout` is
+  the pattern for "state derived from the window actually existing" and for the blocked notice, but
+  its state is per `ChatDock` and it re-attaches through a `BroadcastChannel`, which a window handle
+  cannot do, so the handle needs to live above the routes (the layout that wraps them, or a small
+  module store). `followsStore.ts` is **not** a model for the handle: its stores are dropped when
+  their last subscriber leaves.
+- `TwitchPlayerPage` renders `PlayerHost` into the dock and owns the channel route param; the
+  YouTube and HLS/DASH pages mount their own `PlayerHost`.
 - `TwitchEmbedPlayer` has the Twitch script loading and the options the page player uses
   (`muted: false`, with a muted fallback after 3 seconds). The window's player is simpler and does not
   need the fallback chain.
-- `followsStore.ts` (PR #64) is a pattern for state that lives outside any one page.
 
 ## Left to the builder
 
-Where the floating state lives (a provider or a small module store, so long as it outlives the
-routes); how the window's player is built (a small dedicated module or an adapted
-`TwitchEmbedPlayer`); the exact copy and icon; keyboard behaviour; the minimum and maximum saved
-size; how the start screen is styled.
+Where the floating state lives (a provider in the layout, or a module store, so long as it outlives
+the routes and does not depend on subscribers); how the window's player is built (a small dedicated
+module or an adapted `TwitchEmbedPlayer`); the exact copy and icon; keyboard behaviour; the minimum
+and maximum saved size; how the start screen and the slim bar are styled; whether to pass
+`preferInitialWindowPlacement` so the saved size wins over Chrome's own memory.
 
 ## Owed in the owner's Chrome (after it is built)
 
 1. Switching channels in the page switches the floating player, with sound and no second click.
 2. Closing the window by its X, by Chrome's back-to-tab button, and by "Bring video back" each returns
-   the video to the page with sound, and the chat gives the space back.
+   the video to the page with sound, and the chat gives the space back without reloading.
 3. Reloading or closing the opening tab closes the window and leaves the page normal.
 4. The chat fills the video's space, in fill mode and in fullscreen, and chat text size still works.
 5. Opening the rail and the slide-down panels does not touch the floating video.
-6. The saved size is used the next time, and a clip started from the page brings the video back.
-7. Chat hidden, or popped out, while floating: the panel and its button appear and work.
+6. The saved size is used the next time; a clip started from the page ends the window and plays inline;
+   going to a YouTube page ends it.
+7. Chat hidden, or popped out, while floating: the panel and its button appear and work; below `md`,
+   the slim bar's button works.
+8. **On the deployed site**, after the merge: Twitch accepts the real domain in the window.
