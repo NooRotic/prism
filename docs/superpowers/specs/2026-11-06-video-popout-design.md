@@ -2,9 +2,9 @@
 
 **Status:** Draft for the owner's review. Nothing is built. A fresh reviewer read it as the builder;
 its answers are folded in below (the calls and the corrected claims). The riskiest unknowns were
-tested in the owner's Chrome on localhost (see "Evidence"); three more are settled by a second
-test before building (see "Settled by a second test"), and what only the deployed site can show is
-under "Owed in the owner's Chrome".
+tested in the owner's Chrome on localhost (see "Evidence"); three more were settled by a second
+test (see "Settled by a second test"), and what only the deployed site can show is under "Owed in
+the owner's Chrome".
 **Date:** 2026-11-06
 
 ---
@@ -55,7 +55,10 @@ the rail and slide-down panels cannot pause it (see "Non-goals" for the rail its
 7. **Size:** opens at 480×270 (16:9), and the last size the viewer left it at is remembered under a
    new storage key, as width and height only. The chat's saved bounds (which hold a position and a
    200px minimum) are a different thing and are not reused. The page cannot choose where the window
-   appears; Chrome decides.
+   appears; Chrome decides. **Twitch pauses a player in a window that is too small** (seen in the
+   second test), so a remembered size below the known-good 480×270 is never restored: it is raised
+   to 480×270 when the window opens. The viewer can still shrink a live window; where Twitch then
+   pauses it is Twitch's own behaviour and nothing here fights it.
 8. **Layout while floating.** The row keeps the height it had with the video, so the page below does
    not jump, and the chat takes the full width of the row. The dock-side swap, the drag handle and the
    resize bar are hidden (there is no player to be beside); the remembered side and split are kept
@@ -71,9 +74,10 @@ the rail and slide-down panels cannot pause it (see "Non-goals" for the rail its
 11. **If the player inside the window fails** (the Twitch script is blocked, the embed will not start,
     or it never becomes ready), the window closes and the video returns to the page, where the existing
     fallback chain deals with it. No second recovery path is built for the window.
-12. **After a channel switch the aim is no second click.** The switching mechanism is chosen by the
-    second test below. If a switch would lose the sound, the window shows the start screen again
-    (one click) rather than playing silent.
+12. **A channel switch uses `setChannel` on the existing player.** The second test showed that both
+    `setChannel` and recreating the player keep the sound with no second click, and `setChannel` is
+    faster. Recreating the player is the fallback if `setChannel` is missing. If a switch ever lost
+    the sound, the window would show the start screen again (one click) rather than playing silent.
 
 ## Behaviour
 
@@ -122,8 +126,8 @@ chat pop-out follows).
 - The repo has no type definitions for the API; a local declaration is needed.
 - jsdom has no such API, so tests need an injected fake of the window opener, as the chat pop-out
   does with `fakePopoutBus`. The fake needs a real second `Document`, `pagehide` and `close()`.
-- Twitch is reported to want embeds of at least about 400×300 for reliable playback; the default
-  480×270 and a viewer-shrinkable window are below that height (see "Settled by a second test").
+- Twitch pauses a player whose window is shrunk too small. The exact floor was not measured; the
+  default 480×270 plays. Chrome lets the viewer drag the window much smaller than that.
 
 ## Non-goals
 
@@ -167,18 +171,17 @@ deploys from `main`, so it can only be seen after a merge. If it fails there, th
 PRISM-owned page loaded inside the window (as the chat pop-out does with `/chat/:channel`), so Twitch
 sees a real PRISM origin.
 
-## Settled by a second test before building
+## Settled by a second test (2026-11-06, the owner's Chrome, localhost)
 
-A second throwaway page (`public/spike-pip2.html`) answers three questions the design depends on;
-its results are folded in here once run, and may change calls 8 and 12:
+A second throwaway page (`public/spike-pip2.html`, never committed) answered three questions:
 
-1. **Channel switch:** does the sound survive switching the floating player to another channel, by
-   `setChannel` on the existing player, or by recreating the player in the same window?
-2. **Fullscreen:** the dock row goes fullscreen in this app. Does Chrome keep the floating window
-   open when the opener goes fullscreen, and does it allow opening one from inside fullscreen? If not,
-   the fullscreen button is hidden while floating (or leaves fullscreen before opening).
-3. **Small size:** does the player keep playing, with sound, when the window is shrunk well below
-   400×300?
+1. **Channel switch:** the sound survives both ways, by `setChannel` on the existing player and by
+   recreating the player in the same window. `setChannel` is faster. (Call 12.)
+2. **Fullscreen:** the floating window survives the opener going fullscreen, "perfectly". The
+   fullscreen button therefore stays available while floating. Opening the window from inside
+   fullscreen was not separately reported; it is on the list below.
+3. **Small size:** Chrome lets the viewer drag the window very small, and Twitch pauses the player
+   when it gets too small. The exact floor was not measured. (Call 7.)
 
 ## Existing pieces to build on
 
@@ -219,3 +222,5 @@ and maximum saved size; how the start screen and the slim bar are styled; whethe
 7. Chat hidden, or popped out, while floating: the panel and its button appear and work; below `md`,
    the slim bar's button works.
 8. **On the deployed site**, after the merge: Twitch accepts the real domain in the window.
+9. Opening the window from inside fullscreen (the control sits in the dock row that goes fullscreen).
+10. After shrinking the window until Twitch pauses, does enlarging it resume playback by itself?
