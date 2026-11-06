@@ -1,10 +1,8 @@
-import { render, screen, act, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, act, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import ChannelRail from '../ChannelRail'
-import { RAIL_FOLLOWS_CAP } from '../RailSection'
 import { useFollowedChannels } from '../../../hooks/useFollowedChannels'
-import { useCategoryRail } from '../../../hooks/useCategoryRail'
 import { useRailAvatars } from '../../../hooks/useRailAvatars'
 import { useTwitchAuth } from '../../../hooks/useTwitchAuth'
 import { useApp } from '../../../contexts/AppContext'
@@ -12,13 +10,11 @@ import { useApp } from '../../../contexts/AppContext'
 vi.mock('../../../hooks/useFollowedChannels', () => ({
   useFollowedChannels: vi.fn(),
 }))
-vi.mock('../../../hooks/useCategoryRail', () => ({ useCategoryRail: vi.fn() }))
 vi.mock('../../../hooks/useRailAvatars', () => ({ useRailAvatars: vi.fn() }))
 vi.mock('../../../hooks/useTwitchAuth', () => ({ useTwitchAuth: vi.fn() }))
 vi.mock('../../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 
 const mockFollows = vi.mocked(useFollowedChannels)
-const mockCategory = vi.mocked(useCategoryRail)
 const mockAvatars = vi.mocked(useRailAvatars)
 const mockAuth = vi.mocked(useTwitchAuth)
 const mockApp = vi.mocked(useApp)
@@ -54,10 +50,11 @@ interface SetupOptions {
   isAuthenticated?: boolean
   follows?: ReturnType<typeof live>[]
   followsError?: string | null
+  /** A category in context (the stream being watched), which no longer adds anything to the rail. */
   gameId?: string | null
-  recommendations?: unknown[]
   loading?: boolean
-  categoryError?: string | null
+  /** The follows store's next-page cursor: non-null means more follows are still to load. */
+  cursor?: string | null
   /**
    * Defaults to a Twitch channel route so `gameId`-bearing setups keep
    * exercising the category path without every call site having to know
@@ -72,9 +69,8 @@ function setup(opts: SetupOptions = {}) {
     follows = [live(0), live(1)],
     followsError = null,
     gameId = null,
-    recommendations = [],
     loading = false,
-    categoryError = null,
+    cursor = null,
     path = '/twitch/testchannel',
   } = opts
 
@@ -105,16 +101,10 @@ function setup(opts: SetupOptions = {}) {
     loading,
     loadingMore: false,
     error: followsError,
-    cursor: null,
+    cursor,
     refetch: vi.fn(),
     loadMore: vi.fn(),
   } as unknown as ReturnType<typeof useFollowedChannels>)
-
-  mockCategory.mockReturnValue({
-    streams: recommendations,
-    loading: false,
-    error: categoryError,
-  } as unknown as ReturnType<typeof useCategoryRail>)
 
   mockAvatars.mockReturnValue(new Map())
 
@@ -269,7 +259,6 @@ describe('ChannelRail — content and states', () => {
     expect(screen.getByRole('button', { name: /connect twitch/i })).toBeInTheDocument()
     // The follows hook must be called with a null userId, which makes it a no-op.
     expect(mockFollows).toHaveBeenCalledWith(null, expect.anything())
-    expect(mockCategory).toHaveBeenCalledWith(null, null)
   })
 
   it('renders one entry per live follow and excludes offline follows', () => {
@@ -281,96 +270,33 @@ describe('ChannelRail — content and states', () => {
     expect(screen.queryByText('Off1')).not.toBeInTheDocument()
   })
 
-  it('hides the recommendations section when there is no category in context', () => {
-    setup({ gameId: null })
+  // The owner found the category leaders not useful (2026-11-06): the rail is
+  // the people you follow, nothing else.
+  it('never shows category leaders, even with a category in context', () => {
+    setup({ gameId: '509658' })
     fireEvent.focusIn(rail())
+
     expect(screen.queryByRole('region', { name: /category/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('region')).toHaveLength(1)
     expect(screen.getByRole('region', { name: /following/i })).toBeInTheDocument()
   })
 
-  it('shows the recommendations section when a category is in context', () => {
-    setup({
-      gameId: '509658',
-      recommendations: [
-        {
-          id: 's1',
-          user_id: '99',
-          user_login: 'rec1',
-          user_name: 'Rec1',
-          game_name: 'Just Chatting',
-          title: 'hello',
-          viewer_count: 500,
-          started_at: '2026-09-22T00:00:00Z',
-        },
-      ],
-    })
-    fireEvent.focusIn(rail())
-    expect(screen.getByText('Rec1')).toBeInTheDocument()
-  })
-
-  it('keeps recommendations when the follows section fails', () => {
-    setup({
-      follows: [],
-      followsError: 'Twitch API error: 500',
-      gameId: '509658',
-      recommendations: [
-        {
-          id: 's1',
-          user_id: '99',
-          user_login: 'rec1',
-          user_name: 'Rec1',
-          game_name: 'Just Chatting',
-          title: 'hello',
-          viewer_count: 500,
-          started_at: '2026-09-22T00:00:00Z',
-        },
-      ],
-    })
-    fireEvent.focusIn(rail())
-
-    expect(screen.queryByRole('region', { name: /following/i })).not.toBeInTheDocument()
-    expect(screen.getByText('Rec1')).toBeInTheDocument()
-  })
-
-  it('keeps the follows section when the recommendations section fails', () => {
-    setup({
-      follows: [live(0), live(1)],
-      gameId: '509658',
-      recommendations: [],
-      categoryError: 'Twitch API error: 500',
-    })
-    fireEvent.focusIn(rail())
-
-    expect(screen.getByRole('region', { name: /following/i })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: /category/i })).not.toBeInTheDocument()
-  })
-
-  it('renders nothing when signed in with no content in either section', () => {
-    setup({ follows: [], gameId: null })
+  it('renders nothing when signed in and nobody followed is live', () => {
+    setup({ follows: [offline(0), offline(1)] as never })
     expect(screen.queryByTestId('channel-rail')).not.toBeInTheDocument()
   })
 
-  it('opens the Following panel from the +N control', async () => {
-    const user = userEvent.setup()
-    setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
-    fireEvent.focusIn(rail())
-
-    await user.click(screen.getByRole('button', { name: new RegExp(`\\+${20 - RAIL_FOLLOWS_CAP}`) }))
-
-    expect(dispatch).toHaveBeenCalledWith({
-      type: 'OPEN_NAV_PANEL',
-      panel: 'following',
-    })
+  it('renders nothing when the follows fail to load', () => {
+    setup({ follows: [], followsError: 'Twitch API error: 500' })
+    expect(screen.queryByTestId('channel-rail')).not.toBeInTheDocument()
   })
 
-  // 8 turned out to be too few in use: with a few dozen live follows the rail
-  // showed the same handful. The Following section has its own, larger cap.
-  it('shows up to RAIL_FOLLOWS_CAP of the live follows', () => {
-    setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
+  it('shows every live follow, with no cap', () => {
+    setup({ follows: Array.from({ length: 30 }, (_, i) => live(i)) })
     fireEvent.focusIn(rail())
 
     const region = screen.getByRole('region', { name: /following/i })
-    expect(within(region).getAllByRole('link')).toHaveLength(RAIL_FOLLOWS_CAP)
+    expect(within(region).getAllByRole('link')).toHaveLength(30)
   })
 
   it('lists live follows with the newest to go live first', () => {
@@ -391,58 +317,59 @@ describe('ChannelRail — content and states', () => {
     ])
   })
 
-  // Twitch returns follows newest-followed first, so without this the rail
-  // showed the same dozen no matter who had just gone live.
-  it('shows the newest to go live when there are more than fit, and requests exactly their avatars', () => {
-    const follows = Array.from({ length: 20 }, (_, i) => ({
-      ...live(i),
-      startedAt: new Date(Date.UTC(2026, 10, 5, 0, i)).toISOString(), // higher i = went live later
-    }))
-    setup({ follows })
-    fireEvent.focusIn(rail())
-
-    const region = screen.getByRole('region', { name: /following/i })
-    expect(within(region).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(
-      Array.from({ length: RAIL_FOLLOWS_CAP }, (_, k) => `/twitch/chan${19 - k}`),
-    )
-    expect(mockAvatars.mock.calls.at(-1)?.[0]).toEqual(
-      Array.from({ length: RAIL_FOLLOWS_CAP }, (_, k) => `${19 - k}`),
-    )
-  })
-
-  it('asks for an avatar for every follow it shows, and no more', () => {
-    setup({ follows: Array.from({ length: 20 }, (_, i) => live(i)) })
+  it('asks for an avatar for every live follow it shows, and no more', () => {
+    setup({
+      follows: [...Array.from({ length: 30 }, (_, i) => live(i)), offline(0), offline(1)] as never,
+    })
 
     const requested = mockAvatars.mock.calls.at(-1)?.[0] ?? []
-    expect(requested).toHaveLength(RAIL_FOLLOWS_CAP)
-    expect(requested).toEqual(Array.from({ length: RAIL_FOLLOWS_CAP }, (_, i) => `${i}`))
+    expect([...requested].sort()).toEqual(Array.from({ length: 30 }, (_, i) => `${i}`).sort())
   })
 
-  it('excludes the current channel from recommendations', () => {
-    setup({ gameId: '509658' })
-    expect(mockCategory).toHaveBeenCalledWith('509658', 'current')
-  })
+  describe('offline follows', () => {
+    const mixed = [live(0), live(1), offline(0), offline(1), offline(2)] as never
 
-  it('requests avatars for both live follows and recommendations', async () => {
-    setup({
-      follows: [live(0)],
-      gameId: '509658',
-      recommendations: [
-        {
-          id: 's1',
-          user_id: '99',
-          user_login: 'rec1',
-          user_name: 'Rec1',
-          game_name: 'JC',
-          title: 't',
-          viewer_count: 5,
-          started_at: '2026-09-22T00:00:00Z',
-        },
-      ],
+    it('ends the rail with a button counting the follows who are not live', () => {
+      setup({ follows: mixed })
+      expect(screen.getByRole('button', { name: /3 offline/i })).toBeInTheDocument()
     })
-    await waitFor(() =>
-      expect(mockAvatars).toHaveBeenCalledWith(expect.arrayContaining(['0', '99'])),
-    )
+
+    it('puts that button after the live follows', () => {
+      setup({ follows: mixed })
+      const lastLink = screen.getAllByRole('link').at(-1)!
+      const button = screen.getByRole('button', { name: /3 offline/i })
+      expect(lastLink.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('opens the Following panel when pressed', async () => {
+      const user = userEvent.setup()
+      setup({ follows: mixed })
+      fireEvent.focusIn(rail())
+
+      await user.click(screen.getByRole('button', { name: /3 offline/i }))
+
+      expect(dispatch).toHaveBeenCalledWith({ type: 'OPEN_NAV_PANEL', panel: 'following' })
+    })
+
+    it('is not shown when everyone followed is live', () => {
+      setup({ follows: [live(0), live(1)] })
+      expect(screen.queryByRole('button', { name: /offline/i })).not.toBeInTheDocument()
+    })
+
+    it('adds a plus when more follows are still to be loaded, since the count is then a floor', () => {
+      setup({ follows: mixed, cursor: 'next-page' })
+      expect(screen.getByRole('button', { name: /3\+ offline/i })).toBeInTheDocument()
+    })
+
+    it('puts only the count on the collapsed rail and adds the word offline when it opens', () => {
+      setup({ follows: mixed })
+      const button = screen.getByRole('button', { name: /3 offline/i })
+      expect(button).toHaveTextContent('3')
+      expect(button).not.toHaveTextContent(/offline/i)
+
+      fireEvent.focusIn(rail())
+      expect(screen.getByRole('button', { name: /3 offline/i })).toHaveTextContent(/offline/i)
+    })
   })
 
   it('shows dimmed placeholder circles while follows are loading', () => {
@@ -452,9 +379,9 @@ describe('ChannelRail — content and states', () => {
     expect(screen.getAllByTestId('rail-placeholder')).toHaveLength(5)
   })
 
-  // These two exercise a *transition*, not a static mock — the bug class
-  // the whole-branch review found (auth and route going stale under a rail
-  // that never unmounts) is invisible to a render-once test by construction.
+  // This exercises a *transition*, not a static mock — the bug class the
+  // whole-branch review found (auth going stale under a rail that never
+  // unmounts) is invisible to a render-once test by construction.
 
   it('reacts to a logout: hides stale follows and shows the signed-out affordance', () => {
     const { rerender } = setup({ follows: [live(0), live(1)] })
@@ -485,52 +412,5 @@ describe('ChannelRail — content and states', () => {
     expect(screen.queryByText('Chan0')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /connect twitch/i })).toBeInTheDocument()
   })
-
-  it('drops recommendations when the route leaves the Twitch channel page, keeping follows', () => {
-    const rec = {
-      id: 's1',
-      user_id: '99',
-      user_login: 'rec1',
-      user_name: 'Rec1',
-      game_name: 'Just Chatting',
-      title: 'hello',
-      viewer_count: 500,
-      started_at: '2026-09-22T00:00:00Z',
-    }
-
-    const { rerender } = setup({
-      path: '/twitch/testchannel',
-      gameId: '509658',
-      recommendations: [rec],
-    })
-    fireEvent.focusIn(rail())
-    expect(screen.getByRole('region', { name: /category/i })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: /following/i })).toBeInTheDocument()
-
-    // From here, useCategoryRail must respond to whatever gameId
-    // ChannelRail actually computes on the next render — a static
-    // mockReturnValue can't distinguish "gated on route" from "gated on
-    // nothing". state.channel.stream is deliberately left untouched:
-    // nothing in the app ever clears it on navigation (GO_HOME is
-    // dispatched nowhere), so only the route moves, exactly like the real
-    // bug this test guards against.
-    mockCategory.mockImplementation(
-      (gameId: string | null) =>
-        ({
-          streams: gameId ? [rec] : [],
-          loading: false,
-          error: null,
-        }) as unknown as ReturnType<typeof useCategoryRail>,
-    )
-
-    rerender(
-      <MemoryRouter key="/" initialEntries={['/']}>
-        <ChannelRail />
-      </MemoryRouter>,
-    )
-    fireEvent.focusIn(rail())
-
-    expect(screen.queryByRole('region', { name: /category/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('region', { name: /following/i })).toBeInTheDocument()
-  })
 })
+

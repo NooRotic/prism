@@ -6,8 +6,8 @@ import { getUsersByIds } from '../lib/twitchApi'
  *
  * `EnrichedFollow` has no avatar field — its `thumbnailUrl` is the stream
  * preview, not the profile picture — so the rail needs a second join against
- * /users. One request covers the realistic case: at most 8 live follows plus
- * 8 recommendations is well under Helix's 100-id cap.
+ * /users. The rail lists every live follow, which can pass Helix's 100-id cap;
+ * getUsersByIds splits the ids into capped requests itself.
  *
  * Avatars never block the rail. A rejected or partial fetch resolves to a
  * map missing those ids, and the cards render initial-letter circles.
