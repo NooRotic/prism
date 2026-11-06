@@ -65,7 +65,7 @@ export default function ChatHeader({
     <div
       data-testid="chat-header"
       className="hidden md:flex flex-wrap items-center justify-between gap-x-1 gap-y-0.5 px-2 py-1"
-      style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}
+      style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)' }}
     >
       <span
         {...dragHandleProps}

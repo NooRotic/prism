@@ -131,6 +131,11 @@ describe('ChatDock', () => {
     expect(header).toHaveClass('hidden', 'md:flex')
   })
 
+  it('draws the header controls in the secondary text colour, not the dim muted one', () => {
+    renderDock()
+    expect(screen.getByTestId('chat-header')).toHaveStyle({ color: 'var(--text-secondary)' })
+  })
+
   it('dragging the chat handle onto the left half docks the chat on the left, and remembers it', () => {
     Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true })
     Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true })
