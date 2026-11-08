@@ -14,20 +14,39 @@ export interface FloatSize {
  */
 export const FLOAT_DEFAULT_SIZE: FloatSize = { width: 480, height: 270 }
 
-/** Each side raised to the default if it is smaller. */
-export function clampFloatSize(size: FloatSize): FloatSize {
-  return {
-    width: Math.max(size.width, FLOAT_DEFAULT_SIZE.width),
-    height: Math.max(size.height, FLOAT_DEFAULT_SIZE.height),
-  }
-}
-
 function isUsableSide(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
 
-/** The saved size (raised to the floor), or the default. Never throws. */
-export function loadFloatSize(): FloatSize {
+/**
+ * Each side raised to the default if it is smaller. With a `ceiling` (the screen) a side is
+ * first brought down to it, so a size saved on a bigger monitor does not open off the screen;
+ * the floor still wins on a screen smaller than the floor.
+ */
+export function clampFloatSize(size: FloatSize, ceiling?: FloatSize): FloatSize {
+  const side = (value: number, floor: number, top: number | undefined) =>
+    Math.max(floor, top === undefined ? value : Math.min(value, top))
+  return {
+    width: side(size.width, FLOAT_DEFAULT_SIZE.width, ceiling?.width),
+    height: side(size.height, FLOAT_DEFAULT_SIZE.height, ceiling?.height),
+  }
+}
+
+type ScreenArea = Pick<Screen, 'availWidth' | 'availHeight'>
+
+/** The screen's usable size, or nothing when it reports none (a test environment, an odd browser). */
+function ceilingOf(screenArea: ScreenArea | undefined): FloatSize | undefined {
+  if (!screenArea) return undefined
+  const { availWidth, availHeight } = screenArea
+  if (!isUsableSide(availWidth) || !isUsableSide(availHeight)) return undefined
+  return { width: availWidth, height: availHeight }
+}
+
+/**
+ * The saved size, raised to the floor and brought down to the screen, or the default. Never
+ * throws. Takes the screen as an argument so a test can hand it a small or a missing one.
+ */
+export function loadFloatSize(screenArea: ScreenArea | undefined = window.screen): FloatSize {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.LOCAL_VIDEO_POPOUT_SIZE)
     if (!raw) return { ...FLOAT_DEFAULT_SIZE }
@@ -35,7 +54,7 @@ export function loadFloatSize(): FloatSize {
     if (typeof value !== 'object' || value === null) return { ...FLOAT_DEFAULT_SIZE }
     const { width, height } = value as Record<string, unknown>
     if (!isUsableSide(width) || !isUsableSide(height)) return { ...FLOAT_DEFAULT_SIZE }
-    return clampFloatSize({ width, height })
+    return clampFloatSize({ width, height }, ceilingOf(screenArea))
   } catch {
     return { ...FLOAT_DEFAULT_SIZE }
   }

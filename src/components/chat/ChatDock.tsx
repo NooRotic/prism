@@ -142,9 +142,11 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
     <>
       {/* Above the row, never over the player. One place for every entry point, because
           the strip is too narrow to hold text. */}
-      {video.blocked && (
+      {(video.blocked || video.failed) && (
         <p role="status" className="px-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-          {"Couldn't open the floating window. Click the button again."}
+          {video.failed
+            ? "The video couldn't start in the floating window, so it was closed. Click the button to try again."
+            : "Couldn't open the floating window. Click the button again."}
         </p>
       )}
       <div

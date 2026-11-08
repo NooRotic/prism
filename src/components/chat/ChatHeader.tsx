@@ -72,7 +72,8 @@ export default function ChatHeader({
         title={dockControls ? 'Drag to dock the chat on the other side' : undefined}
         className="flex items-center gap-1 text-xs select-none"
       >
-        <GripVertical size={14} />
+        {/* The grip promises a drag; while the video floats there is no side to drag to. */}
+        {dockControls && <GripVertical size={14} />}
         Chat
       </span>
       <div className="flex flex-wrap items-center gap-1">
@@ -114,7 +115,7 @@ export default function ChatHeader({
           <VideoPopoutButton
             floating={videoControl.floating}
             onClick={videoControl.onClick}
-            className={buttonClass}
+            className={toggleClass}
           />
         )}
         <button

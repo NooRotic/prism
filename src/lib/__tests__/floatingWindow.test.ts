@@ -257,6 +257,58 @@ describe('openFloatingWindow: changing channel', () => {
   })
 })
 
+describe('openFloatingWindow: a window that is not usable', () => {
+  it('closes the window and rejects when setting it up throws, so none is left open', async () => {
+    const { options, fake, callbacks } = setup()
+    vi.spyOn(fake.win.document.head, 'appendChild').mockImplementation(() => {
+      throw new Error('the document is gone')
+    })
+
+    await expect(openFloatingWindow(options)).rejects.toThrow('the document is gone')
+
+    expect(fake.win.close).toHaveBeenCalled()
+    expect(callbacks.onClosed).not.toHaveBeenCalled()
+  })
+
+  it('reports a window that was already closed when it was handed over, once', async () => {
+    const { options, fake, callbacks } = setup()
+    fake.setClosed()
+
+    const session = await openFloatingWindow(options)
+
+    expect(session.closed).toBe(true)
+    expect(callbacks.onClosed).toHaveBeenCalledTimes(1)
+  })
+})
+
+// The tab that opened the window may be hidden, and a hidden tab throttles its timers, so
+// everything the window waits on has to be the window's own timer, not the opener's.
+describe("openFloatingWindow: the window's own timers", () => {
+  it('arms the ready timer on the window and clears it there when the window closes', async () => {
+    const { options, fake } = setup()
+    const armed = vi.spyOn(fake.win, 'setTimeout')
+    const cleared = vi.spyOn(fake.win, 'clearTimeout')
+    const session = await openFloatingWindow(options)
+    startButton(fake.win).click()
+    await flush()
+
+    expect(armed).toHaveBeenCalledWith(expect.any(Function), READY_TIMEOUT_MS)
+    cleared.mockClear()
+    session.close()
+    expect(cleared).toHaveBeenCalled()
+  })
+
+  it('debounces a resize on the window', async () => {
+    const { options, fake } = setup()
+    const armed = vi.spyOn(fake.win, 'setTimeout')
+    await openFloatingWindow(options)
+
+    fake.emit('resize')
+
+    expect(armed).toHaveBeenCalledWith(expect.any(Function), RESIZE_DEBOUNCE_MS)
+  })
+})
+
 // Twitch pauses a player in a window that is too small and does not resume it when the window
 // grows back (seen in the owner's Chrome), so the window asks the player to play again.
 describe('openFloatingWindow: resuming after the window was too small', () => {

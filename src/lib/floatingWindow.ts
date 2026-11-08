@@ -87,9 +87,20 @@ function defaultLoadScript(win: Window): Promise<void> {
 export function openFloatingWindow(options: OpenFloatingOptions): Promise<FloatingSession> {
   const opener = options.opener ?? defaultOpener
   const loadScript = options.loadScript ?? defaultLoadScript
-  return opener({ width: options.size.width, height: options.size.height }).then((win) =>
-    buildSession(win, options, loadScript),
-  )
+  return opener({ width: options.size.width, height: options.size.height }).then((win) => {
+    try {
+      return buildSession(win, options, loadScript)
+    } catch (error) {
+      // The browser opened a window that setup could not use: close it, or it would stay open
+      // with nothing in the app knowing it exists.
+      try {
+        win.close()
+      } catch {
+        // already gone
+      }
+      throw error
+    }
+  })
 }
 
 function buildSession(
@@ -191,6 +202,8 @@ function buildSession(
     onClosed()
   }
   win.addEventListener('pagehide', handleClosed)
+  // Closed before it was handed over (the viewer shut it at once): no `pagehide` will come now.
+  if (win.closed) handleClosed()
 
   // Twitch pauses a player in a window that is too small and does not resume it when the window
   // grows back, so a window that grows while it is (or was) below the floor asks the player to

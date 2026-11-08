@@ -13,6 +13,8 @@ export interface FakeFloatingWindow {
   emit: (type: string) => void
   /** Changes what `innerWidth` / `innerHeight` report; follow with `emit('resize')`. */
   setSize: (width: number, height: number) => void
+  /** Makes `closed` read true without firing `pagehide`, like a window that went away before it was handed over. */
+  setClosed: () => void
 }
 
 export function createFakeFloatingWindow(): FakeFloatingWindow {
@@ -20,10 +22,14 @@ export function createFakeFloatingWindow(): FakeFloatingWindow {
   const emit = (type: string) => {
     listeners.get(type)?.forEach((callback) => callback())
   }
+  const state = { closed: false }
   const fake = {
     document: document.implementation.createHTMLDocument(''),
     innerWidth: 480,
     innerHeight: 270,
+    get closed() {
+      return state.closed
+    },
     addEventListener: (type: string, callback: () => void) => {
       const existing = listeners.get(type)
       if (existing) existing.add(callback)
@@ -32,8 +38,11 @@ export function createFakeFloatingWindow(): FakeFloatingWindow {
     removeEventListener: (type: string, callback: () => void) => {
       listeners.get(type)?.delete(callback)
     },
-    // Closing a real window fires pagehide in it.
-    close: vi.fn(() => emit('pagehide')),
+    // Closing a real window marks it closed and fires pagehide in it.
+    close: vi.fn(() => {
+      state.closed = true
+      emit('pagehide')
+    }),
     // Delegate at call time so fake timers installed by a test take effect.
     setTimeout: (callback: () => void, ms?: number) => globalThis.setTimeout(callback, ms),
     clearTimeout: (id: ReturnType<typeof globalThis.setTimeout>) => globalThis.clearTimeout(id),
@@ -44,6 +53,9 @@ export function createFakeFloatingWindow(): FakeFloatingWindow {
     setSize: (width, height) => {
       fake.innerWidth = width
       fake.innerHeight = height
+    },
+    setClosed: () => {
+      state.closed = true
     },
   }
 }

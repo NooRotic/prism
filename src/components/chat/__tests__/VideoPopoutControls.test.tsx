@@ -24,6 +24,25 @@ describe('VideoPopoutButton', () => {
     expect(screen.queryByRole('button', { name: 'Pop out video' })).not.toBeInTheDocument()
   })
 
+  it('is a toggle: pressed while the video floats, not pressed while it is in the page', () => {
+    const { rerender } = render(<VideoPopoutButton floating={false} onClick={vi.fn()} className="x" />)
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'false')
+
+    rerender(<VideoPopoutButton floating onClick={vi.fn()} className="x" />)
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('draws a different icon in each state, so the state shows without reading the label', () => {
+    const popOut = render(<VideoPopoutButton floating={false} onClick={vi.fn()} className="x" />)
+    const popOutIcon = popOut.container.querySelector('svg')?.getAttribute('class')
+    const bringBack = render(<VideoPopoutButton floating onClick={vi.fn()} className="x" />)
+    const bringBackIcon = bringBack.container.querySelector('svg')?.getAttribute('class')
+
+    expect(popOutIcon).toBeTruthy()
+    expect(bringBackIcon).toBeTruthy()
+    expect(bringBackIcon).not.toBe(popOutIcon)
+  })
+
   it('calls its handler when clicked', () => {
     const onClick = vi.fn()
     render(<VideoPopoutButton floating={false} onClick={onClick} className="x" />)
@@ -108,6 +127,13 @@ describe('ChatHeader video control', () => {
     expect(screen.getByRole('button', { name: 'Bring video back' })).toBeInTheDocument()
   })
 
+  it('lights the video button like the header toggles while the video floats', () => {
+    renderHeader({ videoControl: { floating: true, onClick: vi.fn() } })
+    expect(screen.getByRole('button', { name: 'Bring video back' })).toHaveClass(
+      'aria-pressed:text-[color:var(--accent-green)]',
+    )
+  })
+
   it('shows neither without a video control', () => {
     renderHeader()
     expect(screen.queryByRole('button', { name: 'Pop out video' })).not.toBeInTheDocument()
@@ -118,12 +144,19 @@ describe('ChatHeader video control', () => {
     renderHeader()
     expect(screen.getByRole('button', { name: 'Move chat to the left' })).toBeInTheDocument()
     expect(screen.getByTitle('Drag to dock the chat on the other side')).toBeInTheDocument()
+    expect(document.querySelector('.lucide-grip-vertical')).not.toBeNull()
   })
 
   it('drops the dock-side controls when told the dock has no sides to swap', () => {
     renderHeader({ dockControls: false })
     expect(screen.queryByRole('button', { name: /Move chat to the/ })).not.toBeInTheDocument()
     expect(screen.queryByTitle('Drag to dock the chat on the other side')).not.toBeInTheDocument()
+  })
+
+  it('drops the grip too: with nothing to drag it would only look draggable', () => {
+    renderHeader({ dockControls: false })
+    expect(document.querySelector('.lucide-grip-vertical')).toBeNull()
+    expect(screen.getByText('Chat')).toBeInTheDocument()
   })
 })
 

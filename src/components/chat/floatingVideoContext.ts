@@ -10,6 +10,8 @@ export interface FloatingVideoControls {
   isFloating: boolean
   /** The browser refused the last request. Clears itself after a few seconds. */
   blocked: boolean
+  /** The window opened but the player could not start in it, so it was closed. Clears itself too. */
+  failed: boolean
   /** Must run inside a click: the browser only opens the window for one. */
   open: () => void
   close: () => void
@@ -21,6 +23,7 @@ const INERT: FloatingVideoControls = {
   canOpen: false,
   isFloating: false,
   blocked: false,
+  failed: false,
   open: () => {},
   close: () => {},
 }
