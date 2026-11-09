@@ -25,7 +25,6 @@ import type { ReactNode } from 'react'
 import App from '../../../App'
 import ChannelRail from '../ChannelRail'
 import { useFollowedChannels } from '../../../hooks/useFollowedChannels'
-import { useCategoryRail } from '../../../hooks/useCategoryRail'
 import { useRailAvatars } from '../../../hooks/useRailAvatars'
 import { useTwitchAuth } from '../../../hooks/useTwitchAuth'
 import { useApp } from '../../../contexts/AppContext'
@@ -38,7 +37,6 @@ vi.mock('../../../hooks/useFollowedChannels', async (importOriginal) => {
     await importOriginal<typeof import('../../../hooks/useFollowedChannels')>()
   return { ...actual, useFollowedChannels: vi.fn() }
 })
-vi.mock('../../../hooks/useCategoryRail', () => ({ useCategoryRail: vi.fn() }))
 vi.mock('../../../hooks/useRailAvatars', () => ({ useRailAvatars: vi.fn() }))
 vi.mock('../../../hooks/useTwitchAuth', () => ({ useTwitchAuth: vi.fn() }))
 vi.mock('../../../contexts/AppContext', () => ({
@@ -103,12 +101,6 @@ function setup() {
     refetch: vi.fn(),
     loadMore: vi.fn(),
   } as unknown as ReturnType<typeof useFollowedChannels>)
-
-  vi.mocked(useCategoryRail).mockReturnValue({
-    streams: [],
-    loading: false,
-    error: null,
-  } as unknown as ReturnType<typeof useCategoryRail>)
 
   vi.mocked(useRailAvatars).mockReturnValue(new Map())
 }

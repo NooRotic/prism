@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import RailSection, { RAIL_SECTION_CAP } from '../RailSection'
+import RailSection from '../RailSection'
 import type { RailEntry } from '../types'
 
 function entries(n: number): RailEntry[] {
@@ -70,44 +69,11 @@ describe('RailSection', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('caps the visible entries at the section cap', () => {
-    renderSection({ entries: entries(20) })
-    expect(screen.getAllByRole('link')).toHaveLength(RAIL_SECTION_CAP)
-  })
-
-  it('lets a section set its own cap, and counts the overflow from it', () => {
-    renderSection({ entries: entries(20), cap: 12, onOverflowClick: vi.fn() })
-    expect(screen.getAllByRole('link')).toHaveLength(12)
-    expect(screen.getByRole('button', { name: /\+8/ })).toBeInTheDocument()
-  })
-
-  it('shows a +N control counting everything hidden', () => {
-    renderSection({ entries: entries(20), onOverflowClick: vi.fn() })
-    expect(screen.getByRole('button', { name: /\+12/ })).toBeInTheDocument()
-  })
-
-  it('counts overflow from totalCount when the caller knows more than it passed', () => {
-    renderSection({ entries: entries(8), totalCount: 30, onOverflowClick: vi.fn() })
-    expect(screen.getByRole('button', { name: /\+22/ })).toBeInTheDocument()
-  })
-
-  it('shows no +N control when everything fits', () => {
-    renderSection({ entries: entries(RAIL_SECTION_CAP) })
-    expect(screen.queryByRole('button', { name: /\+/ })).not.toBeInTheDocument()
-  })
-
-  it('renders no +N control when entries overflow but no overflow handler was given', () => {
-    renderSection({ entries: entries(20) })
-    expect(screen.queryByRole('button', { name: /\+/ })).not.toBeInTheDocument()
-  })
-
-  it('calls onOverflowClick when the +N control is pressed', async () => {
-    const onOverflowClick = vi.fn()
-    const user = userEvent.setup()
-    renderSection({ entries: entries(20), onOverflowClick })
-
-    await user.click(screen.getByRole('button', { name: /\+12/ }))
-
-    expect(onOverflowClick).toHaveBeenCalledTimes(1)
+  // A cap and a "+N" control used to hide the rest. The rail now lists everyone live and
+  // scrolls, so a section shows every entry it is given.
+  it('shows every entry it is given, however many', () => {
+    renderSection({ entries: entries(40) })
+    expect(screen.getAllByRole('link')).toHaveLength(40)
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 })
