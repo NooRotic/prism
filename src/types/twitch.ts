@@ -174,33 +174,6 @@ export interface TwitchVIP {
   user_name: string
 }
 
-export interface TwitchHypeTrainContribution {
-  total: number
-  type: 'BITS' | 'SUBS' | 'OTHER'
-  user: string
-}
-
-export interface TwitchHypeTrainEventData {
-  id: string
-  broadcaster_id: string
-  cooldown_end_time: string
-  expires_at: string
-  goal: number
-  last_contribution: TwitchHypeTrainContribution
-  level: number
-  started_at: string
-  top_contributions: TwitchHypeTrainContribution[]
-  total: number
-}
-
-export interface TwitchHypeTrainEvent {
-  id: string
-  event_type: string
-  event_timestamp: string
-  version: string
-  event_data: TwitchHypeTrainEventData
-}
-
 export interface TwitchPollChoice {
   id: string
   title: string

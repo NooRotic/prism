@@ -9,7 +9,6 @@ import {
   Star,
   Target,
   Crown,
-  TrendingUp,
   BarChart3,
   Sparkles,
   Coins,
@@ -24,7 +23,6 @@ import type {
   TwitchGoal,
   TwitchPoll,
   TwitchPrediction,
-  TwitchHypeTrainEvent,
 } from '../../types/twitch'
 
 // ─── Shared card wrapper ──────────────────────────────────────────────
@@ -302,55 +300,6 @@ function VIPsBody({ vips }: { vips: VIPsBodyData }) {
           ))}
         </div>
       )}
-    </div>
-  )
-}
-
-function HypeTrainsBody({ events }: { events: TwitchHypeTrainEvent[] }) {
-  const latest = events[0]?.event_data
-  if (!latest) {
-    return (
-      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-        No recent hype trains
-      </p>
-    )
-  }
-  const pct = Math.min(
-    100,
-    Math.round((latest.total / Math.max(1, latest.goal)) * 100),
-  )
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-baseline gap-3">
-        <p
-          className="text-2xl font-bold"
-          style={{
-            color: 'var(--accent-green)',
-            fontFamily: 'var(--font-heading)',
-          }}
-        >
-          Lvl {latest.level}
-        </p>
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          {latest.total.toLocaleString()} / {latest.goal.toLocaleString()}
-        </p>
-      </div>
-      <div
-        className="w-full h-1.5 rounded-full overflow-hidden"
-        style={{ backgroundColor: 'var(--bg-card-hover)' }}
-      >
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${pct}%`,
-            backgroundColor: 'var(--accent-twitch)',
-            boxShadow: '0 0 8px var(--accent-twitch-glow)',
-          }}
-        />
-      </div>
-      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-        {events.length} in history
-      </p>
     </div>
   )
 }
@@ -769,15 +718,6 @@ export default function YourStatsPanel() {
                 </StatCard>
 
                 <StatCard
-                  title="Recent Hype Train"
-                  icon={<TrendingUp size={14} />}
-                  section={stats.hypeTrains}
-                  emptyMessage="No recent hype trains"
-                >
-                  {(events) => <HypeTrainsBody events={events} />}
-                </StatCard>
-
-                <StatCard
                   title="Latest Poll"
                   icon={<BarChart3 size={14} />}
                   section={stats.polls}
@@ -848,9 +788,9 @@ export default function YourStatsPanel() {
                 }}
               >
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Streamer-only sections (subscribers, goals, VIPs, hype
-                  trains, polls, predictions, bits) unlock when your
-                  account becomes a Twitch Affiliate or Partner.
+                  Streamer-only sections (subscribers, goals, VIPs, polls,
+                  predictions, bits) unlock when your account becomes a
+                  Twitch Affiliate or Partner.
                 </p>
                 <p className="text-xs">
                   For now, your follower count is shown above.

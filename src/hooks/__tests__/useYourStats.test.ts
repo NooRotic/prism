@@ -16,7 +16,6 @@ vi.mock('../../lib/twitchApi', async () => {
     getBroadcasterSubscriptions: vi.fn(),
     getBroadcasterGoals: vi.fn(),
     getBroadcasterVIPs: vi.fn(),
-    getHypeTrainEvents: vi.fn(),
     getBroadcasterPolls: vi.fn(),
     getBroadcasterPredictions: vi.fn(),
     getBitsLeaderboard: vi.fn(),
@@ -28,7 +27,6 @@ import {
   getBroadcasterSubscriptions,
   getBroadcasterGoals,
   getBroadcasterVIPs,
-  getHypeTrainEvents,
   getBroadcasterPolls,
   getBroadcasterPredictions,
   getBitsLeaderboard,
@@ -39,7 +37,6 @@ const mockedFollowers = vi.mocked(getBroadcasterFollowerCount)
 const mockedSubs = vi.mocked(getBroadcasterSubscriptions)
 const mockedGoals = vi.mocked(getBroadcasterGoals)
 const mockedVIPs = vi.mocked(getBroadcasterVIPs)
-const mockedHype = vi.mocked(getHypeTrainEvents)
 const mockedPolls = vi.mocked(getBroadcasterPolls)
 const mockedPreds = vi.mocked(getBroadcasterPredictions)
 const mockedBits = vi.mocked(getBitsLeaderboard)
@@ -68,7 +65,6 @@ function installSuccessMocks() {
   })
   mockedGoals.mockResolvedValue([])
   mockedVIPs.mockResolvedValue({ data: [], cursor: null })
-  mockedHype.mockResolvedValue([])
   mockedPolls.mockResolvedValue({ data: [], cursor: null })
   mockedPreds.mockResolvedValue({ data: [], cursor: null })
   mockedBits.mockResolvedValue([])
@@ -103,7 +99,6 @@ describe('useYourStats', () => {
     expect(mockedSubs).not.toHaveBeenCalled()
     expect(mockedGoals).not.toHaveBeenCalled()
     expect(mockedVIPs).not.toHaveBeenCalled()
-    expect(mockedHype).not.toHaveBeenCalled()
     expect(mockedPolls).not.toHaveBeenCalled()
     expect(mockedPreds).not.toHaveBeenCalled()
     expect(mockedBits).not.toHaveBeenCalled()
@@ -121,10 +116,20 @@ describe('useYourStats', () => {
     expect(mockedSubs).toHaveBeenCalledOnce()
     expect(mockedGoals).toHaveBeenCalledOnce()
     expect(mockedVIPs).toHaveBeenCalledOnce()
-    expect(mockedHype).toHaveBeenCalledOnce()
     expect(mockedPolls).toHaveBeenCalledOnce()
     expect(mockedPreds).toHaveBeenCalledOnce()
     expect(mockedBits).toHaveBeenCalledOnce()
+  })
+
+  it('has no hype train section: Twitch retired the endpoint it called', async () => {
+    installSuccessMocks()
+    const { result } = renderHook(() => useYourStats('42', true))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.stats).not.toHaveProperty('hypeTrains')
   })
 
   it('maps subscription response into the simplified section shape', async () => {
@@ -175,7 +180,6 @@ describe('useYourStats', () => {
     mockedSubs.mockRejectedValue(err)
     mockedGoals.mockRejectedValue(err)
     mockedVIPs.mockRejectedValue(err)
-    mockedHype.mockRejectedValue(err)
     mockedPolls.mockRejectedValue(err)
     mockedPreds.mockRejectedValue(err)
     mockedBits.mockRejectedValue(err)
