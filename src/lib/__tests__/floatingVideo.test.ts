@@ -35,7 +35,39 @@ describe('clampFloatSize', () => {
   })
 })
 
+describe('clampFloatSize with a ceiling', () => {
+  const screenArea = { width: 1920, height: 1080 }
+
+  it.each([
+    [{ width: 5000, height: 4000 }, { width: 1920, height: 1080 }],
+    [{ width: 800, height: 500 }, { width: 800, height: 500 }],
+    [{ width: 5000, height: 500 }, { width: 1920, height: 500 }],
+    [{ width: 900, height: 4000 }, { width: 900, height: 1080 }],
+  ])('turns %j into %j on a 1920x1080 screen', (input, expected) => {
+    expect(clampFloatSize(input, screenArea)).toEqual(expected)
+  })
+
+  it('never goes under the floor, even on a screen smaller than it', () => {
+    expect(clampFloatSize({ width: 5000, height: 5000 }, { width: 400, height: 200 })).toEqual({
+      width: 480,
+      height: 270,
+    })
+  })
+})
+
 describe('loadFloatSize', () => {
+  it('brings a saved size bigger than the screen down to the screen, per side', () => {
+    localStorage.setItem(KEY, '{"width":4000,"height":2500}')
+    expect(loadFloatSize({ availWidth: 1920, availHeight: 1040 })).toEqual({ width: 1920, height: 1040 })
+    localStorage.setItem(KEY, '{"width":900,"height":2500}')
+    expect(loadFloatSize({ availWidth: 1920, availHeight: 1040 })).toEqual({ width: 900, height: 1040 })
+  })
+
+  it('puts no ceiling on a size when the screen reports none', () => {
+    localStorage.setItem(KEY, '{"width":4000,"height":2500}')
+    expect(loadFloatSize({ availWidth: 0, availHeight: 0 })).toEqual({ width: 4000, height: 2500 })
+  })
+
   it('is 480x270 when nothing is saved', () => {
     expect(loadFloatSize()).toEqual({ width: 480, height: 270 })
   })

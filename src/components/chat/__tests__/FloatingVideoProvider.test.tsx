@@ -198,6 +198,32 @@ describe('FloatingVideoProvider: opening', () => {
     expect(probe.controls.blocked).toBe(false)
   })
 
+  it('restarts the notice when the browser refuses again while it is still showing', async () => {
+    vi.useFakeTimers()
+    armOpener()
+    renderProvider()
+    play(LIVE_URL)
+    act(() => probe.controls.open())
+    await lastOpening().reject(new Error('no activation'))
+    act(() => {
+      vi.advanceTimersByTime(4000)
+    })
+    expect(probe.controls.blocked).toBe(true)
+
+    act(() => probe.controls.open())
+    await lastOpening().reject(new Error('no activation'))
+
+    // Six seconds from the second refusal, not from the first.
+    act(() => {
+      vi.advanceTimersByTime(5999)
+    })
+    expect(probe.controls.blocked).toBe(true)
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(probe.controls.blocked).toBe(false)
+  })
+
   it('does not float if the window was already closed before the request resolved', async () => {
     armOpener({ sessionClosed: true })
     renderProvider()
@@ -267,6 +293,23 @@ describe('FloatingVideoProvider: while floating', () => {
     expect(probe.controls.isFloating).toBe(false)
   })
 
+  it('stays open when a channel is opened while an old clip is still the last thing played', async () => {
+    await float()
+    const { session } = lastOpening()
+
+    // A clip pasted on the hub: not a channel page, so nothing ends.
+    act(() => probe.navigate('/'))
+    play(CLIP_URL)
+    expect(session.close).not.toHaveBeenCalled()
+
+    // The channel page has not yet replaced that clip with its own stream.
+    act(() => probe.navigate('/twitch/other'))
+
+    expect(session.close).not.toHaveBeenCalled()
+    expect(probe.controls.isFloating).toBe(true)
+    expect(session.setChannel).toHaveBeenCalledWith('other')
+  })
+
   it('closes the window when the player inside it fails', async () => {
     await float()
 
@@ -274,6 +317,35 @@ describe('FloatingVideoProvider: while floating', () => {
 
     expect(lastOpening().session.close).toHaveBeenCalled()
     expect(probe.controls.isFloating).toBe(false)
+  })
+
+  it('says so when the player inside the window fails, and the notice clears itself', async () => {
+    vi.useFakeTimers()
+    await float()
+
+    act(() => lastOpening().options.onFailed())
+
+    expect(probe.controls.failed).toBe(true)
+    act(() => {
+      vi.advanceTimersByTime(5999)
+    })
+    expect(probe.controls.failed).toBe(true)
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(probe.controls.failed).toBe(false)
+  })
+
+  it('drops the failure notice when a window opens again', async () => {
+    await float()
+    act(() => lastOpening().options.onFailed())
+    expect(probe.controls.failed).toBe(true)
+
+    act(() => probe.controls.open())
+    await lastOpening().resolve()
+
+    expect(probe.controls.failed).toBe(false)
+    expect(probe.controls.isFloating).toBe(true)
   })
 
   it('stops floating, and offers the control again, when the window goes away', async () => {
@@ -328,6 +400,7 @@ describe('useFloatingVideo outside a provider', () => {
       canOpen: false,
       isFloating: false,
       blocked: false,
+      failed: false,
     })
     expect(() => {
       controls?.open()

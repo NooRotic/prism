@@ -15,8 +15,17 @@ import type { FloatingSession } from '../../lib/floatingWindow'
 import { FloatingVideoContext } from './floatingVideoContext'
 import type { FloatingVideoControls } from './floatingVideoContext'
 
-/** How long the "could not open" notice stays, the same as the chat pop-out's. */
-const BLOCKED_NOTICE_MS = 6000
+/** How long a notice ("could not open", "could not start") stays, the same as the chat pop-out's. */
+const NOTICE_MS = 6000
+
+/**
+ * What the viewer is told about a window that did not work out. `id` counts, so showing a
+ * notice again while one is still up is a new value and its time starts over.
+ */
+interface Notice {
+  kind: 'blocked' | 'failed'
+  id: number
+}
 
 /**
  * Owns the floating video window for the whole app. It sits above the routes
@@ -36,7 +45,7 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
 
   const [supported] = useState(() => isFloatingSupported())
   const [isFloating, setIsFloating] = useState(false)
-  const [blocked, setBlocked] = useState(false)
+  const [notice, setNotice] = useState<Notice | null>(null)
 
   const sessionRef = useRef<FloatingSession | null>(null)
   const openingRef = useRef(false)
@@ -54,6 +63,17 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
     sessionRef.current?.close()
   }, [])
 
+  const showNotice = useCallback((kind: Notice['kind']) => {
+    setNotice((previous) => ({ kind, id: (previous?.id ?? 0) + 1 }))
+  }, [])
+
+  // The player could not start inside the window: close it, and say so rather than leave the
+  // viewer wondering where the window went.
+  const handleFailed = useCallback(() => {
+    showNotice('failed')
+    close()
+  }, [showNotice, close])
+
   const open = useCallback(() => {
     if (!supported || !channel || sessionRef.current || openingRef.current) return
     openingRef.current = true
@@ -64,7 +84,7 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
       parent: window.location.hostname,
       size: loadFloatSize(),
       onClosed: handleClosed,
-      onFailed: close,
+      onFailed: handleFailed,
       onResize: saveFloatSize,
     })
       .then((session) => {
@@ -75,17 +95,17 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
         // Already gone before it was handed over: nothing to show.
         if (session.closed) return
         sessionRef.current = session
-        setBlocked(false)
+        setNotice(null)
         setIsFloating(true)
       })
       .catch(() => {
         shownChannelRef.current = null
-        setBlocked(true)
+        showNotice('blocked')
       })
       .finally(() => {
         openingRef.current = false
       })
-  }, [supported, channel, handleClosed, close])
+  }, [supported, channel, handleClosed, handleFailed, showNotice])
 
   // The window follows the channel opened in the page; off a channel page it keeps what it has.
   useEffect(() => {
@@ -94,16 +114,24 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
     sessionRef.current?.setChannel(channel)
   }, [isFloating, channel])
 
-  // A page that plays its own video ends the window, so two things never play at once.
+  // A page that plays its own video ends the window, so two things never play at once. A clip or
+  // VOD only counts when it is started while a channel page is showing: the last thing played
+  // can be a clip from an earlier page (one pasted on the hub), and reaching a channel must not
+  // end the window before that page has replaced it with its own stream. Every PLAY_URL stores
+  // a fresh `detection` object, so a change of it is a start.
+  const seenDetectionRef = useRef(detection)
   useEffect(() => {
-    if (isFloating && floatingShouldEnd(pathname, detection)) sessionRef.current?.close()
+    const startedNow = detection !== seenDetectionRef.current
+    seenDetectionRef.current = detection
+    if (!isFloating) return
+    if (floatingShouldEnd(pathname, startedNow ? detection : null)) sessionRef.current?.close()
   }, [isFloating, pathname, detection])
 
   useEffect(() => {
-    if (!blocked) return
-    const id = setTimeout(() => setBlocked(false), BLOCKED_NOTICE_MS)
+    if (!notice) return
+    const id = setTimeout(() => setNotice(null), NOTICE_MS)
     return () => clearTimeout(id)
-  }, [blocked])
+  }, [notice])
 
   useEffect(() => {
     mountedRef.current = true
@@ -118,11 +146,12 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
       supported,
       canOpen: supported && !isFloating && canPopOutOn(pathname, detection),
       isFloating,
-      blocked,
+      blocked: notice?.kind === 'blocked',
+      failed: notice?.kind === 'failed',
       open,
       close,
     }),
-    [supported, isFloating, pathname, detection, blocked, open, close],
+    [supported, isFloating, pathname, detection, notice, open, close],
   )
 
   return <FloatingVideoContext.Provider value={value}>{children}</FloatingVideoContext.Provider>

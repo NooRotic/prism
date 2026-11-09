@@ -13,12 +13,15 @@ vi.mock('../useFullscreen', () => ({ useFullscreen: vi.fn() }))
 
 const FLOATING_TEXT = 'The video is in a floating window'
 const NOTICE_TEXT = "Couldn't open the floating window. Click the button again."
+const FAILED_TEXT =
+  "The video couldn't start in the floating window, so it was closed. Click the button to try again."
 
 const controls = (overrides: Partial<FloatingVideoControls> = {}): FloatingVideoControls => ({
   supported: true,
   canOpen: false,
   isFloating: false,
   blocked: false,
+  failed: false,
   open: vi.fn(),
   close: vi.fn(),
   ...overrides,
@@ -91,6 +94,15 @@ describe('ChatDock with a floating video', () => {
     const notice = screen.getByText(NOTICE_TEXT)
     expect(notice).toHaveAttribute('role', 'status')
     expect(screen.getByTestId('chat-dock')).not.toContainElement(notice)
+  })
+
+  it('shows a notice above the row when the video could not start in the window it opened', () => {
+    renderDock(controls({ canOpen: true, failed: true }))
+
+    const notice = screen.getByText(FAILED_TEXT)
+    expect(notice).toHaveAttribute('role', 'status')
+    expect(screen.getByTestId('chat-dock')).not.toContainElement(notice)
+    expect(screen.queryByText(NOTICE_TEXT)).not.toBeInTheDocument()
   })
 
   describe('while floating, with the chat docked', () => {
