@@ -7,12 +7,15 @@ interface ResizableHandleProps {
   onResizeEnd?: () => void
   /** Direction of resize. Default 'horizontal' */
   direction?: 'horizontal' | 'vertical'
+  /** Accessible name of the separator. */
+  label?: string
 }
 
 export function ResizableHandle({
   onResize,
   onResizeEnd,
   direction = 'horizontal',
+  label,
 }: ResizableHandleProps) {
   const startPos = useRef(0)
   const isDragging = useRef(false)
@@ -59,6 +62,7 @@ export function ResizableHandle({
       }}
       role="separator"
       aria-orientation={isHorizontal ? 'vertical' : 'horizontal'}
+      aria-label={label}
       tabIndex={0}
     >
       {/* Visible drag indicator */}

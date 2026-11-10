@@ -29,6 +29,8 @@ export const STORAGE_KEYS = {
   LOCAL_RAIL_POSITION: 'prism_rail_position',
   /** Chat dock state: JSON `{ side: 'left' | 'right', hidden: boolean }`. */
   LOCAL_CHAT_PLACEMENT: 'prism_chat_placement',
+  /** Height in px the viewer dragged the chat to while the video floats; absent means the default height. */
+  LOCAL_CHAT_FLOAT_HEIGHT: 'prism_chat_float_height',
   /** Last size and position of the chat pop-out window (JSON). */
   LOCAL_CHAT_POPOUT_BOUNDS: 'prism_chat_popout_bounds',
   /** Fill mode (video and chat fill the window): the string 'true' when on. */
