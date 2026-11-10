@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import ChatDock from '../ChatDock'
 import { FloatingVideoContext } from '../floatingVideoContext'
 import type { FloatingVideoControls } from '../floatingVideoContext'
@@ -127,12 +127,17 @@ describe('ChatDock with a floating video', () => {
       expect(screen.queryByRole('button', { name: 'Pop out video' })).not.toBeInTheDocument()
     })
 
-    it('drops the side swap, the drag hint and the resize handle', () => {
+    it('drops the side swap, the drag hint and the side-by-side resize handle', () => {
       renderDock(controls({ isFloating: true }))
 
       expect(screen.queryByRole('button', { name: /Move chat to the/ })).not.toBeInTheDocument()
       expect(screen.queryByTitle('Drag to dock the chat on the other side')).not.toBeInTheDocument()
-      expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+      // The vertical separator is the split between video and chat; the chat-height bar
+      // is a horizontal one and is covered below.
+      const vertical = screen
+        .queryAllByRole('separator')
+        .filter((el) => el.getAttribute('aria-orientation') === 'vertical')
+      expect(vertical).toHaveLength(0)
     })
 
     it('does not reload the chat when the video floats or comes back', () => {
@@ -157,6 +162,153 @@ describe('ChatDock with a floating video', () => {
       const row = screen.getByTestId('chat-dock')
       expect(row).toHaveClass('md:fixed')
       expect(row).not.toHaveClass('relative')
+    })
+  })
+
+  describe('resizing the chat while floating', () => {
+    const HEIGHT_VAR = '--chat-floating-height'
+    const originalInnerHeight = window.innerHeight
+    const heightBar = () => screen.getByRole('separator', { name: 'Resize chat height' })
+    const queryHeightBar = () => screen.queryByRole('separator', { name: 'Resize chat height' })
+    const rowVar = () => screen.getByTestId('chat-dock').style.getPropertyValue(HEIGHT_VAR)
+    const capped = (px: number) => `min(${px}px, calc(100vh - var(--header-height)))`
+
+    // jsdom has no layout, so the row's height is whatever the test says it is.
+    const rowIsHigh = (px: number) =>
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(px)
+
+    // Drags the bar: down on `from`, one move to each of `moves`, up on the last.
+    const drag = (bar: HTMLElement, from: number, ...moves: number[]) => {
+      Object.defineProperty(bar, 'setPointerCapture', { value: vi.fn(), configurable: true })
+      const fire = (type: 'pointerDown' | 'pointerMove' | 'pointerUp', clientY: number) => {
+        const event = createEvent[type](bar, { button: 0 })
+        Object.defineProperty(event, 'clientX', { value: 100 })
+        Object.defineProperty(event, 'clientY', { value: clientY })
+        Object.defineProperty(event, 'pointerId', { value: 1 })
+        fireEvent(bar, event)
+      }
+      fire('pointerDown', from)
+      moves.forEach((y) => fire('pointerMove', y))
+      fire('pointerUp', moves[moves.length - 1] ?? from)
+    }
+
+    beforeEach(() => {
+      Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true })
+    })
+    afterEach(() => {
+      Object.defineProperty(window, 'innerHeight', { value: originalInnerHeight, configurable: true })
+    })
+
+    it('puts a horizontal Resize chat height bar inside the chat, along its bottom edge', () => {
+      renderDock(controls({ isFloating: true }))
+
+      const bar = heightBar()
+      expect(bar).toHaveAttribute('aria-orientation', 'horizontal')
+      expect(screen.getByTestId('chat-panel')).toContainElement(bar)
+      // Last in the panel, under the chat itself.
+      expect(screen.getByTestId('chat-panel').lastElementChild).toContainElement(bar)
+    })
+
+    it('offers no bar while the video is on the page', () => {
+      renderDock(controls())
+      expect(queryHeightBar()).not.toBeInTheDocument()
+    })
+
+    it('offers no bar when there is no chat beside the video', () => {
+      hideChat()
+      renderDock(controls({ isFloating: true }))
+      expect(queryHeightBar()).not.toBeInTheDocument()
+    })
+
+    it('offers no bar in fill mode, where the chat already fills the window', () => {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_FILL_MODE, 'true')
+      renderDock(controls({ isFloating: true }))
+      expect(queryHeightBar()).not.toBeInTheDocument()
+    })
+
+    it('shows it at md and up only', () => {
+      renderDock(controls({ isFloating: true }))
+      expect(heightBar().parentElement).toHaveClass('hidden', 'md:flex')
+    })
+
+    it('makes the chat taller when the bar is dragged down, and remembers the height', () => {
+      rowIsHigh(400)
+      renderDock(controls({ isFloating: true }))
+      expect(rowVar()).toBe('')
+
+      drag(heightBar(), 500, 600)
+
+      expect(rowVar()).toBe(capped(500))
+      expect(screen.getByTestId('chat-dock')).toHaveClass('md:min-h-(--chat-floating-height)')
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT)).toBe('500')
+    })
+
+    it('adds up a drag made of several moves', () => {
+      rowIsHigh(400)
+      renderDock(controls({ isFloating: true }))
+
+      drag(heightBar(), 500, 540, 580)
+
+      expect(rowVar()).toBe(capped(480))
+    })
+
+    it('goes back to the default height when dragged up to the video height or above', () => {
+      rowIsHigh(400)
+      localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT, '500')
+      renderDock(controls({ isFloating: true }))
+      expect(rowVar()).toBe(capped(500))
+
+      drag(heightBar(), 500, 350)
+
+      expect(rowVar()).toBe('')
+      expect(screen.getByTestId('chat-dock')).not.toHaveClass('md:min-h-(--chat-floating-height)')
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT)).toBeNull()
+    })
+
+    it('stops growing where the window ends, below the header', () => {
+      rowIsHigh(400)
+      renderDock(controls({ isFloating: true }))
+
+      drag(heightBar(), 500, 1500)
+
+      // 900 (window) - 56 (header)
+      expect(rowVar()).toBe(capped(844))
+    })
+
+    it('uses the remembered height when the video floats, and drops it when the video returns', () => {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT, '540')
+      const view = renderDock(controls())
+      expect(rowVar()).toBe('')
+
+      view.rerender(dock(controls({ isFloating: true })))
+      expect(rowVar()).toBe(capped(540))
+
+      view.rerender(dock(controls()))
+      expect(rowVar()).toBe('')
+      expect(screen.getByTestId('chat-dock')).not.toHaveClass('md:min-h-(--chat-floating-height)')
+      // Still remembered for the next time.
+      expect(localStorage.getItem(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT)).toBe('540')
+    })
+
+    it('does not reload the chat while it is resized', () => {
+      rowIsHigh(400)
+      renderDock(controls({ isFloating: true }))
+      const frame = chatFrame()
+
+      drag(heightBar(), 500, 600)
+
+      expect(chatFrame()).toBe(frame)
+    })
+
+    it('does not throw when saving the height fails', () => {
+      rowIsHigh(400)
+      renderDock(controls({ isFloating: true }))
+      vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw new DOMException('QuotaExceededError')
+      })
+
+      expect(() => drag(heightBar(), 500, 600)).not.toThrow()
+      expect(rowVar()).toBe(capped(500))
     })
   })
 
