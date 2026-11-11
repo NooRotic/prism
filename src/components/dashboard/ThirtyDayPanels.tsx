@@ -176,7 +176,7 @@ export default function ThirtyDayPanels({ followers, videos, tracker, trackerLoa
   return (
     <section
       aria-label="Last 30 days panels"
-      className="flex flex-col gap-2 rounded-md p-3"
+      className="@container flex flex-col gap-2 rounded-md p-3"
       style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
@@ -188,7 +188,7 @@ export default function ThirtyDayPanels({ followers, videos, tracker, trackerLoa
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-3">
         <Panel
           title="Followers"
           figure={followerFigure}

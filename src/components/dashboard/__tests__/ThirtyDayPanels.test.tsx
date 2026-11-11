@@ -412,6 +412,6 @@ describe('ThirtyDayPanels', () => {
   it('stacks the panels in one column on a phone and puts them side by side from md up', () => {
     renderPanels()
 
-    expect(panel('Followers').parentElement).toHaveClass('grid-cols-1', 'md:grid-cols-3')
+    expect(panel('Followers').parentElement).toHaveClass('grid-cols-1', '@2xl:grid-cols-3')
   })
 })
