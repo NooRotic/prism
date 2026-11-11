@@ -117,7 +117,7 @@ describe('TwitchDashboard', () => {
     vi.clearAllMocks()
     setApp()
     setFollows()
-    mockTracker.mockReturnValue({ summary: null, loading: false })
+    mockTracker.mockReturnValue({ summary: null, loading: false, unavailable: false })
     mockNumbers.mockReturnValue({ followers: idle, subscribers: idle })
     mockHistory.mockReturnValue({ followers: idle, videos: idle })
   })
@@ -356,13 +356,24 @@ describe('TwitchDashboard', () => {
       setApp({ user: streamer('affiliate') })
       setFollows({ data: liveFollows })
       loadedStreamerData()
-      mockTracker.mockReturnValue({ summary: tracker, loading: false })
+      mockTracker.mockReturnValue({ summary: tracker, loading: false, unavailable: false })
       renderDashboard()
 
       const row = within(screen.getByRole('region', { name: 'Your channel' }))
       expect(row.getByText('#18,402')).toBeInTheDocument()
       expect(row.getByText('+96')).toBeInTheDocument()
       expect(screen.getByRole('img', { name: 'Followers gained per day, last 30 days, total 96' })).toBeInTheDocument()
+    })
+
+    it('says TwitchTracker is unavailable, not that the channel is untracked, when it could not be reached', () => {
+      setApp({ user: streamer('affiliate') })
+      setFollows({ data: liveFollows })
+      mockTracker.mockReturnValue({ summary: null, loading: false, unavailable: true })
+      renderDashboard()
+
+      const row = within(screen.getByRole('region', { name: 'Your channel' }))
+      expect(row.getByText(/unavailable right now/i)).toBeInTheDocument()
+      expect(row.queryByText(/appear here once/i)).not.toBeInTheDocument()
     })
 
     it('shows them above the nobody-live card too', () => {

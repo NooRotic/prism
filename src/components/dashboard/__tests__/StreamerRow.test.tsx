@@ -17,6 +17,7 @@ interface RowOverrides {
   subscribers?: number | null
   tracker?: TrackerSummary | null
   trackerLoading?: boolean
+  trackerUnavailable?: boolean
 }
 
 function renderRow({
@@ -24,6 +25,7 @@ function renderRow({
   subscribers = 37,
   tracker = TRACKER,
   trackerLoading = false,
+  trackerUnavailable = false,
 }: RowOverrides = {}) {
   return render(
     <StreamerRow
@@ -31,6 +33,7 @@ function renderRow({
       subscribers={subscribers}
       tracker={tracker}
       trackerLoading={trackerLoading}
+      trackerUnavailable={trackerUnavailable}
       login="yourname"
     />,
   )
@@ -156,6 +159,41 @@ describe('StreamerRow', () => {
       'href',
       'https://twitchtracker.com/yourname',
     )
+  })
+
+  // No answer is not the same fact as "does not track you": saying the second when only the first
+  // happened could send a tracked streamer off to twitchtracker.com to get tracked.
+  it('says the figures are unavailable, not that the channel is untracked, when no answer could be had', () => {
+    renderRow({ tracker: null, trackerUnavailable: true })
+
+    expect(screen.getByText(/figures are unavailable right now/i)).toBeInTheDocument()
+    expect(screen.getByText(/reload to try again/i)).toBeInTheDocument()
+    expect(screen.queryByText(/appear here once/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'TwitchTracker' })).toHaveAttribute(
+      'href',
+      'https://twitchtracker.com/yourname',
+    )
+  })
+
+  it('still shows dashes in the TwitchTracker chips and the Twitch chips when it is unavailable', () => {
+    renderRow({ tracker: null, trackerUnavailable: true })
+
+    for (const label of TT_LABELS) expect(within(chip(label)).getByText('–')).toBeInTheDocument()
+    expect(within(chip('Followers')).getByText('1,284')).toBeInTheDocument()
+  })
+
+  it('keeps the untracked wording when TwitchTracker answered with nothing', () => {
+    renderRow({ tracker: null, trackerUnavailable: false })
+
+    expect(screen.getByText(/appear here once/i)).toBeInTheDocument()
+    expect(screen.queryByText(/unavailable right now/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the normal note, not the unavailable one, while TwitchTracker is loading', () => {
+    renderRow({ tracker: null, trackerLoading: true, trackerUnavailable: true })
+
+    expect(screen.queryByText(/unavailable right now/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/marked TT/i)).toBeInTheDocument()
   })
 
   it('does not claim the channel is untracked while TwitchTracker is still loading', () => {

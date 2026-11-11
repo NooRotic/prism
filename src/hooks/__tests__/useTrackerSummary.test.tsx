@@ -1,10 +1,11 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { useTrackerSummary } from '../useTrackerSummary'
-import { fetchTrackerSummary, type TrackerSummary } from '../../lib/twitchTracker'
+import { fetchTrackerSummary, trackerUnavailable, type TrackerSummary } from '../../lib/twitchTracker'
 
-vi.mock('../../lib/twitchTracker', () => ({ fetchTrackerSummary: vi.fn() }))
+vi.mock('../../lib/twitchTracker', () => ({ fetchTrackerSummary: vi.fn(), trackerUnavailable: vi.fn() }))
 
 const mockFetch = vi.mocked(fetchTrackerSummary)
+const mockUnavailable = vi.mocked(trackerUnavailable)
 
 const SUMMARY: TrackerSummary = {
   rank: 3290,
@@ -19,12 +20,13 @@ const SUMMARY: TrackerSummary = {
 describe('useTrackerSummary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUnavailable.mockReturnValue(false)
   })
 
   it('makes no request without a login', () => {
     const { result } = renderHook(() => useTrackerSummary(null))
 
-    expect(result.current).toEqual({ summary: null, loading: false })
+    expect(result.current).toEqual({ summary: null, loading: false, unavailable: false })
     expect(mockFetch).not.toHaveBeenCalled()
   })
 
@@ -32,17 +34,38 @@ describe('useTrackerSummary', () => {
     mockFetch.mockResolvedValue(SUMMARY)
     const { result } = renderHook(() => useTrackerSummary('streamer'))
 
-    expect(result.current).toEqual({ summary: null, loading: true })
-    await waitFor(() => expect(result.current).toEqual({ summary: SUMMARY, loading: false }))
+    expect(result.current).toEqual({ summary: null, loading: true, unavailable: false })
+    await waitFor(() => expect(result.current).toEqual({ summary: SUMMARY, loading: false, unavailable: false }))
     expect(mockFetch).toHaveBeenCalledWith('streamer')
   })
 
-  it('stops loading with no summary when TwitchTracker has nothing', async () => {
+  it('stops loading with no summary, and not unavailable, when TwitchTracker answered that it knows nothing', async () => {
     mockFetch.mockResolvedValue(null)
+    mockUnavailable.mockReturnValue(false)
     const { result } = renderHook(() => useTrackerSummary('streamer'))
 
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.summary).toBeNull()
+    expect(result.current.unavailable).toBe(false)
+  })
+
+  it('says unavailable when there is no summary because no answer could be had', async () => {
+    mockFetch.mockResolvedValue(null)
+    mockUnavailable.mockReturnValue(true)
+    const { result } = renderHook(() => useTrackerSummary('streamer'))
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current).toEqual({ summary: null, loading: false, unavailable: true })
+    expect(mockUnavailable).toHaveBeenCalledWith('streamer')
+  })
+
+  it('never says unavailable when it has a summary', async () => {
+    mockFetch.mockResolvedValue(SUMMARY)
+    mockUnavailable.mockReturnValue(true)
+    const { result } = renderHook(() => useTrackerSummary('streamer'))
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.unavailable).toBe(false)
   })
 
   it('asks once per login, and again when the login changes', async () => {
@@ -56,7 +79,7 @@ describe('useTrackerSummary', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1)
 
     rerender({ login: 'two' })
-    expect(result.current).toEqual({ summary: null, loading: true })
+    expect(result.current).toEqual({ summary: null, loading: true, unavailable: false })
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(mockFetch).toHaveBeenCalledTimes(2)
   })
@@ -70,14 +93,15 @@ describe('useTrackerSummary', () => {
 
     rerender({ login: null })
 
-    expect(result.current).toEqual({ summary: null, loading: false })
+    expect(result.current).toEqual({ summary: null, loading: false, unavailable: false })
   })
 
-  it('treats a rejected request as no data', async () => {
+  it('treats a rejected request as no answer: unavailable', async () => {
     mockFetch.mockRejectedValue(new Error('boom'))
     const { result } = renderHook(() => useTrackerSummary('streamer'))
 
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.summary).toBeNull()
+    expect(result.current.unavailable).toBe(true)
   })
 })

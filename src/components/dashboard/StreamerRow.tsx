@@ -10,6 +10,8 @@ interface StreamerRowProps {
   /** TwitchTracker's 30-day summary, or null when it has none. */
   tracker: TrackerSummary | null
   trackerLoading: boolean
+  /** True when there is no TwitchTracker summary because no answer could be had, not because it does not track the channel. */
+  trackerUnavailable: boolean
   login: string
 }
 
@@ -53,9 +55,17 @@ function chips(
  * never a 0, and every chip keeps the same height whether it is loading, empty or full, so the
  * page does not jump when TwitchTracker answers.
  */
-export default function StreamerRow({ followers, subscribers, tracker, trackerLoading, login }: StreamerRowProps) {
+export default function StreamerRow({
+  followers,
+  subscribers,
+  tracker,
+  trackerLoading,
+  trackerUnavailable,
+  login,
+}: StreamerRowProps) {
   const trackerUrl = `https://twitchtracker.com/${encodeURIComponent(login)}`
-  const untracked = tracker === null && !trackerLoading
+  const noAnswer = tracker === null && !trackerLoading && trackerUnavailable
+  const untracked = tracker === null && !trackerLoading && !trackerUnavailable
   const link = (text: string) => (
     <a href={trackerUrl} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--text-primary)' }}>
       {text}
@@ -69,7 +79,9 @@ export default function StreamerRow({ followers, subscribers, tracker, trackerLo
           Your channel
         </h3>
         <p className="m-0 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-          {untracked ? (
+          {noAnswer ? (
+            <>{link('TwitchTracker')} figures are unavailable right now; reload to try again</>
+          ) : untracked ? (
             <>30-day figures appear here once {link('TwitchTracker')} tracks your channel</>
           ) : (
             <>Figures marked TT come from {link('twitchtracker.com')}, last 30 days</>
