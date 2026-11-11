@@ -1,22 +1,43 @@
-import { useEffect, useCallback, useMemo } from 'react'
+import { useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { Tv } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
 import { useChannelData } from '../hooks/useChannelData'
+import { useChannelLive } from '../hooks/useChannelLive'
+import { useOfflineLayout } from '../hooks/useOfflineLayout'
+import { useSessionExpiry } from '../hooks/useSessionExpiry'
 import { useTwitchAuth } from '../hooks/useTwitchAuth'
+import { lastStreamedAt } from '../lib/offlineLayout'
 import { detectURLType } from '../lib/urlDetection'
+import type { TwitchVideo } from '../types/twitch'
 import PlayerHost from '../components/player/PlayerHost'
 import ChatDock from '../components/chat/ChatDock'
-import ProfileSidebar from '../components/channel/ProfileSidebar'
-import StatsRow from '../components/channel/StatsRow'
-import ClipGrid from '../components/channel/ClipGrid'
-import VODGrid from '../components/channel/VODGrid'
-import DebugPanel from '../components/layout/DebugPanel'
+import ChannelBody from '../components/channel/ChannelBody'
+import OfflineLayout from '../components/channel/OfflineLayout'
+import OfflineStrip from '../components/channel/OfflineStrip'
+import { useNow } from '../components/dashboard/useNow'
+
+/** The strip for the offline layout, with its own clock so "last live 2 hours ago" ticks without re-rendering the page. */
+function PageOfflineStrip({
+  videos,
+  folded,
+  onShowPlayer,
+}: {
+  videos: TwitchVideo[]
+  folded: boolean
+  onShowPlayer: () => void
+}) {
+  const now = useNow()
+  return (
+    <OfflineStrip lastStreamedAt={lastStreamedAt(videos)} now={now} folded={folded} onShowPlayer={onShowPlayer} />
+  )
+}
 
 export default function TwitchPlayerPage() {
   const { channel } = useParams<{ channel: string }>()
   const { state, dispatch } = useApp()
   const { handleAuthError, isAuthenticated } = useTwitchAuth()
+  const onSessionExpired = useSessionExpiry()
   const { player } = state
 
   const authErrorHandler = useCallback(
@@ -31,6 +52,15 @@ export default function TwitchPlayerPage() {
     [authErrorHandler],
   )
   useChannelData(channelForApi, channelDataOptions)
+
+  // A signed-in viewer of a channel that is not live gets the offline layout; while it shows, the
+  // channel's live status is checked once a minute so the page can go back to the normal layout.
+  const layout = useOfflineLayout(channel)
+  useChannelLive({
+    userId: state.channel.profile?.id ?? null,
+    enabled: layout.offline,
+    onSessionExpired,
+  })
 
   // Set player URL from route param
   useEffect(() => {
@@ -51,52 +81,55 @@ export default function TwitchPlayerPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [channel, player.detection])
 
+  // The offline layout also changes the page's top without touching the player's address:
+  // when the channel goes live the player appears there, and "Show player" unfolds it.
+  const previous = useRef({ offline: layout.offline, folded: layout.folded })
+  useEffect(() => {
+    const was = previous.current
+    previous.current = { offline: layout.offline, folded: layout.folded }
+    const wentLive = was.offline && !layout.offline
+    const unfolded = layout.offline && was.folded && !layout.folded
+    if (wentLive || unfolded) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [layout.offline, layout.folded])
+
+  const playerNode =
+    player.currentUrl && player.detection ? (
+      <PlayerHost url={player.currentUrl} detection={player.detection} />
+    ) : (
+      <div
+        className="flex items-center justify-center w-full h-full"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        <div className="flex flex-col items-center gap-2">
+          <Tv size={32} />
+          <span className="text-sm">Loading {channel}...</span>
+        </div>
+      </div>
+    )
+
   return (
     <div className="flex flex-col gap-4 w-full px-4 md:px-6 lg:px-8 pt-4 pb-8">
-      {/* Top row: Player + Chat (resizable, dockable) — stacks on mobile */}
-      <ChatDock
-        channel={channel}
-        player={
-          player.currentUrl && player.detection ? (
-            <PlayerHost url={player.currentUrl} detection={player.detection} />
-          ) : (
-            <div
-              className="flex items-center justify-center w-full h-full"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              <div className="flex flex-col items-center gap-2">
-                <Tv size={32} />
-                <span className="text-sm">Loading {channel}...</span>
-              </div>
-            </div>
-          )
-        }
-      />
-
-      {/* Profile sidebar — full width below player+chat */}
-      <div className="fill-hide max-w-[1600px] mx-auto w-full">
-        <ProfileSidebar />
-      </div>
-
-      {/* Stats row */}
-      <div className="fill-hide max-w-[1600px] mx-auto w-full">
-        <StatsRow />
-      </div>
-
-      {/* Debug panel */}
-      <div className="fill-hide max-w-[1600px] mx-auto w-full">
-        <DebugPanel />
-      </div>
-
-      {/* Bottom row: Clips + VODs */}
-      <div className="fill-hide flex flex-col lg:flex-row gap-4 w-full max-w-[1600px] mx-auto">
-        <div className="w-full lg:w-1/2">
-          <ClipGrid />
-        </div>
-        <div className="w-full lg:w-1/2">
-          <VODGrid />
-        </div>
-      </div>
+      {layout.offline ? (
+        <OfflineLayout
+          channel={channel ?? ''}
+          strip={
+            <PageOfflineStrip
+              videos={state.channel.videos}
+              folded={layout.folded}
+              onShowPlayer={layout.showPlayer}
+            />
+          }
+          player={layout.folded ? null : playerNode}
+        >
+          <ChannelBody channel={channel} />
+        </OfflineLayout>
+      ) : (
+        <>
+          {/* Top row: Player + Chat (resizable, dockable) — stacks on mobile */}
+          <ChatDock channel={channel} player={playerNode} />
+          <ChannelBody channel={channel} />
+        </>
+      )}
     </div>
   )
 }
