@@ -214,6 +214,7 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
             onToggleFullscreen={noop}
             videoControl={videoControl}
             fillControls={false}
+            verticalFrom="lg"
           />
         )}
       </div>

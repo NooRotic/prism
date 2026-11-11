@@ -91,6 +91,9 @@ describe('OfflineLayout', () => {
     expect(screen.queryByRole('button', { name: /fill/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /fullscreen/i })).toBeNull()
     expect(rootVar('--offline-chat-width')).toBe('40px')
+    // A bar across the page in the thin layout, a column only from lg (not a lone tab from md).
+    expect(screen.getByTestId('chat-strip').className).toContain('lg:flex-col')
+    expect(screen.getByTestId('chat-strip').className).not.toContain('md:flex-col')
     expect(screen.queryByRole('separator', { name: 'Resize chat width' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Show chat' }))
     expect(chatFrame()).not.toBeNull()
