@@ -4,7 +4,10 @@ import { useState } from 'react'
 import { DemoGrid } from '../components/grid/DemoGrid'
 import { YouTubeGrid } from '../components/grid/YouTubeGrid'
 import { SmartUrlInput } from '../components/search/SmartUrlInput'
+import SignedOutCard from '../components/dashboard/SignedOutCard'
+import TwitchDashboard from '../components/dashboard/TwitchDashboard'
 import ConnectTwitchButton from '../components/ui/ConnectTwitchButton'
+import { useApp } from '../contexts/AppContext'
 import { useTwitchAuth } from '../hooks/useTwitchAuth'
 import { getDemoByProtocol, getHlsDashDemo, PROTOCOL_META, type ProtocolKey } from '../config/demoContent'
 
@@ -155,6 +158,8 @@ function ProtocolSidebar() {
 
 export default function ProtocolPage({ protocol }: ProtocolPageProps) {
   const meta = PROTOCOL_META[protocol]
+  const { state } = useApp()
+  const { isAuthenticated, login } = useTwitchAuth()
   const entries =
     protocol === 'hls-dash' ? getHlsDashDemo() : getDemoByProtocol(protocol as 'twitch' | 'youtube')
 
@@ -190,7 +195,7 @@ export default function ProtocolPage({ protocol }: ProtocolPageProps) {
         <ProtocolSidebar />
       </div>
 
-      <div className="flex-1 p-4 md:p-6">
+      <div className="min-w-0 flex-1 p-4 md:p-6">
         {/* Page header */}
         <div className="flex items-center gap-3 mb-6">
           <div
@@ -208,11 +213,18 @@ export default function ProtocolPage({ protocol }: ProtocolPageProps) {
           </span>
         </div>
 
-        {/* Content grid — YouTube uses live API data, others use static demo entries */}
+        {/* Content — YouTube uses live API data, a signed-in Twitch viewer gets their
+            dashboard, and everything else uses static demo entries (a signed-out
+            Twitch visitor gets a connect card above them) */}
         {protocol === 'youtube' ? (
           <YouTubeGrid />
+        ) : protocol === 'twitch' && isAuthenticated ? (
+          <TwitchDashboard />
         ) : (
-          <DemoGrid entries={entries} columns={3} />
+          <>
+            {protocol === 'twitch' && <SignedOutCard expired={state.auth.expired} onConnect={login} />}
+            <DemoGrid entries={entries} columns={3} />
+          </>
         )}
       </div>
     </div>
