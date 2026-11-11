@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { clearHistoryCache, useStreamerHistory } from '../useStreamerHistory'
 import { getFollowerDates, getVideos, SessionExpiredError } from '../../lib/twitchApi'
+import { localDayKey } from '../../lib/historyStats'
 import type { TwitchVideo } from '../../types/twitch'
 
 vi.mock('../../lib/twitchApi', async (importOriginal) => {
@@ -117,6 +118,40 @@ describe('useStreamerHistory', () => {
     expect(data?.hours).toHaveLength(30)
     expect(data?.hours.reduce((sum, b) => sum + (b.value ?? 0), 0)).toBeCloseTo(3.5, 10)
     expect(data?.coverageDays).toBe(9)
+  })
+
+  describe('when the recordings read fills its page of 100', () => {
+    const full = (stepDays: number) =>
+      Array.from({ length: 100 }, (_, i) => archive((i * stepDays + 0.1) * DAY, '1h', 5))
+
+    it('says the read was cut, and blanks the oldest recording’s day, when it stops inside the 30 days', async () => {
+      mockVideos.mockResolvedValue(full(0.2))
+      const { result } = renderHook(() => useStreamerHistory('99', vi.fn()))
+      await settled(result)
+
+      const data = result.current.videos.data
+      expect(data?.cut).toBe(true)
+      const oldestDay = localDayKey(NOW - (99 * 0.2 + 0.1) * DAY)
+      expect(data?.hours.find((b) => b.day === oldestDay)?.value).toBeNull()
+      expect(data?.hours.at(-1)?.value).not.toBeNull()
+    })
+
+    it('does not say it was cut when the page reaches back past the start of the 30 days', async () => {
+      mockVideos.mockResolvedValue(full(0.5))
+      const { result } = renderHook(() => useStreamerHistory('99', vi.fn()))
+      await settled(result)
+
+      const data = result.current.videos.data
+      expect(data?.cut).toBe(false)
+      expect(data?.hours.every((b) => b.value !== null)).toBe(true)
+    })
+
+    it('does not say it was cut for a short list', async () => {
+      const { result } = renderHook(() => useStreamerHistory('99', vi.fn()))
+      await settled(result)
+
+      expect(result.current.videos.data?.cut).toBe(false)
+    })
   })
 
   it('lets one section fail without the other', async () => {

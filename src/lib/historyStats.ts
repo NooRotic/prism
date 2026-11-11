@@ -78,9 +78,15 @@ export function bucketFollowersByDay(
 /**
  * Hours streamed per local day, from the archives. A broadcast counts wholly for the day it
  * started. Days before the oldest archive's day are null, because the recordings do not reach
- * back that far; later days with no archive are 0.
+ * back that far; later days with no archive are 0. With `partialOldestDay` (the list was cut by
+ * a page limit, so more archives may exist for the oldest one's day) that day is null too.
  */
-export function bucketHoursByDay(videos: TwitchVideo[], now: number, days: number = DEFAULT_DAYS): DayBucket[] {
+export function bucketHoursByDay(
+  videos: TwitchVideo[],
+  now: number,
+  days: number = DEFAULT_DAYS,
+  partialOldestDay: boolean = false,
+): DayBucket[] {
   const archives = archiveStarts(videos)
   const oldestDay =
     archives.length > 0 ? startOfLocalDay(Math.min(...archives.map((a) => a.startedAt))) : null
@@ -93,8 +99,21 @@ export function bucketHoursByDay(videos: TwitchVideo[], now: number, days: numbe
 
   return dayStarts(now, days).map((at) => {
     const day = localDayKey(at)
-    return { day, at, value: oldestDay === null || at < oldestDay ? null : (hours.get(day) ?? 0) }
+    const unknown = oldestDay === null || at < oldestDay || (partialOldestDay && at === oldestDay)
+    return { day, at, value: unknown ? null : (hours.get(day) ?? 0) }
   })
+}
+
+/**
+ * True when a list of archives filled its page (`limit`) and its oldest one is still inside the
+ * window: the page limit, not how long Twitch keeps recordings, is what stopped the read, so
+ * earlier days are unknown rather than empty.
+ */
+export function recordingsCut(videos: TwitchVideo[], now: number, limit: number, days: number = DEFAULT_DAYS): boolean {
+  const archives = archiveStarts(videos)
+  if (archives.length < limit) return false
+  const oldest = Math.min(...archives.map((a) => a.startedAt))
+  return oldest > startOfLocalDay(now, days - 1)
 }
 
 /** Views of each archive that started inside the window, oldest first, one point per broadcast. */

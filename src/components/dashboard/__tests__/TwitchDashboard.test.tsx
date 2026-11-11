@@ -281,6 +281,7 @@ describe('TwitchDashboard', () => {
             views: [{ at: Date.now() - DAY, value: 40 }],
             hours: days(1),
             coverageDays: 30,
+            cut: false,
             source: 'twitch',
           },
           loading: false,
@@ -363,6 +364,18 @@ describe('TwitchDashboard', () => {
       expect(row.getByText('#18,402')).toBeInTheDocument()
       expect(row.getByText('+96')).toBeInTheDocument()
       expect(screen.getByRole('img', { name: 'Followers gained per day, last 30 days, total 96' })).toBeInTheDocument()
+    })
+
+    it('holds the 30-day big numbers at the loading mark while TwitchTracker has not answered', () => {
+      setApp({ user: streamer('affiliate') })
+      setFollows({ data: liveFollows })
+      loadedStreamerData()
+      mockTracker.mockReturnValue({ summary: null, loading: true, unavailable: false })
+      renderDashboard()
+
+      const panel = within(screen.getByRole('region', { name: 'Followers' }))
+      expect(panel.getByText('…')).toBeInTheDocument()
+      expect(panel.queryByText('+60')).not.toBeInTheDocument()
     })
 
     it('says TwitchTracker is unavailable, not that the channel is untracked, when it could not be reached', () => {
