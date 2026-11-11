@@ -93,7 +93,7 @@ export default function StatsRow() {
   if (!isAuthenticated) return <ConnectPrompt onConnect={login} />
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+    <div className="grid grid-cols-2 @4xl:grid-cols-4 gap-3 w-full">
       {/* Clips */}
       <StatCard
         icon={<Film size={14} style={{ color: 'var(--text-muted)' }} />}

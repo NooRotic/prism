@@ -73,7 +73,7 @@ export default function StreamerRow({
   )
 
   return (
-    <section aria-label="Your channel" className="flex flex-col gap-1.5">
+    <section aria-label="Your channel" className="@container flex flex-col gap-1.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
         <h3 className="m-0 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--streamer-text)' }}>
           Your channel
@@ -89,7 +89,7 @@ export default function StreamerRow({
         </p>
       </div>
 
-      <ul aria-label="Your channel stats" className="m-0 grid list-none grid-cols-2 gap-2 p-0 md:flex md:flex-wrap">
+      <ul aria-label="Your channel stats" className="m-0 grid list-none grid-cols-2 gap-2 p-0 @lg:flex @lg:flex-wrap">
         {chips(followers, subscribers, tracker).map((chip) => (
           <li
             key={chip.label}

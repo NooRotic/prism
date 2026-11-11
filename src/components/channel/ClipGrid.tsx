@@ -31,7 +31,7 @@ export default function ClipGrid() {
       </div>
 
       {/* Scrollable row on mobile, grid on wider screens */}
-      <div className="flex md:grid md:grid-cols-2 xl:grid-cols-3 gap-3 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-thin">
+      <div className="flex @lg:grid @lg:grid-cols-2 @5xl:grid-cols-3 gap-3 overflow-x-auto @lg:overflow-x-visible pb-2 @lg:pb-0 scrollbar-thin">
         {sortedClips.map((clip) => (
           <ClipCard
             key={clip.id}

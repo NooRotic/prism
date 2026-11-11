@@ -36,7 +36,7 @@ export default function ClipCard({ clip, game }: ClipCardProps) {
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group flex flex-col rounded-lg overflow-hidden text-left transition-all duration-200 shrink-0 w-[280px] md:w-auto"
+      className="group flex flex-col rounded-lg overflow-hidden text-left transition-all duration-200 shrink-0 w-[280px] @lg:w-auto"
       style={{
         backgroundColor: 'var(--bg-card)',
         border: `1px solid ${isHovered ? 'var(--accent-twitch)' : 'var(--border)'}`,

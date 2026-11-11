@@ -14,7 +14,7 @@ const SECTION = 'fill-hide max-w-[1600px] mx-auto w-full'
  */
 export default function ChannelBody({ channel }: { channel: string | undefined }) {
   return (
-    <div className="fill-hide flex flex-col gap-4">
+    <div className="@container fill-hide flex flex-col gap-4">
       <div className={SECTION}>
         <ProfileSidebar />
       </div>
@@ -31,11 +31,14 @@ export default function ChannelBody({ channel }: { channel: string | undefined }
       </div>
 
       {/* Clips + VODs */}
-      <div className="fill-hide flex flex-col lg:flex-row gap-4 w-full max-w-[1600px] mx-auto">
-        <div className="w-full lg:w-1/2">
+      {/* Side by side once the body itself is wide enough (not the window: in the offline layout the
+          body is only the left column). The grids inside key off the body's width too, so a half
+          gets three columns only when the body is wide enough for halves of about 500px. */}
+      <div className="fill-hide flex flex-col @4xl:flex-row gap-4 w-full max-w-[1600px] mx-auto">
+        <div className="w-full @4xl:w-1/2">
           <ClipGrid />
         </div>
-        <div className="w-full lg:w-1/2">
+        <div className="w-full @4xl:w-1/2">
           <VODGrid />
         </div>
       </div>
