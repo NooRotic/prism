@@ -46,3 +46,22 @@ describe('text colour contrast', () => {
     expect(primary - secondary).toBeGreaterThanOrEqual(1.5)
   })
 })
+
+// The streamer row and the 30-day panels are amber on dark amber. The mockups' dim amber text
+// (#8f7a3e, #6d5e36) missed 4.5:1, so these tokens are checked on every box they sit on:
+// the row's chips, the dashboard card behind the row header, and the panels.
+describe('streamer text colour contrast', () => {
+  const BOXES = ['--streamer-box', '--bg-card', '--bg-card-hover'] as const
+
+  describe.each(['--streamer-text', '--streamer-label'] as const)('%s', (name) => {
+    it.each(BOXES)('is at least 4.5:1 on %s', (box) => {
+      expect(contrast(token(name), token(box))).toBeGreaterThanOrEqual(4.5)
+    })
+  })
+
+  it('keeps the value colour brighter than the label colour, so the tiers stay distinct', () => {
+    expect(contrast(token('--streamer-text'), token('--streamer-box'))).toBeGreaterThan(
+      contrast(token('--streamer-label'), token('--streamer-box')),
+    )
+  })
+})

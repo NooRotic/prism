@@ -33,6 +33,14 @@
   --accent-orange: #ff6b35;
   --accent-red: #ff4444;
 
+  /* The streamer row and the 30-day panels: amber on dark amber, so they read as "your channel".
+     The mockups' dim amber (#8f7a3e) was about 3:1, so the label colour is lighter than that;
+     src/__tests__/contrast.test.ts holds every text pair at 4.5:1 or better. */
+  --streamer-box: #2a2110;
+  --streamer-border: #5a4516;
+  --streamer-text: #ffc857;
+  --streamer-label: #c9a85a;
+
   /* Typography — distinctive choices, extreme weights */
   --font-heading: 'Orbitron', sans-serif;
   --font-body: 'Satoshi', sans-serif;
