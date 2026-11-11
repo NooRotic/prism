@@ -70,6 +70,7 @@ function Panel({
   loading,
   chart,
   axis,
+  note,
   children,
 }: {
   title: string
@@ -77,6 +78,9 @@ function Panel({
   loading: boolean
   chart: ReactNode
   axis: { from: number; to: number } | null
+  /** The text that depends on the data (errors, retention, limits). Its area keeps two lines of height before it arrives. */
+  note: ReactNode
+  /** The text that is always the same. */
   children: ReactNode
 }) {
   const big = typeof figure === 'string' ? figure : figure ? figure.text : loading ? LOADING : MISSING
@@ -104,6 +108,9 @@ function Panel({
         {axis && <Axis from={axis.from} to={axis.to} />}
       </div>
       {children}
+      <div data-slot="note" className="flex min-h-[28px] flex-col gap-1.5">
+        {note}
+      </div>
     </section>
   )
 }
@@ -192,15 +199,19 @@ export default function ThirtyDayPanels({ followers, videos, tracker, trackerLoa
               ? { from: followerData.buckets[0].at, to: followerData.buckets[followerData.buckets.length - 1].at }
               : null
           }
+          note={
+            <>
+              {followers.error !== null && couldNotLoadFollowers}
+              {reached && (
+                <Caption>
+                  The bars cover only the span reached (since {formatAxisDate(reached.at)}): PRISM reads at most 1,000
+                  followers.
+                </Caption>
+              )}
+            </>
+          }
         >
-          {followers.error !== null && couldNotLoadFollowers}
           <Caption>New followers per day, from the dates people followed you. Shows gains only: Twitch does not list who left.</Caption>
-          {reached && (
-            <Caption>
-              The bars cover only the span reached (since {formatAxisDate(reached.at)}): PRISM reads at most 1,000
-              followers.
-            </Caption>
-          )}
         </Panel>
 
         <Panel
@@ -219,14 +230,18 @@ export default function ThirtyDayPanels({ followers, videos, tracker, trackerLoa
             )
           }
           axis={videoData && hasRecordings ? { from: windowStart, to: now } : null}
+          note={
+            <>
+              {videoData && !hasRecordings && noRecordings}
+              {videos.error !== null && couldNotLoadVideos}
+              {recordingsNote(videoData)}
+            </>
+          }
         >
-          {videoData && !hasRecordings && noRecordings}
-          {videos.error !== null && couldNotLoadVideos}
           <Caption>
             One point per broadcast: views of its recording (not live viewers). Recordings keep gaining views after a
             stream, so older points are not comparable with newer ones.
           </Caption>
-          {recordingsNote(videoData)}
         </Panel>
 
         <Panel
@@ -247,11 +262,15 @@ export default function ThirtyDayPanels({ followers, videos, tracker, trackerLoa
               ? { from: videoData.hours[0].at, to: videoData.hours[videoData.hours.length - 1].at }
               : null
           }
+          note={
+            <>
+              {videoData && !hasRecordings && noRecordings}
+              {videos.error !== null && couldNotLoadVideos}
+              {recordingsNote(videoData)}
+            </>
+          }
         >
-          {videoData && !hasRecordings && noRecordings}
-          {videos.error !== null && couldNotLoadVideos}
           <Caption>Hours streamed each day, added up from the length of your recordings.</Caption>
-          {recordingsNote(videoData)}
         </Panel>
       </div>
     </section>
