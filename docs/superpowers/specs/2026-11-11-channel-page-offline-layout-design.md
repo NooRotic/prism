@@ -142,8 +142,11 @@ Anti-goals (would make this a failure even if it works)
   `displayMode`. When the channel goes live the layout returns to today's: the player unfolds and loads as it would on
   opening a live channel, chat goes back to its docked place, and the page scrolls to the top so the new player is in view
   (an embed only autoplays while visible).
-- If the player was unfolded by the viewer ("Show player") nothing changes when the channel goes live except that it starts
-  playing as a live channel would.
+- If the player was unfolded by the viewer (they pressed "Show player" or chose a clip or recording), the page KEEPS the
+  offline layout when the channel goes live: swapping to the live layout would remount the player, and a recording being
+  watched would start over at 0:00 (found by the final review). The strip then says "Live now", and when the player is on a
+  clip or recording it offers "Watch live", which points the player at the live stream. The poll stops. The viewer gets the
+  normal live layout on their next visit or channel change.
 
 ### What may reload the chat
 Today the chat lives inside `ChatDock`'s row, and the profile, cards and grids are siblings after that row. Layout C
