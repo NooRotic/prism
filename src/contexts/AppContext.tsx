@@ -126,6 +126,8 @@ type Action =
       }
     }
   | { type: 'LOAD_CHANNEL_ERROR'; error: string }
+  /** The loaded channel's live status was checked again: its stream now, or null when it is offline. */
+  | { type: 'UPDATE_CHANNEL_STREAM'; stream: TwitchStream | null }
   | { type: 'PLAY_URL'; url: string; detection: URLDetectionResult }
   | { type: 'SET_ENGINE'; engine: PlayerEngine; fallbackStep: number }
   | { type: 'TOGGLE_DEBUG' }
@@ -233,6 +235,17 @@ function appReducer(state: AppState, action: Action): AppState {
     }
     case 'LOAD_CHANNEL_ERROR':
       return { ...state, loading: false, error: action.error }
+    case 'UPDATE_CHANNEL_STREAM': {
+      const { profile } = state.channel
+      if (profile === null) return state
+      const isLive = action.stream?.type === 'live'
+      // Only the streamer/chatter modes follow live status; video mode and idle stay as they are.
+      const displayMode =
+        state.displayMode === 'streamer' || state.displayMode === 'chatter'
+          ? channelDisplayMode(isLive, profile)
+          : state.displayMode
+      return { ...state, channel: { ...state.channel, stream: action.stream, isLive }, displayMode }
+    }
     case 'PLAY_URL': {
       // For non-Twitch URLs (youtube, hls, dash, direct) and Twitch
       // clips/VODs pasted without a channel context, flip to 'video'
