@@ -8,7 +8,13 @@ import TwitchPlayerPage from '../TwitchPlayerPage'
 // replaced: only the wrappers this page owns are under test.
 vi.mock('../../contexts/AppContext', () => ({
   useApp: () => ({
-    state: { player: { currentUrl: null, detection: null } },
+    state: {
+      player: { currentUrl: null, detection: null },
+      // Signed out with nothing loaded: the page keeps today's layout, which is what this test is about.
+      auth: { isAuthenticated: false, user: null },
+      channel: { profile: null, isLive: false, videos: [] },
+      loading: false,
+    },
     dispatch: vi.fn(),
   }),
 }))
