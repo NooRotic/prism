@@ -1,5 +1,5 @@
 import { sortNewestLiveFirst } from '../sortLiveFollows'
-import type { EnrichedFollow } from '../../../lib/followsStore'
+import type { EnrichedFollow } from '../followsStore'
 
 function live(name: string, startedAt?: string): EnrichedFollow {
   return {
