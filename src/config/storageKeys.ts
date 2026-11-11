@@ -39,6 +39,8 @@ export const STORAGE_KEYS = {
   LOCAL_CHAT_SCALE: 'prism_chat_scale',
   /** Last content size of the floating video window (JSON `{ width, height }`). Raised to 480x270 on load. */
   LOCAL_VIDEO_POPOUT_SIZE: 'prism_video_popout_size',
+  /** Which view of the dashboard's live follows the viewer last used: 'wall' or 'list'. */
+  LOCAL_DASHBOARD_WALL_VIEW: 'prism_dashboard_wall_view',
   /** Id of this browser tab, so a chat pop-out knows which tab owns it. Survives a reload. */
   SESSION_TAB_ID: 'prism_tab_id',
 } as const
