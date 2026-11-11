@@ -1,0 +1,75 @@
+<style>
+  .pm { background:#0c0c10; border:1px solid #23232e; border-radius:8px; padding:14px; color:#d8d8e4; font-size:12px; font-family:system-ui,sans-serif; }
+  .pm .lv { color:#39FF14; } .pm .mu { color:#8888a0; }
+  .pm .id { display:flex; align-items:center; gap:12px; padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid #23232e; }
+  .pm .pic { width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg,#ff7f50,#9146FF); border:2px solid #ff7f50; flex:none; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:10px; text-align:center; line-height:1.1; }
+  .pm .id .who b { font-size:15px; color:#ff7f50; } .pm .id .who span { display:block; color:#8888a0; margin-top:2px; }
+  .pm .badge { background:#9146FF33; color:#c9a8ff; border-radius:4px; padding:1px 6px; font-size:9px; margin-left:6px; letter-spacing:.06em; }
+  .pm .id .tot { margin-left:auto; text-align:right; color:#8888a0; } .pm .id .tot b { color:#fff; font-size:15px; }
+  .pm .chips { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+  .pm .chip { background:#14141b; border-radius:6px; padding:7px 11px; } .pm .chip small { display:block; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#8888a0; } .pm .chip b { color:#fff; font-size:14px; }
+  .pm .rowlabel { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:#ffc857; margin:12px 0 5px; display:flex; justify-content:space-between; } .pm .rowlabel span:last-child { color:#8888a0; letter-spacing:0; text-transform:none; }
+  .pm .chips.sr .chip { background:#2a2110; border:1px solid #5a4516; } .pm .chips.sr .chip small { color:#c9a85a; } .pm .chips.sr .chip b { color:#ffc857; }
+  .pm .chips.sr .chip em { font-style:normal; font-size:8px; color:#8f7a3e; border:1px solid #5a4516; border-radius:3px; padding:0 3px; margin-left:5px; vertical-align:middle; }
+  .pm .chips.sr .chip.dim b { color:#6d5e36; }
+  .pm .ph { height:70px; border:1px dashed #33333f; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#55556a; margin-top:12px; }
+  .pm .note { color:#8f7a3e; font-size:10px; margin-top:6px; }
+</style>
+
+<h2>Streamer row</h2>
+<p class="subtitle">A second row of stat chips that only appears when the signed-in account is a streamer: amber box and amber text so it reads as "your channel", distinct from the green-and-white row about the channels you follow. Colours are my guess.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Signed-in account is a streamer &middot; TwitchTracker has the channel</div>
+  <div class="mockup-body">
+    <div class="pm">
+      <div class="id">
+        <div class="pic">your<br>photo</div>
+        <div class="who"><b>yourname</b><span class="badge">AFFILIATE</span><span>following 59 &middot; account since 2016</span></div>
+        <div class="tot"><b>17 live</b> of 59<br>8.1k watching right now</div>
+      </div>
+
+      <div class="chips">
+        <div class="chip"><small>Live now</small><b class="lv">17 / 59</b></div>
+        <div class="chip"><small>Watching (all follows)</small><b>8.1k</b></div>
+        <div class="chip"><small>Typical time live</small><b>2h 40m</b></div>
+        <div class="chip"><small>Just went live</small><b>3</b></div>
+        <div class="chip"><small>Longest live</small><b>5h 18m</b></div>
+        <div class="chip"><small>Languages</small><b>EN 14 &middot; DE 2 &middot; FR 1</b></div>
+      </div>
+
+      <div class="rowlabel"><span>Your channel</span><span>amber chips = from Twitch; marked TT = from TwitchTracker, last 30 days</span></div>
+      <div class="chips sr">
+        <div class="chip"><small>Followers</small><b>1,284</b></div>
+        <div class="chip"><small>Subscribers</small><b>37</b></div>
+        <div class="chip"><small>Avg viewers</small><b>86<em>TT</em></b></div>
+        <div class="chip"><small>Peak viewers</small><b>312<em>TT</em></b></div>
+        <div class="chip"><small>Hours streamed</small><b>41h<em>TT</em></b></div>
+        <div class="chip"><small>Hours watched</small><b>3.5k<em>TT</em></b></div>
+        <div class="chip"><small>Followers gained</small><b>+96<em>TT</em></b></div>
+        <div class="chip"><small>Rank</small><b>#18,402<em>TT</em></b></div>
+      </div>
+
+      <div class="ph">live wall + categories + just went live + most watched, as in the last screen</div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">Same account, but TwitchTracker does not track the channel (small or new channel)</div>
+  <div class="mockup-body">
+    <div class="pm">
+      <div class="rowlabel" style="margin-top:0"><span>Your channel</span><span>30-day stats appear here once TwitchTracker starts tracking you</span></div>
+      <div class="chips sr">
+        <div class="chip"><small>Followers</small><b>1,284</b></div>
+        <div class="chip"><small>Subscribers</small><b>37</b></div>
+        <div class="chip dim"><small>Avg viewers</small><b>&ndash;<em>TT</em></b></div>
+        <div class="chip dim"><small>Peak viewers</small><b>&ndash;<em>TT</em></b></div>
+        <div class="chip dim"><small>Hours streamed</small><b>&ndash;<em>TT</em></b></div>
+        <div class="chip dim"><small>Hours watched</small><b>&ndash;<em>TT</em></b></div>
+        <div class="chip dim"><small>Followers gained</small><b>&ndash;<em>TT</em></b></div>
+        <div class="chip dim"><small>Rank</small><b>&ndash;<em>TT</em></b></div>
+      </div>
+    </div>
+  </div>
+</div>

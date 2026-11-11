@@ -1,0 +1,67 @@
+<style>
+  .pm { background:#0c0c10; border:1px solid #23232e; border-radius:8px; padding:14px; color:#d8d8e4; font-size:12px; font-family:system-ui,sans-serif; }
+  .pm .rowlabel { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:#ffc857; margin:0 0 8px; display:flex; justify-content:space-between; } .pm .rowlabel span:last-child { color:#8888a0; letter-spacing:0; text-transform:none; }
+  .pm .three { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .pm .panel { background:#14141b; border-radius:6px; padding:10px 11px 8px; }
+  .pm .panel h6 { margin:0; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#c9a85a; font-weight:600; }
+  .pm .panel .big { color:#ffc857; font-size:18px; font-weight:700; margin:2px 0 8px; } .pm .panel .big em { font-style:normal; font-size:9px; color:#8f7a3e; border:1px solid #5a4516; border-radius:3px; padding:0 3px; margin-left:6px; vertical-align:middle; font-weight:400; }
+  .pm .bars { height:76px; display:flex; align-items:flex-end; gap:1px; border-bottom:1px solid #2a2a36; }
+  .pm .bars i { flex:1; background:#ffc857; opacity:.85; border-radius:1px 1px 0 0; display:block; }
+  .pm .bars i.z { background:#33333f; opacity:1; }
+  .pm .axis { display:flex; justify-content:space-between; color:#8888a0; font-size:9px; margin:3px 0 6px; }
+  .pm .src { color:#8f7a3e; font-size:10px; line-height:1.35; }
+  .pm svg text { fill:#8888a0; font-size:9px; font-family:system-ui,sans-serif; }
+</style>
+
+<h2>The last 30 days, as charts</h2>
+<p class="subtitle">TwitchTracker hands over the 30-day totals (the big numbers). The day-by-day shapes come from Twitch itself. Data here is made up, but the three totals match each other (14 streams, 41 hours, +96 followers).</p>
+
+<div class="mockup">
+  <div class="mockup-header">History block under the streamer row &middot; replaces the tab strip</div>
+  <div class="mockup-body">
+    <div class="pm">
+      <div class="rowlabel"><span>Last 30 days</span><span>big number = TwitchTracker &middot; chart shape = Twitch (your follows and recordings)</span></div>
+      <div class="three">
+
+        <div class="panel">
+          <h6>Followers</h6>
+          <div class="big">+96<em>TT</em></div>
+          <div class="bars">
+            <i style="height:24px"></i><i style="height:36px"></i><i style="height:48px"></i><i style="height:36px"></i><i class="z" style="height:2px"></i><i style="height:24px"></i><i style="height:60px"></i><i style="height:48px"></i><i style="height:36px"></i><i style="height:24px"></i>
+            <i style="height:36px"></i><i style="height:72px"></i><i style="height:48px"></i><i style="height:36px"></i><i style="height:24px"></i><i class="z" style="height:2px"></i><i style="height:36px"></i><i style="height:48px"></i><i style="height:60px"></i><i style="height:36px"></i>
+            <i style="height:24px"></i><i style="height:48px"></i><i style="height:72px"></i><i style="height:36px"></i><i style="height:24px"></i><i style="height:48px"></i><i style="height:60px"></i><i style="height:36px"></i><i style="height:24px"></i><i style="height:48px"></i>
+          </div>
+          <div class="axis"><span>Oct 11</span><span>Oct 21</span><span>Nov 10</span></div>
+          <div class="src">New followers per day, from the dates people followed you. Shows gains only: Twitch does not list who left.</div>
+        </div>
+
+        <div class="panel">
+          <h6>Views per stream</h6>
+          <div class="big">14 streams</div>
+          <svg viewBox="0 0 300 100" width="100%" role="img" aria-label="Views per broadcast across 30 days">
+            <line x1="0" y1="100" x2="300" y2="100" stroke="#2a2a36"/>
+            <polyline fill="none" stroke="#ffc857" stroke-width="2" points="19.6,75.2 38.8,70.4 58,76.8 77.2,63.6 96.4,64.8 115.6,52 134.8,72 154,74.4 173.2,62 192.4,59.2 211.6,65.6 240.4,46.8 259.6,55.2 278.8,60.8"/>
+            <g fill="#ffc857"><circle cx="19.6" cy="75.2" r="2.6"/><circle cx="38.8" cy="70.4" r="2.6"/><circle cx="58" cy="76.8" r="2.6"/><circle cx="77.2" cy="63.6" r="2.6"/><circle cx="96.4" cy="64.8" r="2.6"/><circle cx="115.6" cy="52" r="2.6"/><circle cx="134.8" cy="72" r="2.6"/><circle cx="154" cy="74.4" r="2.6"/><circle cx="173.2" cy="62" r="2.6"/><circle cx="192.4" cy="59.2" r="2.6"/><circle cx="211.6" cy="65.6" r="2.6"/><circle cx="240.4" cy="46.8" r="2.6"/><circle cx="259.6" cy="55.2" r="2.6"/><circle cx="278.8" cy="60.8" r="2.6"/></g>
+          </svg>
+          <div class="axis"><span>Oct 11</span><span>Oct 21</span><span>Nov 10</span></div>
+          <div class="src">One point per broadcast: views of its recording (not live viewers). Only broadcasts Twitch still keeps appear.</div>
+        </div>
+
+        <div class="panel">
+          <h6>Time streamed</h6>
+          <div class="big">41h<em>TT</em></div>
+          <div class="bars">
+            <i class="z" style="height:2px"></i><i style="height:54px"></i><i class="z" style="height:2px"></i><i style="height:45px"></i><i class="z" style="height:2px"></i><i style="height:72px"></i><i class="z" style="height:2px"></i><i style="height:54px"></i><i class="z" style="height:2px"></i><i style="height:36px"></i>
+            <i class="z" style="height:2px"></i><i style="height:63px"></i><i class="z" style="height:2px"></i><i style="height:36px"></i><i class="z" style="height:2px"></i><i style="height:72px"></i><i class="z" style="height:2px"></i><i style="height:54px"></i><i class="z" style="height:2px"></i><i style="height:45px"></i>
+            <i class="z" style="height:2px"></i><i style="height:54px"></i><i class="z" style="height:2px"></i><i class="z" style="height:2px"></i><i style="height:63px"></i><i class="z" style="height:2px"></i><i style="height:45px"></i><i class="z" style="height:2px"></i><i style="height:45px"></i><i class="z" style="height:2px"></i>
+          </div>
+          <div class="axis"><span>Oct 11</span><span>Oct 21</span><span>Nov 10</span></div>
+          <div class="src">Hours streamed each day, added up from the length of your recordings.</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">The "+/-" you asked for: the follower bars can only show gains today. A true up-and-down line needs PRISM to note your follower total each day, which would start empty and grow from the day it is switched on.</p>

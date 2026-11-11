@@ -1,0 +1,70 @@
+<style>
+  .pm { background:#0c0c10; border:1px solid #23232e; border-radius:8px; padding:14px; color:#d8d8e4; font-size:12px; font-family:system-ui,sans-serif; }
+  .pm .chips { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .pm .chip { background:#2a2110; border:1px solid #5a4516; border-radius:6px; padding:7px 11px; }
+  .pm .chip small { display:block; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#c9a85a; }
+  .pm .chip b { color:#ffc857; font-size:14px; }
+  .pm .chip em { font-style:normal; font-size:8px; color:#8f7a3e; border:1px solid #5a4516; border-radius:3px; padding:0 3px; margin-left:5px; vertical-align:middle; }
+  .pm .chip.rank { border-color:#ffc857; background:#3a2d12; } .pm .chip.rank b { font-size:17px; }
+  .pm .rowlabel { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:#ffc857; margin:0 0 5px; display:flex; justify-content:space-between; } .pm .rowlabel span:last-child { color:#8888a0; letter-spacing:0; text-transform:none; }
+  .pm .tabs { display:flex; gap:6px; margin:4px 0 8px; } .pm .tabs span { padding:3px 10px; border-radius:12px; background:#14141b; color:#8888a0; font-size:11px; } .pm .tabs .on { background:#2a2110; color:#ffc857; border:1px solid #5a4516; }
+  .pm .chart { background:#14141b; border-radius:6px; padding:10px 10px 6px; }
+  .pm svg text { fill:#8888a0; font-size:9px; font-family:system-ui,sans-serif; }
+  .pm .src { color:#8f7a3e; font-size:10px; margin-top:6px; }
+</style>
+
+<h2>Rank first, plus a history line chart</h2>
+<p class="subtitle">Rank is now the first chip, drawn a little larger. The chart sits under the streamer row with tabs for different histories. The data in these two drawings is made up.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Tab: Followers over time</div>
+  <div class="mockup-body">
+    <div class="pm">
+      <div class="rowlabel"><span>Your channel</span><span>amber chips = from Twitch; TT = TwitchTracker, last 30 days</span></div>
+      <div class="chips">
+        <div class="chip rank"><small>Rank</small><b>#18,402<em>TT</em></b></div>
+        <div class="chip"><small>Followers</small><b>1,284</b></div>
+        <div class="chip"><small>Subscribers</small><b>37</b></div>
+        <div class="chip"><small>Avg viewers</small><b>86<em>TT</em></b></div>
+        <div class="chip"><small>Peak viewers</small><b>312<em>TT</em></b></div>
+        <div class="chip"><small>Hours streamed</small><b>41h<em>TT</em></b></div>
+        <div class="chip"><small>Hours watched</small><b>3.5k<em>TT</em></b></div>
+        <div class="chip"><small>Followers gained</small><b>+96<em>TT</em></b></div>
+      </div>
+      <div class="tabs"><span class="on">Followers</span><span>Streams</span><span>Clips</span></div>
+      <div class="chart">
+        <svg viewBox="0 0 700 150" width="100%" role="img" aria-label="Followers over time, rising from about 1,188 to 1,284">
+          <g stroke="#2a2a36" stroke-width="1">
+            <line x1="40" y1="10" x2="690" y2="10"/><line x1="40" y1="60" x2="690" y2="60"/><line x1="40" y1="110" x2="690" y2="110"/>
+          </g>
+          <text x="4" y="13">1,290</text><text x="4" y="63">1,235</text><text x="4" y="113">1,180</text>
+          <polyline fill="none" stroke="#ffc857" stroke-width="2" points="40,102.7 82,99.1 124,94.5 166,89.1 208,89.1 250,81.8 292,73.6 334,70 376,63.6 418,57.3 460,55.5 502,45.5 544,38.2 586,34.5 628,28.2 670,15.5"/>
+          <circle cx="670" cy="15.5" r="3.5" fill="#ffc857"/>
+          <text x="40" y="130">Oct 11</text><text x="250" y="130">Oct 21</text><text x="460" y="130">Oct 31</text><text x="640" y="130">Nov 10</text>
+        </svg>
+        <div class="src">From the dates each current follower followed you, so it shows people who still follow you, not unfollows.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">Tab: Streams (one point per past broadcast)</div>
+  <div class="mockup-body">
+    <div class="pm">
+      <div class="tabs"><span>Followers</span><span class="on">Streams</span><span>Clips</span></div>
+      <div class="chart">
+        <svg viewBox="0 0 700 150" width="100%" role="img" aria-label="Views per past broadcast, between about 58 and 133">
+          <g stroke="#2a2a36" stroke-width="1">
+            <line x1="40" y1="10" x2="690" y2="10"/><line x1="40" y1="60" x2="690" y2="60"/><line x1="40" y1="110" x2="690" y2="110"/>
+          </g>
+          <text x="10" y="13">200</text><text x="10" y="63">100</text><text x="24" y="113">0</text>
+          <polyline fill="none" stroke="#ffc857" stroke-width="2" points="40,79 88,73 136,81 184,64.5 232,66 280,50 328,75 376,78 424,62.5 472,59 520,67 568,43.5 616,54 664,61"/>
+          <g fill="#ffc857"><circle cx="40" cy="79" r="3"/><circle cx="88" cy="73" r="3"/><circle cx="136" cy="81" r="3"/><circle cx="184" cy="64.5" r="3"/><circle cx="232" cy="66" r="3"/><circle cx="280" cy="50" r="3"/><circle cx="328" cy="75" r="3"/><circle cx="376" cy="78" r="3"/><circle cx="424" cy="62.5" r="3"/><circle cx="472" cy="59" r="3"/><circle cx="520" cy="67" r="3"/><circle cx="568" cy="43.5" r="3"/><circle cx="616" cy="54" r="3"/><circle cx="664" cy="61" r="3"/></g>
+          <text x="40" y="130">oldest kept</text><text x="620" y="130">latest</text>
+        </svg>
+        <div class="src">Views of each recorded broadcast (not live viewers). Twitch only keeps recordings for a limited time, so this goes back as far as they do.</div>
+      </div>
+    </div>
+  </div>
+</div>
