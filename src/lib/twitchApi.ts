@@ -208,11 +208,22 @@ export async function getClips(
 
 // --- Videos ---
 
-export async function getVideos(userId: string, first: number = 50): Promise<TwitchVideo[]> {
-  const data = await twitchApiFetch<{ data: TwitchVideo[] }>('videos', {
-    user_id: userId,
-    first: String(first),
-  })
+export interface GetVideosOptions {
+  /** Only this kind of video; Twitch returns every kind when it is left out. */
+  type?: 'all' | 'archive' | 'highlight' | 'upload'
+  /** Pagination cursor from an earlier page. */
+  after?: string
+}
+
+export async function getVideos(
+  userId: string,
+  first: number = 50,
+  options: GetVideosOptions = {},
+): Promise<TwitchVideo[]> {
+  const params: Record<string, string> = { user_id: userId, first: String(first) }
+  if (options.type) params.type = options.type
+  if (options.after) params.after = options.after
+  const data = await twitchApiFetch<{ data: TwitchVideo[] }>('videos', params)
   return data.data ?? []
 }
 
@@ -420,6 +431,52 @@ export async function getBroadcasterFollowerCount(
     first: '1',
   })
   return data.total ?? 0
+}
+
+const FOLLOWERS_PAGE_SIZE = 100
+
+/**
+ * When the authenticated broadcaster's most recent followers followed, newest first, reading
+ * 100 per page until a follow older than `sinceMs` shows up or `maxPages` pages are read.
+ * Returns the dates only, never who followed. `total` is the channel's all-time follower
+ * count from the first page; `reachedCap` is true when the page limit stopped the read while
+ * followers inside the window were still unread, so the dates cover only part of it.
+ * Same scope and ownership rule as getBroadcasterFollowerCount.
+ */
+export async function getFollowerDates(
+  broadcasterId: string,
+  sinceMs: number,
+  maxPages: number = 10,
+): Promise<{ dates: string[]; total: number; reachedCap: boolean }> {
+  const dates: string[] = []
+  let total = 0
+  let after: string | undefined
+
+  for (let pageNumber = 0; pageNumber < maxPages; pageNumber++) {
+    const params: Record<string, string> = {
+      broadcaster_id: broadcasterId,
+      first: String(FOLLOWERS_PAGE_SIZE),
+    }
+    if (after) params.after = after
+    const page = await twitchApiFetch<{
+      data?: { followed_at: string }[]
+      total?: number
+      pagination?: { cursor?: string }
+    }>('channels/followers', params)
+
+    if (pageNumber === 0) total = page.total ?? 0
+    for (const item of page.data ?? []) {
+      const followedAt = Date.parse(item.followed_at)
+      if (Number.isNaN(followedAt)) continue
+      if (followedAt < sinceMs) return { dates, total, reachedCap: false }
+      dates.push(item.followed_at)
+    }
+
+    after = page.pagination?.cursor
+    if (!after) return { dates, total, reachedCap: false }
+  }
+
+  return { dates, total, reachedCap: true }
 }
 
 /** Poll history (completed + active), newest first. Accepts optional cursor for pagination. */
