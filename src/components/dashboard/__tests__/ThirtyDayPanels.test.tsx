@@ -36,6 +36,7 @@ function videoHistory(overrides: Partial<VideoHistory> = {}): VideoHistory {
     views: Array.from({ length: 14 }, (_, i) => ({ at: WINDOW_START + (i * 2 + 1) * DAY, value: 10 + i })),
     hours: dayBuckets(0, { 27: 5, 29: 7.5 }),
     coverageDays: 30,
+    cut: false,
     source: 'twitch',
     ...overrides,
   }
@@ -55,14 +56,24 @@ interface PanelProps {
   followers?: Section<FollowerHistory>
   videos?: Section<VideoHistory>
   tracker?: TrackerSummary | null
+  trackerLoading?: boolean
 }
 
 function renderPanels({
   followers = ok(followerHistory()),
   videos = ok(videoHistory()),
   tracker = TRACKER,
+  trackerLoading = false,
 }: PanelProps = {}) {
-  return render(<ThirtyDayPanels followers={followers} videos={videos} tracker={tracker} now={NOW} />)
+  return render(
+    <ThirtyDayPanels
+      followers={followers}
+      videos={videos}
+      tracker={tracker}
+      trackerLoading={trackerLoading}
+      now={NOW}
+    />,
+  )
 }
 
 const panel = (name: string) => screen.getByRole('region', { name })
@@ -262,6 +273,111 @@ describe('ThirtyDayPanels', () => {
     renderPanels()
 
     expect(screen.getByText(/tagged TT are from TwitchTracker/i)).toBeInTheDocument()
+  })
+
+  // A big number must not change value and source in front of the viewer: while TwitchTracker has
+  // not answered, the panels show the loading mark, as the row does, and fall back to the bars'
+  // sum only once TwitchTracker has settled with nothing.
+  describe('while TwitchTracker has not answered yet', () => {
+    it('shows the loading mark, not the sum of the bars, in the Followers and Time streamed panels', () => {
+      renderPanels({ tracker: null, trackerLoading: true })
+
+      expect(within(panel('Followers')).getByText('…')).toBeInTheDocument()
+      expect(within(panel('Followers')).queryByText('+5')).not.toBeInTheDocument()
+      expect(within(panel('Time streamed')).getByText('…')).toBeInTheDocument()
+      expect(within(panel('Time streamed')).queryByText('12.5h')).not.toBeInTheDocument()
+    })
+
+    it('still draws the Twitch charts, and counts the streams', () => {
+      renderPanels({ tracker: null, trackerLoading: true })
+
+      expect(screen.getByRole('img', { name: /Followers gained per day/ })).toBeInTheDocument()
+      expect(screen.getByRole('img', { name: /Hours streamed per day/ })).toBeInTheDocument()
+      expect(within(panel('Views per stream')).getByText('14 streams')).toBeInTheDocument()
+    })
+
+    it('shows the TwitchTracker figures as soon as it has them, whatever the loading flag says', () => {
+      renderPanels({ trackerLoading: true })
+
+      expect(within(panel('Followers')).getByText('+96')).toBeInTheDocument()
+      expect(within(panel('Time streamed')).getByText('41h')).toBeInTheDocument()
+    })
+
+    it('falls back to the sum of the bars once TwitchTracker has settled with nothing', () => {
+      renderPanels({ tracker: null, trackerLoading: false })
+
+      expect(within(panel('Followers')).getByText('+5')).toBeInTheDocument()
+      expect(within(panel('Time streamed')).getByText('12.5h')).toBeInTheDocument()
+    })
+  })
+
+  // jsdom has no layout, so the reserved space is pinned by its classes: every panel holds a
+  // chart slot of the chart's own shape, and an axis row, whether the data is loading, failed,
+  // absent or here, so the live wall below does not move when the Twitch history arrives.
+  describe('the space reserved for each chart', () => {
+    const SLOT = '[data-slot="chart"]'
+    const states: [string, PanelProps][] = [
+      ['loaded', {}],
+      ['loading', { followers: loadingSection(), videos: loadingSection() }],
+      ['failed', { followers: failed(), videos: failed() }],
+      [
+        'without recordings',
+        { videos: ok(videoHistory({ views: [], hours: dayBuckets(null), coverageDays: null })) },
+      ],
+    ]
+
+    it.each(states)('is held in every panel when %s', (_name, props) => {
+      const { container } = renderPanels(props)
+
+      const slots = [...container.querySelectorAll(SLOT)]
+      expect(slots).toHaveLength(3)
+      for (const slot of slots) expect(slot).toHaveClass('aspect-[300/76]', 'w-full')
+    })
+
+    it('puts the chart inside the slot when the data is here', () => {
+      renderPanels()
+
+      for (const name of ['Followers', 'Views per stream', 'Time streamed']) {
+        expect(panel(name).querySelector(`${SLOT} svg[role="img"]`)).not.toBeNull()
+      }
+    })
+
+    it('leaves the slot empty, not collapsed, while the data is loading', () => {
+      renderPanels({ followers: loadingSection(), videos: loadingSection() })
+
+      for (const name of ['Followers', 'Views per stream', 'Time streamed']) {
+        expect(panel(name).querySelector(SLOT)?.childElementCount).toBe(0)
+      }
+    })
+
+    it('holds the axis row in every state', () => {
+      for (const [, props] of states) {
+        const { container, unmount } = renderPanels(props)
+        expect(container.querySelectorAll('[data-slot="axis"]')).toHaveLength(3)
+        unmount()
+      }
+    })
+  })
+
+  // The recordings read is one page of 100. A full page that does not reach back past the start of
+  // the window was cut by that limit, not by Twitch's retention, and the panels must not say
+  // otherwise.
+  describe('when the recordings read hit its page limit', () => {
+    it('says only the newest recordings could be read, instead of how far back Twitch keeps them', () => {
+      renderPanels({ videos: ok(videoHistory({ cut: true, coverageDays: 12 })) })
+
+      for (const name of ['Views per stream', 'Time streamed']) {
+        expect(within(panel(name)).getByText(/only the newest recordings could be read/i)).toBeInTheDocument()
+        expect(within(panel(name)).queryByText(/recordings go back/i)).not.toBeInTheDocument()
+      }
+    })
+
+    it('does not say it when the read was complete', () => {
+      renderPanels({ videos: ok(videoHistory({ cut: false, coverageDays: 12 })) })
+
+      expect(screen.queryByText(/only the newest recordings could be read/i)).not.toBeInTheDocument()
+      expect(within(panel('Time streamed')).getByText(/recordings go back 12 days/i)).toBeInTheDocument()
+    })
   })
 
   // jsdom has no layout, so the stacking on a phone is pinned by its classes.

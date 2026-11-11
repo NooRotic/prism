@@ -3,6 +3,7 @@ import {
   bucketHoursByDay,
   coverageDays,
   localDayKey,
+  recordingsCut,
   viewsPerBroadcast,
 } from '../historyStats'
 import type { TwitchVideo } from '../../types/twitch'
@@ -253,5 +254,62 @@ describe('coverageDays', () => {
 
   it('is never negative', () => {
     expect(coverageDays([archive(iso(2026, 10, 12, 8))], NOW)).toBe(0)
+  })
+})
+
+describe('bucketHoursByDay when the oldest day was only partly read', () => {
+  it('gives null for the oldest recording’s own day as well as the days before it', () => {
+    const videos = [archive(iso(2026, 10, 5, 8), '2h'), archive(iso(2026, 10, 9), '1h')]
+
+    const buckets = bucketHoursByDay(videos, NOW, 30, true)
+
+    expect(valueOn(buckets, '2026-11-04')).toBeNull()
+    expect(valueOn(buckets, '2026-11-05')).toBeNull()
+    expect(valueOn(buckets, '2026-11-06')).toBe(0)
+    expect(valueOn(buckets, '2026-11-09')).toBe(1)
+  })
+
+  it('counts the oldest day as usual when the read was complete', () => {
+    const videos = [archive(iso(2026, 10, 5, 8), '2h')]
+
+    expect(valueOn(bucketHoursByDay(videos, NOW, 30, false), '2026-11-05')).toBe(2)
+    expect(valueOn(bucketHoursByDay(videos, NOW), '2026-11-05')).toBe(2)
+  })
+
+  it('stays all null with no recordings, partly read or not', () => {
+    expect(bucketHoursByDay([], NOW, 30, true).every((b) => b.value === null)).toBe(true)
+  })
+})
+
+// A read that filled its page and did not reach back past the start of the 30 days was cut by the
+// page limit, not by how long Twitch keeps recordings, so days before it are unknown, not empty.
+describe('recordingsCut', () => {
+  const many = (count: number, firstDaysAgo: number, stepDays: number) =>
+    Array.from({ length: count }, (_, i) => archive(new Date(NOW - (firstDaysAgo + i * stepDays) * 86_400_000).toISOString()))
+
+  it('is true when the page is full and its oldest recording is inside the 30 days', () => {
+    expect(recordingsCut(many(100, 0.1, 0.2), NOW, 100)).toBe(true)
+  })
+
+  it('is false when the page is not full', () => {
+    expect(recordingsCut(many(99, 0.1, 0.2), NOW, 100)).toBe(false)
+  })
+
+  it('is false when a full page reaches back past the start of the 30 days', () => {
+    expect(recordingsCut(many(100, 0.1, 0.5), NOW, 100)).toBe(false)
+  })
+
+  it('counts archives only', () => {
+    const videos = [...many(60, 0.1, 0.2), ...Array.from({ length: 60 }, () => video({ type: 'highlight' }))]
+
+    expect(recordingsCut(videos, NOW, 100)).toBe(false)
+  })
+
+  it('is false with no recordings', () => {
+    expect(recordingsCut([], NOW, 100)).toBe(false)
+  })
+
+  it('takes a day count', () => {
+    expect(recordingsCut(many(100, 0.1, 0.2), NOW, 100, 10)).toBe(false)
   })
 })

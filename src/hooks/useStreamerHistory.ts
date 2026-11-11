@@ -3,6 +3,7 @@ import {
   bucketFollowersByDay,
   bucketHoursByDay,
   coverageDays,
+  recordingsCut,
   viewsPerBroadcast,
   type DayBucket,
 } from '../lib/historyStats'
@@ -27,6 +28,8 @@ export interface VideoHistory {
   hours: DayBucket[]
   /** How many whole days back the recordings go, or null when there are none. */
   coverageDays: number | null
+  /** True when the one page of recordings that was read filled up inside the 30 days, so earlier days are unknown for that reason, not because Twitch deleted them. */
+  cut: boolean
   source: 'twitch'
 }
 
@@ -91,10 +94,12 @@ async function loadVideos(broadcasterId: string): Promise<VideoHistory> {
     getVideos(broadcasterId, VIDEOS_PER_REQUEST, { type: 'archive' }),
   )
   const now = Date.now()
+  const cut = recordingsCut(videos, now, VIDEOS_PER_REQUEST, WINDOW_DAYS)
   return {
     views: viewsPerBroadcast(videos, now, WINDOW_DAYS),
-    hours: bucketHoursByDay(videos, now, WINDOW_DAYS),
+    hours: bucketHoursByDay(videos, now, WINDOW_DAYS, cut),
     coverageDays: coverageDays(videos, now),
+    cut,
     source: 'twitch',
   }
 }

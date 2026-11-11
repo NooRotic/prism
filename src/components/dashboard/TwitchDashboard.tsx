@@ -145,7 +145,13 @@ export default function TwitchDashboard() {
         trackerUnavailable={tracker.unavailable}
         login={user.login}
       />
-      <ThirtyDayPanels followers={history.followers} videos={history.videos} tracker={tracker.summary} now={now} />
+      <ThirtyDayPanels
+        followers={history.followers}
+        videos={history.videos}
+        tracker={tracker.summary}
+        trackerLoading={tracker.loading}
+        now={now}
+      />
     </>
   ) : null
 
