@@ -1,4 +1,4 @@
-import { fetchTrackerSummary, parseTrackerSummary, resetTrackerSession } from '../twitchTracker'
+import { fetchTrackerSummary, parseTrackerSummary, resetTrackerSession, trackerUnavailable } from '../twitchTracker'
 
 const flags = vi.hoisted(() => ({ enabled: true }))
 vi.mock('../../config/twitchTracker', () => ({
@@ -232,5 +232,67 @@ describe('fetchTrackerSummary', () => {
 
     getItem.mockRestore()
     setItem.mockRestore()
+  })
+})
+
+// "No data" has two causes the page must not run together: TwitchTracker answered and does not
+// track the channel (it will once the channel grows), or PRISM got no answer at all.
+describe('trackerUnavailable', () => {
+  beforeEach(() => {
+    resetTrackerSession()
+    flags.enabled = true
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('is false for a login nothing has gone wrong with', () => {
+    expect(trackerUnavailable('streamer')).toBe(false)
+  })
+
+  it('is false after TwitchTracker answered that it does not know the channel', async () => {
+    stubFetch({})
+    await expect(fetchTrackerSummary('streamer', T0)).resolves.toBeNull()
+
+    expect(trackerUnavailable('streamer')).toBe(false)
+  })
+
+  it('is false after a good answer', async () => {
+    stubFetch(REAL_ANSWER)
+    await fetchTrackerSummary('streamer', T0)
+
+    expect(trackerUnavailable('streamer')).toBe(false)
+  })
+
+  it.each([
+    ['a network error', () => vi.fn(() => Promise.reject(new TypeError('Failed to fetch')))],
+    ['a non-200 answer', () => vi.fn(() => Promise.resolve(new Response('nope', { status: 500 })))],
+    ['invalid JSON', () => vi.fn(() => Promise.resolve(new Response('<html>', { status: 200 })))],
+  ])('is true for a login whose request failed with %s, whatever its capitalisation', async (_name, makeFetch) => {
+    vi.stubGlobal('fetch', makeFetch())
+    await expect(fetchTrackerSummary('Streamer', T0)).resolves.toBeNull()
+
+    expect(trackerUnavailable('streamer')).toBe(true)
+    expect(trackerUnavailable('STREAMER')).toBe(true)
+    expect(trackerUnavailable('someoneelse')).toBe(false)
+  })
+
+  it('is true for every login once TwitchTracker has answered 429', async () => {
+    stubFetch({}, 429)
+    await fetchTrackerSummary('first', T0)
+
+    expect(trackerUnavailable('first')).toBe(true)
+    expect(trackerUnavailable('second')).toBe(true)
+  })
+
+  it('is true while TWITCHTRACKER_ENABLED is false', () => {
+    flags.enabled = false
+
+    expect(trackerUnavailable('streamer')).toBe(true)
+  })
+
+  it('is true for a login it would never ask about', () => {
+    expect(trackerUnavailable('not a login')).toBe(true)
   })
 })

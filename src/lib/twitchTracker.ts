@@ -48,6 +48,16 @@ export function resetTrackerSession(): void {
   inFlight.clear()
 }
 
+/**
+ * True when this session has no way to get an answer for the login: the client is switched off,
+ * the login is malformed, TwitchTracker rate-limited us, or this login's request failed. A null
+ * summary with this false means TwitchTracker answered and does not track the channel. The two
+ * look the same in the figures (a dash) but not in what the page may say about the channel.
+ */
+export function trackerUnavailable(login: string): boolean {
+  return !TWITCHTRACKER_ENABLED || !LOGIN_PATTERN.test(login) || rateLimited || failed.has(login.toLowerCase())
+}
+
 function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }

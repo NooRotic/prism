@@ -15,7 +15,9 @@ vi.mock('../../hooks/useFollowedChannels', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../hooks/useFollowedChannels')>()
   return { ...actual, useFollowedChannels: vi.fn() }
 })
-vi.mock('../../hooks/useTrackerSummary', () => ({ useTrackerSummary: () => ({ summary: null, loading: false }) }))
+vi.mock('../../hooks/useTrackerSummary', () => ({
+  useTrackerSummary: () => ({ summary: null, loading: false, unavailable: false }),
+}))
 vi.mock('../../hooks/useStreamerNumbers', () => ({
   useStreamerNumbers: () => ({
     followers: { data: null, loading: false, error: null },
