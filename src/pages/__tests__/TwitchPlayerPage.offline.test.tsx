@@ -143,7 +143,7 @@ describe('TwitchPlayerPage: live and offline layouts', () => {
     loadChannel('streamer')
     expect(screen.getByTestId('offline-layout')).toBeInTheDocument()
     expect(screen.queryByTestId('chat-dock')).toBeNull()
-    expect(screen.getByRole('status')).toHaveTextContent('Offline')
+    expect(screen.getByTestId('offline-strip')).toHaveTextContent('Offline')
     expect(screen.queryByTestId('player-host')).toBeNull()
     expect(chatFrames()).toHaveLength(1)
     expect(screen.getByTestId('profile')).toBeInTheDocument()

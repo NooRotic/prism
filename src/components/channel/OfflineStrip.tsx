@@ -13,7 +13,6 @@ interface OfflineStripProps {
 export default function OfflineStrip({ lastStreamedAt, now, folded, onShowPlayer }: OfflineStripProps) {
   return (
     <div
-      role="status"
       data-testid="offline-strip"
       className="flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm"
       style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}

@@ -1,6 +1,8 @@
-import { createEvent, fireEvent, render, screen } from '@testing-library/react'
+import { createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
+import { FloatingVideoContext } from '../../chat/floatingVideoContext'
+import type { FloatingVideoControls } from '../../chat/floatingVideoContext'
 import { useChatPopout } from '../../chat/useChatPopout'
 import OfflineLayout from '../OfflineLayout'
 
@@ -174,6 +176,69 @@ describe('OfflineLayout', () => {
       render(layout(null))
       drag(heightBar(), 'y', 100, 2000)
       expect(rootVar('--offline-chat-height')).toBe(capped(844))
+    })
+  })
+
+  describe('where the chat column sits and how wide it may be (CSS, checked by class in jsdom)', () => {
+    it('caps the column at half the page whatever width was remembered', () => {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_OFFLINE_WIDTH, '560')
+      render(layout(null))
+      expect(root().className).toContain('min(var(--offline-chat-width),50%)')
+    })
+
+    it('pins the chat just below the top edge, not under a header that has scrolled away', () => {
+      render(layout(null))
+      const cell = screen.getByTestId('chat-cell')
+      expect(cell.className).toContain('lg:sticky')
+      expect(cell.className).toContain('lg:top-4')
+      expect(cell.className).not.toContain('top-[var(--header-height)]')
+    })
+  })
+
+  describe('the floating video control', () => {
+    const controls = (over: Partial<FloatingVideoControls> = {}): FloatingVideoControls => ({
+      supported: true,
+      canOpen: true,
+      isFloating: false,
+      blocked: false,
+      failed: false,
+      open: vi.fn(),
+      close: vi.fn(),
+      ...over,
+    })
+    const withVideo = (value: FloatingVideoControls, player: React.ReactNode | null) => (
+      <FloatingVideoContext.Provider value={value}>{layout(player)}</FloatingVideoContext.Provider>
+    )
+
+    it('is not offered while the player is folded', () => {
+      render(withVideo(controls(), null))
+      expect(screen.queryByRole('button', { name: /pop out video/i })).toBeNull()
+    })
+
+    it('is offered once the player is shown, and opens the floating window', () => {
+      const value = controls()
+      render(withVideo(value, <div data-testid="the-player">player</div>))
+      const buttons = screen.getAllByRole('button', { name: 'Pop out video' })
+      expect(buttons.length).toBeGreaterThan(0)
+      fireEvent.click(buttons[0])
+      expect(value.open).toHaveBeenCalledTimes(1)
+    })
+
+    it('is offered while the video floats even if the player is folded, so it can always be brought back', () => {
+      const value = controls({ isFloating: true, canOpen: false })
+      render(withVideo(value, null))
+      const buttons = screen.getAllByRole('button', { name: 'Bring video back' })
+      fireEvent.click(buttons[0])
+      expect(value.close).toHaveBeenCalledTimes(1)
+    })
+
+    it('puts a panel where the player would be while the video floats, and mounts no second player', () => {
+      const value = controls({ isFloating: true, canOpen: false })
+      render(withVideo(value, <div data-testid="the-player">player</div>))
+      expect(screen.getByTestId('floating-panel')).toBeInTheDocument()
+      expect(screen.queryByTestId('the-player')).toBeNull()
+      fireEvent.click(within(screen.getByTestId('floating-panel')).getByRole('button', { name: 'Bring video back' }))
+      expect(value.close).toHaveBeenCalledTimes(1)
     })
   })
 })
