@@ -31,6 +31,8 @@ export const STORAGE_KEYS = {
   LOCAL_CHAT_PLACEMENT: 'prism_chat_placement',
   /** Height in px the viewer dragged the chat to while the video floats; absent means the default height. */
   LOCAL_CHAT_FLOAT_HEIGHT: 'prism_chat_float_height',
+  /** Width in px the viewer dragged the chat column to on an offline channel's page (wide window). */
+  LOCAL_CHAT_OFFLINE_WIDTH: 'prism_chat_offline_width',
   /** Last size and position of the chat pop-out window (JSON). */
   LOCAL_CHAT_POPOUT_BOUNDS: 'prism_chat_popout_bounds',
   /** Fill mode (video and chat fill the window): the string 'true' when on. */
