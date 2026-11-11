@@ -350,6 +350,34 @@ describe('ThirtyDayPanels', () => {
       }
     })
 
+    // The recordings note, the page-limit note, the cap note and the error lines all depend on the
+    // data, so they live in one area that keeps two lines of height before they arrive.
+    it('holds a two-line note area in every panel in every state', () => {
+      for (const [, props] of states) {
+        const { container, unmount } = renderPanels(props)
+        const notes = [...container.querySelectorAll('[data-slot="note"]')]
+        expect(notes).toHaveLength(3)
+        for (const note of notes) expect(note).toHaveClass('min-h-[28px]')
+        unmount()
+      }
+    })
+
+    it('keeps the notes that depend on the data inside that area', () => {
+      renderPanels({ videos: ok(videoHistory({ coverageDays: 9 })) })
+
+      for (const name of ['Views per stream', 'Time streamed']) {
+        const note = panel(name).querySelector('[data-slot="note"]')
+        expect(note).toHaveTextContent(/recordings go back 9 days/)
+      }
+    })
+
+    it('keeps the error line inside that area', () => {
+      renderPanels({ followers: failed(), videos: failed() })
+
+      expect(panel('Followers').querySelector('[data-slot="note"]')).toHaveTextContent(/couldn.t load/i)
+      expect(panel('Time streamed').querySelector('[data-slot="note"]')).toHaveTextContent(/couldn.t load/i)
+    })
+
     it('holds the axis row in every state', () => {
       for (const [, props] of states) {
         const { container, unmount } = renderPanels(props)
