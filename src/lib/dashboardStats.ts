@@ -106,7 +106,8 @@ export interface CategoryRow {
   viewers: number
 }
 
-const NO_CATEGORY = 'No category'
+/** The row name for live follows that have no category. */
+export const NO_CATEGORY = 'No category'
 
 /** Live follows grouped by category, the one with the most viewers first. */
 export function groupCategories(follows: EnrichedFollow[]): CategoryRow[] {
