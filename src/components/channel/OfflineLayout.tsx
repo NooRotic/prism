@@ -3,6 +3,8 @@ import type { CSSProperties, ReactNode } from 'react'
 import ChatHeader from '../chat/ChatHeader'
 import ChatSource from '../chat/ChatSource'
 import ChatStrip from '../chat/ChatStrip'
+import FloatingBar from '../chat/FloatingBar'
+import FloatingPanel from '../chat/FloatingPanel'
 import ScaledChat from '../chat/ScaledChat'
 import {
   availableChatHeight,
@@ -11,6 +13,7 @@ import {
   nextFloatingHeight,
   storeFloatingHeight,
 } from '../chat/chatLayout'
+import { useFloatingVideo } from '../chat/floatingVideoContext'
 import { useChatPlacement } from '../chat/useChatPlacement'
 import { useChatPopout } from '../chat/useChatPopout'
 import { useChatScale } from '../chat/useChatScale'
@@ -26,7 +29,7 @@ const STRIP_COLUMN_PX = 40
 // the strip, the player (only when unfolded), the chat and the page body. Below `lg` they stack
 // in that order; from `lg` the chat is a column of its own that spans every row.
 const GRID =
-  'grid grid-cols-1 gap-4 w-full max-w-[1600px] mx-auto lg:grid-cols-[minmax(0,1fr)_var(--offline-chat-width)]'
+  'grid grid-cols-1 gap-4 w-full max-w-[1600px] mx-auto lg:grid-cols-[minmax(0,1fr)_min(var(--offline-chat-width),50%)]'
 const AREAS_FOLDED =
   '[grid-template-areas:"strip"_"chat"_"body"] lg:[grid-template-areas:"strip_chat"_"body_chat"]'
 const AREAS_SHOWN =
@@ -56,6 +59,16 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
   const popout = useChatPopout(channel)
   const chatScale = useChatScale()
   const chatVisible = !placement.hidden && !popout.isOpen
+
+  // The pop-out control is for a video that is in the page, so it is not offered while the player
+  // is folded. A video that already floats (it was popped out on a live channel and the viewer
+  // moved to this one) always gets its way back.
+  const video = useFloatingVideo()
+  const floating = video.isFloating
+  const videoControl =
+    (player !== null || floating) && (floating || video.canOpen)
+      ? { floating, onClick: floating ? video.close : video.open }
+      : null
 
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -116,13 +129,14 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
           className="relative min-w-0 aspect-video overflow-hidden rounded-lg border border-[color:var(--border)] [grid-area:player]"
           style={{ backgroundColor: 'var(--bg-card)' }}
         >
-          {player}
+          {/* While the video floats the slot holds a panel, never a second player. */}
+          {floating ? <FloatingPanel onBringBack={video.close} /> : player}
         </div>
       )}
 
       <div
         data-testid="chat-cell"
-        className="min-w-0 [grid-area:chat] lg:sticky lg:top-[var(--header-height)] lg:h-[calc(100vh-var(--header-height))] lg:self-start"
+        className="min-w-0 [grid-area:chat] lg:sticky lg:top-4 lg:h-[calc(100vh-var(--header-height)-1rem)] lg:self-start"
       >
         {chatVisible ? (
           <div className="flex h-full min-w-0">
@@ -138,6 +152,7 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
               className="flex h-[var(--offline-chat-height)] min-w-0 flex-1 flex-col overflow-hidden rounded-lg lg:h-full"
               style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}
             >
+              {videoControl && <FloatingBar floating={videoControl.floating} onClick={videoControl.onClick} />}
               <ChatHeader
                 side="right"
                 onHide={hide}
@@ -157,7 +172,7 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
                   onReset: chatScale.reset,
                 }}
                 dragHandleProps={{}}
-                videoControl={null}
+                videoControl={videoControl}
                 dockControls={false}
                 fillControls={false}
               />
@@ -197,6 +212,7 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
             fullscreenSupported={false}
             isFullscreen={false}
             onToggleFullscreen={noop}
+            videoControl={videoControl}
             fillControls={false}
           />
         )}

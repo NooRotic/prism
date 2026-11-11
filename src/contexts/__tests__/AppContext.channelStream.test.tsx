@@ -80,6 +80,16 @@ describe('UPDATE_CHANNEL_STREAM', () => {
     expect(result.current.state.channel.isLive).toBe(true)
   })
 
+  it('returns the very same state when the answer changes nothing, so a quiet minute re-renders no one', () => {
+    const { result } = renderHook(() => useApp(), { wrapper })
+    act(() => loadChannel(result.current.dispatch, profile(''), null))
+    const before = result.current.state
+
+    act(() => result.current.dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: null }))
+
+    expect(result.current.state).toBe(before)
+  })
+
   it('changes nothing when no channel is loaded', () => {
     const { result } = renderHook(() => useApp(), { wrapper })
     const before = result.current.state

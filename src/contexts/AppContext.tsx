@@ -239,6 +239,8 @@ function appReducer(state: AppState, action: Action): AppState {
       const { profile } = state.channel
       if (profile === null) return state
       const isLive = action.stream?.type === 'live'
+      // A quiet poll (offline, still offline) must not hand every consumer a new state.
+      if (action.stream === state.channel.stream && isLive === state.channel.isLive) return state
       // Only the streamer/chatter modes follow live status; video mode and idle stay as they are.
       const displayMode =
         state.displayMode === 'streamer' || state.displayMode === 'chatter'
