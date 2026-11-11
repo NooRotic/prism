@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import LiveWall from '../LiveWall'
+import { LIVE_BADGE_BG } from '../colours'
+import { contrastRatio } from '../../../lib/contrast'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
 import type { EnrichedFollow } from '../../../lib/followsStore'
 
@@ -58,30 +60,37 @@ function renderWall({
 const tiles = () => screen.getAllByRole('link')
 
 describe('LiveWall', () => {
-  it('opens on the Wall tab, with Wall and List as tabs', () => {
+  it('draws the LIVE badge in a colour that reaches 4.5:1 with its white text', () => {
+    renderWall({ live: [live('PixelFox', 4)] })
+
+    expect(contrastRatio('#FFFFFF', LIVE_BADGE_BG) as number).toBeGreaterThanOrEqual(4.5)
+    expect(screen.getByText('LIVE')).toHaveStyle({ backgroundColor: LIVE_BADGE_BG })
+  })
+
+  it('opens on the Wall view, with Wall and List as a pair of toggle buttons', () => {
     renderWall()
 
-    expect(screen.getByRole('tab', { name: 'Wall' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'List' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('button', { name: 'Wall' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('remembers the chosen tab', () => {
     const first = renderWall()
-    fireEvent.click(screen.getByRole('tab', { name: 'List' }))
+    fireEvent.click(screen.getByRole('button', { name: 'List' }))
 
     expect(localStorage.getItem(STORAGE_KEYS.LOCAL_DASHBOARD_WALL_VIEW)).toBe('list')
 
     first.unmount()
     renderWall()
 
-    expect(screen.getByRole('tab', { name: 'List' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('falls back to the Wall tab when the stored value is not a known view', () => {
     localStorage.setItem(STORAGE_KEYS.LOCAL_DASHBOARD_WALL_VIEW, 'sideways')
     renderWall()
 
-    expect(screen.getByRole('tab', { name: 'Wall' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Wall' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('shows a tile that links to the channel page with its viewers, name, category and uptime', () => {
@@ -135,7 +144,7 @@ describe('LiveWall', () => {
 
   it('shows name, category, viewers and uptime for each row in the List view', () => {
     renderWall({ live: [live('Kestrel', 160, { viewerCount: 2400, gameName: 'Elden Ring' })] })
-    fireEvent.click(screen.getByRole('tab', { name: 'List' }))
+    fireEvent.click(screen.getByRole('button', { name: 'List' }))
 
     const row = screen.getByRole('link', { name: /Kestrel/ })
     expect(row).toHaveAttribute('href', '/twitch/kestrel')

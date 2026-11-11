@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { STORAGE_KEYS } from '../../config/storageKeys'
 import { compactCount, formatCompactDuration } from '../../lib/dashboardStats'
 import type { EnrichedFollow } from '../../lib/followsStore'
+import { LIVE_BADGE_BG } from './colours'
 
 type WallView = 'wall' | 'list'
 
@@ -64,7 +65,7 @@ function Tile({ follow, now }: { follow: EnrichedFollow; now: number }) {
         {src && <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />}
         <span
           className="absolute left-1 top-1 rounded px-1 text-[9px] font-bold"
-          style={{ backgroundColor: 'var(--accent-red)', color: '#fff' }}
+          style={{ backgroundColor: LIVE_BADGE_BG, color: '#fff' }}
         >
           LIVE
         </span>
@@ -131,13 +132,12 @@ export default function LiveWall({ live, offlineCount, more, now, cap, onOpenFol
         <h3 className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
           Live follows · newest first
         </h3>
-        <div role="tablist" aria-label="Live follows view" className="flex gap-1">
+        <div role="group" aria-label="Live follows view" className="flex gap-1">
           {(['wall', 'list'] as const).map((tab) => (
             <button
               key={tab}
               type="button"
-              role="tab"
-              aria-selected={view === tab}
+              aria-pressed={view === tab}
               onClick={() => choose(tab)}
               className={TAB_BASE}
               style={{
