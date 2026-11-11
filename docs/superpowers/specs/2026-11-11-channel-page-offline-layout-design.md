@@ -1,6 +1,6 @@
 # Channel page, offline layout — design
 
-Date: 2026-11-11. Status: APPROVED by the owner on 2026-11-11 (the TwitchTracker default of "no" stands). Author: Claude, from a conversation with the owner
+Date: 2026-11-11. Status: APPROVED by the owner on 2026-11-11 (visited channels get TwitchTracker numbers from the server, never from the browser, for now). Author: Claude, from a conversation with the owner
 (the layout was chosen in the visual companion; the owner's own words are quoted where they are the source).
 
 ## Intent and why
@@ -201,11 +201,13 @@ the route's channel changes; the chat controls shown while folded are the listed
 - **DECIDED by the owner (2026-11-11, "Accept the reloads"):** the chat may reload once when an offline channel finishes
   loading and once when a channel goes live during the visit (about a second each). Moving between the wide and thin
   layouts never reloads it. No restructure of the page (see "What may reload the chat").
-- **Should the browser ever ask TwitchTracker about a channel the viewer is only visiting?** The owner accepted the
-  default and said "we'll see how it goes with server, maybe adjust in the future": revisit once the history server runs. The dashboard asks about the
-  streamer's own channel, which the owner accepted. For visited channels it would tell twitchtracker.com which channels
-  PRISM viewers watch, with their IP. The default in this design is no: other channels get their TwitchTracker numbers
-  from the history server later, which fetches them itself.
+- **DECIDED by the owner (2026-11-11):** visited channels DO get TwitchTracker numbers, fetched by the history SERVER, not
+  by the viewer's browser ("we keep TT at server first for sure"). The browser asks TwitchTracker only about the viewer's
+  own channel (the dashboard and this page's stats slot, already accepted). Whether the browser should also call
+  TwitchTracker for updates on visited channels is revisited once the server runs ("we'll see how it goes with server,
+  maybe adjust in the future"). Reason for server-first: a browser call would tell twitchtracker.com which channels PRISM
+  viewers watch, with their IP. This project is client-only, so until the server project lands the slot is empty for other
+  channels; the server project is next on the list.
 
 ## My calls (marked so they can be overruled)
 - Offline layout for signed-in viewers only; signed out keeps today's page. Cost if wrong: signed-out viewers of an
