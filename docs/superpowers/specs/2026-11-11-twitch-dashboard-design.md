@@ -85,7 +85,8 @@ colour, with the rank chip first and a chart of the last 30 days.
     only opens with a category name. The category rows in the right column **are** clickable: each dispatches
     the existing `OPEN_CATEGORY_PANEL` with its `gameName`, as `ProfileSidebar` does. The header is unchanged.
 14. **Session expiry logs the viewer out.** When the follows store (or any dashboard call) reports an expired
-    session, the dashboard really logs out (`handleAuthError(new SessionExpiredError())`), so the page flips to
+    session, the dashboard really logs out (clears the token and dispatches `TOKEN_EXPIRED`, which sets an `expired`
+    flag so the connect card can say so), so the page flips to
     the signed-out view and its connect card, which says the sign-in expired. A Retry cannot help: `twitchApiFetch`
     has already deleted the token. The same covers a **missing-scope 401** on the streamer calls (the code's own
     comment in `twitchAuth.ts` says a token from before the scope list grew will 401 on the newer endpoints): the
