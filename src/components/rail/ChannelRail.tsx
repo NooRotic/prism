@@ -10,7 +10,7 @@ import RailSection from './RailSection'
 import RailOfflineLink from './RailOfflineLink'
 import { useRailPosition } from './useRailPosition'
 import { isPlayerPagePath } from '../../lib/routes'
-import { sortNewestLiveFirst } from './sortLiveFollows'
+import { sortNewestLiveFirst } from '../../lib/sortLiveFollows'
 import { RAIL_RESERVE_LEFT_VAR, RAIL_RESERVE_RIGHT_VAR } from './RailGutter'
 import type { RailEntry } from './types'
 

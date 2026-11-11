@@ -1,4 +1,4 @@
-import type { EnrichedFollow } from '../../lib/followsStore'
+import type { EnrichedFollow } from './followsStore'
 
 /** When a channel went live, as a sortable number; 0 when the time is missing or unreadable. */
 function wentLiveAt(follow: EnrichedFollow): number {
