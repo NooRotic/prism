@@ -62,6 +62,10 @@ export interface AppState {
     isAuthenticated: boolean
     /** The authenticated user's own profile, populated after login. */
     user: TwitchUser | null
+    /** True when loading the profile failed for a reason other than an expired session. */
+    profileError: boolean
+    /** True when the viewer was signed out because their Twitch session expired. */
+    expired: boolean
   }
   search: { query: string; history: SearchEntry[] }
   channel: {
@@ -101,6 +105,8 @@ export interface AppState {
 type Action =
   | { type: 'LOGIN'; token: string }
   | { type: 'LOGIN_USER_LOADED'; user: TwitchUser }
+  | { type: 'LOGIN_USER_FAILED' }
+  | { type: 'LOGIN_USER_RETRY' }
   | { type: 'LOGOUT' }
   | { type: 'TOKEN_EXPIRED' }
   | { type: 'SET_QUERY'; query: string }
@@ -140,7 +146,7 @@ function channelDisplayMode(
 }
 
 const initialState: AppState = {
-  auth: { token: null, isAuthenticated: false, user: null },
+  auth: { token: null, isAuthenticated: false, user: null, profileError: false, expired: false },
   search: { query: '', history: [] },
   channel: {
     profile: null,
@@ -175,15 +181,32 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'LOGIN':
       return {
         ...state,
-        auth: { ...state.auth, token: action.token, isAuthenticated: true },
+        auth: {
+          ...state.auth,
+          token: action.token,
+          isAuthenticated: true,
+          profileError: false,
+          expired: false,
+        },
       }
     case 'LOGIN_USER_LOADED':
-      return { ...state, auth: { ...state.auth, user: action.user } }
+      return { ...state, auth: { ...state.auth, user: action.user, profileError: false } }
+    case 'LOGIN_USER_FAILED':
+      return { ...state, auth: { ...state.auth, profileError: true } }
+    case 'LOGIN_USER_RETRY':
+      return { ...state, auth: { ...state.auth, profileError: false } }
     case 'LOGOUT':
     case 'TOKEN_EXPIRED':
       return {
         ...state,
-        auth: { token: null, isAuthenticated: false, user: null },
+        // An expired session is remembered so the signed-out page can say so.
+        auth: {
+          token: null,
+          isAuthenticated: false,
+          user: null,
+          profileError: false,
+          expired: action.type === 'TOKEN_EXPIRED',
+        },
         // Close any open nav panel since it requires auth
         navPanel: { ...state.navPanel, open: null },
       }

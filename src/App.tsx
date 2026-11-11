@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { BrowserRouter, Outlet, useLocation } from 'react-router-dom'
-import { AppProvider, useApp } from './contexts/AppContext'
+import { AppProvider } from './contexts/AppContext'
 import { Header } from './components/layout/Header'
 import FollowingPanel from './components/layout/FollowingPanel'
 import YourStatsPanel from './components/layout/YourStatsPanel'
@@ -11,7 +11,7 @@ import FloatingVideoProvider from './components/chat/FloatingVideoProvider'
 import MatrixRainBackground from './components/ui/MatrixRainBackground'
 import { OnboardingIntro } from './components/intro/OnboardingIntro'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
-import { getAuthenticatedUser, SessionExpiredError } from './lib/twitchApi'
+import { useAuthProfile } from './hooks/useAuthProfile'
 import { STORAGE_KEYS } from './config/storageKeys'
 import { isPlayerPagePath } from './lib/routes'
 
@@ -43,30 +43,13 @@ migrateLocalStorageKeys()
 
 /** Shared layout wrapper — Header + slide-down panels + child route via Outlet */
 function AppLayout() {
-  const { state, dispatch } = useApp()
-  const { handleAuthError, isAuthenticated, login } = useTwitchAuth()
+  const { isAuthenticated, login } = useTwitchAuth()
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem(ONBOARDING_SEEN_KEY)
   })
 
   // Fetch the authenticated user's own profile once after login
-  const authUserLoaded = state.auth.user !== null
-  useEffect(() => {
-    if (!isAuthenticated || authUserLoaded) return
-    let cancelled = false
-    getAuthenticatedUser()
-      .then((user) => {
-        if (!cancelled) dispatch({ type: 'LOGIN_USER_LOADED', user })
-      })
-      .catch((err) => {
-        if (err instanceof SessionExpiredError) {
-          handleAuthError(err)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [isAuthenticated, authUserLoaded, dispatch, handleAuthError])
+  useAuthProfile()
 
   const handleOnboardingComplete = useCallback(() => {
     localStorage.setItem(ONBOARDING_SEEN_KEY, '1')
