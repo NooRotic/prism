@@ -38,6 +38,8 @@ export interface EnrichedFollow {
   streamTitle?: string
   thumbnailUrl?: string
   startedAt?: string
+  /** The stream's language code as Twitch reports it (for example `en`). */
+  language?: string
 }
 
 export interface FollowsSnapshot {
@@ -60,7 +62,7 @@ export const EMPTY_FOLLOWS: FollowsSnapshot = {
   cursor: null,
 }
 
-function enrichFollows(
+export function enrichFollows(
   follows: TwitchFollowedChannel[],
   liveStreams: TwitchStream[],
 ): EnrichedFollow[] {
@@ -90,6 +92,7 @@ function enrichFollows(
       streamTitle: stream.title,
       thumbnailUrl: stream.thumbnail_url,
       startedAt: stream.started_at,
+      language: stream.language,
     }
   })
 }
