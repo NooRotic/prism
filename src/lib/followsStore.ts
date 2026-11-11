@@ -341,8 +341,17 @@ export function subscribeToFollows(
   return store.subscribe(listener, onAuthError)
 }
 
+/**
+ * What a component reads for a user whose store does not exist yet. A store is created when
+ * something subscribes, which a component does in an effect after its first render, so for
+ * that first render there is nothing to read. That must say "loading" (the first load starts
+ * the moment the subscription does), not "empty", which reads as a viewer who follows no one.
+ * One shared object, because `useSyncExternalStore` needs a stable snapshot.
+ */
+const PENDING_FOLLOWS: FollowsSnapshot = { ...EMPTY_FOLLOWS, loading: true }
+
 export function getFollowsSnapshot(userId: string): FollowsSnapshot {
-  return stores.get(userId)?.getSnapshot() ?? EMPTY_FOLLOWS
+  return stores.get(userId)?.getSnapshot() ?? PENDING_FOLLOWS
 }
 
 export function getFollowsStore(userId: string): FollowsStore | undefined {

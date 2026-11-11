@@ -94,4 +94,16 @@ describe('useAuthProfile', () => {
     await waitFor(() => expect(result.current.state.auth.isAuthenticated).toBe(false))
     expect(result.current.state.auth.profileError).toBe(false)
   })
+
+  // The profile is the first request after a reload with a stale token, so it is the
+  // expiry a returning viewer meets first: the signed-out page must say it expired.
+  it('marks the session expired, so the signed-out page says so', async () => {
+    signIn()
+    mockProfile.mockRejectedValue(new SessionExpiredError())
+    const { result } = setup()
+
+    await waitFor(() => expect(result.current.state.auth.expired).toBe(true))
+    expect(result.current.state.auth.isAuthenticated).toBe(false)
+    expect(localStorage.getItem(STORAGE_KEYS.LOCAL_TWITCH_ACCESS_TOKEN)).toBeNull()
+  })
 })

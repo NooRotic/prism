@@ -1,17 +1,20 @@
 import { useEffect } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { getAuthenticatedUser, SessionExpiredError } from '../lib/twitchApi'
-import { useTwitchAuth } from './useTwitchAuth'
+import { useSessionExpiry } from './useSessionExpiry'
 
 /**
  * Loads the signed-in user's own profile once after login. A failure that is not
  * an expired session is recorded in the auth state (`profileError`) and is not
  * retried until something dispatches `LOGIN_USER_RETRY`, so a broken endpoint
- * cannot make the page request in a loop.
+ * cannot make the page request in a loop. An expired session signs the viewer
+ * out as expired: this is the first request after a reload with a stale token, so
+ * it is the expiry a returning viewer meets first.
  */
 export function useAuthProfile(): void {
   const { state, dispatch } = useApp()
-  const { isAuthenticated, handleAuthError } = useTwitchAuth()
+  const onSessionExpired = useSessionExpiry()
+  const { isAuthenticated } = state.auth
   const loaded = state.auth.user !== null
   const failed = state.auth.profileError
 
@@ -25,7 +28,7 @@ export function useAuthProfile(): void {
       .catch((err: unknown) => {
         if (cancelled) return
         if (err instanceof SessionExpiredError) {
-          handleAuthError(err)
+          onSessionExpired()
         } else {
           dispatch({ type: 'LOGIN_USER_FAILED' })
         }
@@ -33,5 +36,5 @@ export function useAuthProfile(): void {
     return () => {
       cancelled = true
     }
-  }, [isAuthenticated, loaded, failed, dispatch, handleAuthError])
+  }, [isAuthenticated, loaded, failed, dispatch, onSessionExpired])
 }

@@ -106,6 +106,24 @@ describe('IdentityStrip', () => {
     expect(screen.getByText('account since 2016')).toBeInTheDocument()
   })
 
+  // jsdom has no layout, so the phone layout is pinned by its classes and checked by eye at 375px.
+  it('stacks the totals under the name on a phone and puts them on the right from md up', () => {
+    const { container } = renderStrip()
+
+    expect(container.firstElementChild).toHaveClass('flex-col', 'md:flex-row')
+    const totals = screen.getByText('17 live of 59').parentElement
+    expect(totals).toHaveClass('md:ml-auto', 'md:text-right')
+  })
+
+  // Seen at 375px with a 26-character name: with the strip stacked (items-start) the name
+  // group is not stretched, so it must be capped at the strip's width or the badge is clipped.
+  it('keeps a long name and its badge inside the strip', () => {
+    renderStrip({ user: user({ display_name: 'A Rather Long Display Name' }) })
+
+    expect(screen.getByText('A Rather Long Display Name').closest('.max-w-full')).not.toBeNull()
+    expect(screen.getByText('AFFILIATE')).toHaveClass('shrink-0')
+  })
+
   it('shows the live and watching totals on the right', () => {
     renderStrip()
 
