@@ -9,6 +9,8 @@ interface ResizableHandleProps {
   direction?: 'horizontal' | 'vertical'
   /** Accessible name of the separator. */
   label?: string
+  /** How thick the draggable bar is, in px. Default 8; a bigger one is easier to hit with a finger. */
+  thickness?: number
 }
 
 export function ResizableHandle({
@@ -16,6 +18,7 @@ export function ResizableHandle({
   onResizeEnd,
   direction = 'horizontal',
   label,
+  thickness = 8,
 }: ResizableHandleProps) {
   const startPos = useRef(0)
   const isDragging = useRef(false)
@@ -56,8 +59,8 @@ export function ResizableHandle({
       className="shrink-0 flex items-center justify-center group touch-none select-none"
       style={{
         cursor: isHorizontal ? 'col-resize' : 'row-resize',
-        width: isHorizontal ? '8px' : '100%',
-        height: isHorizontal ? '100%' : '8px',
+        width: isHorizontal ? `${thickness}px` : '100%',
+        height: isHorizontal ? '100%' : `${thickness}px`,
         zIndex: 10,
       }}
       role="separator"
