@@ -83,6 +83,17 @@ export async function getAuthenticatedUser(): Promise<TwitchUser> {
   return data.data[0]
 }
 
+/**
+ * The name colour a user picked for Twitch chat, as `#RRGGBB`, or null when they
+ * never set one (Twitch answers with an empty string). Needs no extra scope.
+ */
+export async function getChatColor(userId: string): Promise<string | null> {
+  const data = await twitchApiFetch<{ data: { color: string }[] }>('chat/color', {
+    user_id: userId,
+  })
+  return data.data?.[0]?.color || null
+}
+
 export async function getChannelInfo(broadcasterId: string): Promise<TwitchChannel> {
   const data = await twitchApiFetch<{ data: TwitchChannel[] }>('channels', {
     broadcaster_id: broadcasterId,
