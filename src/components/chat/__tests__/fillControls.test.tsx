@@ -65,6 +65,35 @@ describe('ChatHeader fillControls', () => {
   })
 })
 
+describe('ChatStrip verticalFrom', () => {
+  it('is a column from md by default, as beside the player', () => {
+    render(strip())
+    const el = screen.getByTestId('chat-strip')
+    expect(el.className).toContain('md:flex-col')
+    expect(el.className).not.toContain('lg:flex-col')
+  })
+
+  it('stays a full-width bar until lg when asked, so a thin window does not get a lone 32px tab', () => {
+    render(
+      <ChatStrip
+        side="right"
+        restoreLabel="Show chat"
+        onRestore={vi.fn()}
+        fill={false}
+        onToggleFill={vi.fn()}
+        fullscreenSupported={false}
+        isFullscreen={false}
+        onToggleFullscreen={vi.fn()}
+        verticalFrom="lg"
+      />,
+    )
+    const el = screen.getByTestId('chat-strip')
+    expect(el.className).toContain('lg:flex-col')
+    expect(el.className).not.toContain('md:flex-col')
+    expect(el.className).not.toContain('md:w-8')
+  })
+})
+
 describe('ChatStrip fillControls', () => {
   it('shows Fill and Fullscreen by default', () => {
     render(strip())
