@@ -35,6 +35,11 @@ interface ChatHeaderProps {
    * swap to, so the swap button and the drag hint go. Defaults to true.
    */
   dockControls?: boolean
+  /**
+   * False when there is no video beside the chat to fill or fullscreen with it (an offline
+   * channel): the Fill and Fullscreen buttons go. Defaults to true.
+   */
+  fillControls?: boolean
 }
 
 const buttonClass = 'rounded-md p-1 transition-colors hover:bg-white/5'
@@ -55,6 +60,7 @@ export default function ChatHeader({
   dragHandleProps,
   videoControl = null,
   dockControls = true,
+  fillControls = true,
 }: ChatHeaderProps) {
   const target: DockSide = side === 'left' ? 'right' : 'left'
   // The header exists only while chat is docked, so filling here fills the video
@@ -78,17 +84,19 @@ export default function ChatHeader({
       </span>
       <div className="flex flex-wrap items-center gap-1">
         <ChatTextSize {...textSize} />
-        <button
-          type="button"
-          onClick={onToggleFill}
-          aria-label={fillLabel}
-          title={fillLabel}
-          aria-pressed={fill}
-          className={toggleClass}
-        >
-          {fill ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </button>
-        {fullscreenSupported && (
+        {fillControls && (
+          <button
+            type="button"
+            onClick={onToggleFill}
+            aria-label={fillLabel}
+            title={fillLabel}
+            aria-pressed={fill}
+            className={toggleClass}
+          >
+            {fill ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+        )}
+        {fillControls && fullscreenSupported && (
           <button
             type="button"
             onClick={onToggleFullscreen}

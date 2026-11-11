@@ -16,6 +16,8 @@ interface ChatStripProps {
   onToggleFullscreen: () => void
   /** Pop out / bring back the video. Omitted or null when the video cannot be popped out here. */
   videoControl?: VideoControl | null
+  /** False when there is no video to fill or fullscreen with the chat (an offline channel): both buttons go. Defaults to true. */
+  fillControls?: boolean
 }
 
 const SMALL_BUTTON = `${STRIP_BUTTON_LOOK} shrink-0 w-9 h-9 md:w-8 md:h-8`
@@ -37,6 +39,7 @@ export default function ChatStrip({
   isFullscreen,
   onToggleFullscreen,
   videoControl = null,
+  fillControls = true,
 }: ChatStripProps) {
   const fillLabel = fill ? 'Exit fill mode' : 'Fill window'
   const fullscreenLabel = isFullscreen ? 'Exit fullscreen' : 'Fullscreen chat and video'
@@ -47,17 +50,19 @@ export default function ChatStrip({
         side === 'right' ? 'md:ml-2' : 'md:mr-2'
       }`}
     >
-      <button
-        type="button"
-        onClick={onToggleFill}
-        aria-label={fillLabel}
-        title={fillLabel}
-        aria-pressed={fill}
-        className={SMALL_BUTTON}
-      >
-        {fill ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-      </button>
-      {fullscreenSupported && (
+      {fillControls && (
+        <button
+          type="button"
+          onClick={onToggleFill}
+          aria-label={fillLabel}
+          title={fillLabel}
+          aria-pressed={fill}
+          className={SMALL_BUTTON}
+        >
+          {fill ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
+      )}
+      {fillControls && fullscreenSupported && (
         <button
           type="button"
           onClick={onToggleFullscreen}
