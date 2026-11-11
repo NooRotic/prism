@@ -1,0 +1,87 @@
+<style>
+  .pm { background:#0c0c10; border:1px solid #23232e; border-radius:8px; padding:14px; color:#d8d8e4; font-size:12px; font-family:system-ui,sans-serif; }
+  .pm .lv { color:#39FF14; } .pm .pu { color:#9146FF; } .pm .mu { color:#8888a0; }
+  .pm .id { display:flex; align-items:center; gap:12px; padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid #23232e; }
+  .pm .pic { width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg,#ff7f50,#9146FF); border:2px solid #ff7f50; flex:none; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:10px; text-align:center; line-height:1.1; }
+  .pm .id .who b { font-size:15px; color:#ff7f50; } .pm .id .who span { display:block; color:#8888a0; margin-top:2px; }
+  .pm .badge { background:#9146FF33; color:#c9a8ff; border-radius:4px; padding:1px 6px; font-size:9px; margin-left:6px; letter-spacing:.06em; }
+  .pm .id .tot { margin-left:auto; text-align:right; color:#8888a0; } .pm .id .tot b { color:#fff; font-size:15px; }
+  .pm .chips { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .pm .chip { background:#14141b; border-radius:6px; padding:7px 11px; } .pm .chip small { display:block; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#8888a0; } .pm .chip b { color:#fff; font-size:14px; }
+  .pm .cols { display:grid; grid-template-columns:2.1fr 1fr; gap:14px; }
+  .pm h5 { margin:0 0 8px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#8888a0; font-weight:600; display:flex; justify-content:space-between; }
+  .pm .tabs span { margin-left:8px; color:#8888a0; text-transform:none; letter-spacing:0; } .pm .tabs .on { color:#39FF14; }
+  .pm .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .pm .tile { background:#14141b; border-radius:6px; overflow:hidden; }
+  .pm .th { height:58px; background:linear-gradient(135deg,#2a1f4d,#12202b); position:relative; }
+  .pm .th i { position:absolute; left:5px; top:5px; background:#e91916; color:#fff; font-style:normal; font-size:9px; padding:1px 4px; border-radius:3px; }
+  .pm .th em { position:absolute; right:5px; bottom:5px; background:#000a; color:#fff; font-style:normal; font-size:9px; padding:1px 4px; border-radius:3px; }
+  .pm .tx { padding:6px 7px; } .pm .tx b { display:block; color:#fff; font-size:11px; } .pm .tx span { color:#8888a0; font-size:10px; }
+  .pm .more { margin-top:10px; padding:7px 10px; border:1px dashed #33333f; border-radius:6px; color:#8888a0; display:flex; justify-content:space-between; }
+  .pm .card { background:#14141b; border-radius:6px; padding:9px 10px; margin-bottom:10px; }
+  .pm .card div { display:flex; justify-content:space-between; padding:3px 0; font-size:11px; color:#d8d8e4; }
+  .pm .card div span:last-child { color:#8888a0; }
+  .pm .card div b { color:#fff; font-weight:600; }
+</style>
+
+<h2>Combined: A, plus B's stats, plus C as text</h2>
+<p class="subtitle">My reading of your reply, for a non-streaming account. The profile picture and name colour are drawn as if pulled from your Twitch account. Still guesses: tell me what's wrong or missing.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Twitch page &middot; default view (not streaming)</div>
+  <div class="mockup-body">
+    <div class="pm">
+
+      <div class="id">
+        <div class="pic">your<br>photo</div>
+        <div class="who"><b>yourname</b><span class="badge">AFFILIATE</span><span>following 59 &middot; account since 2016</span></div>
+        <div class="tot"><b>17 live</b> of 59<br>8.1k watching right now</div>
+      </div>
+
+      <div class="chips">
+        <div class="chip"><small>Live now</small><b class="lv">17 / 59</b></div>
+        <div class="chip"><small>Watching (all follows)</small><b>8.1k</b></div>
+        <div class="chip"><small>Typical time live</small><b>2h 40m</b></div>
+        <div class="chip"><small>Just went live</small><b>3</b></div>
+        <div class="chip"><small>Longest live</small><b>5h 18m</b></div>
+        <div class="chip"><small>Languages</small><b>EN 14 &middot; DE 2 &middot; FR 1</b></div>
+        <div class="chip"><small>Oldest follow live</small><b>kestrel &middot; 2019</b></div>
+      </div>
+
+      <div class="cols">
+        <div>
+          <h5><span>Live follows &middot; newest first</span><span class="tabs"><span class="on">Wall</span><span>List</span></span></h5>
+          <div class="grid4">
+            <div class="tile"><div class="th"><i>LIVE</i><em>1.2k</em></div><div class="tx"><b>pixelfox</b><span>Just Chatting &middot; 4m</span></div></div>
+            <div class="tile"><div class="th"><i>LIVE</i><em>310</em></div><div class="tx"><b>nightowl_tv</b><span>Valorant &middot; 22m</span></div></div>
+            <div class="tile"><div class="th"><i>LIVE</i><em>88</em></div><div class="tx"><b>mossy</b><span>Minecraft &middot; 1h 05m</span></div></div>
+            <div class="tile"><div class="th"><i>LIVE</i><em>2.4k</em></div><div class="tx"><b>kestrel</b><span>Elden Ring &middot; 2h 40m</span></div></div>
+            <div class="tile"><div class="th"><i>LIVE</i><em>45</em></div><div class="tx"><b>dunewalker</b><span>Music &middot; 3h 12m</span></div></div>
+            <div class="tile"><div class="th"><i>LIVE</i><em>640</em></div><div class="tx"><b>halcyon</b><span>Just Chatting &middot; 3h 30m</span></div></div>
+            <div class="tile"><div class="th"><i>LIVE</i><em>19</em></div><div class="tx"><b>tinkerbell</b><span>Software Dev &middot; 4h</span></div></div>
+            <div class="tile"><div class="th"><i>LIVE</i><em>1.9k</em></div><div class="tx"><b>ragnarok_</b><span>Valorant &middot; 5h 18m</span></div></div>
+          </div>
+          <div class="more"><span>+ 9 more live</span><span>42 offline &#9656;</span></div>
+        </div>
+
+        <div>
+          <h5><span>Categories among your live follows</span></h5>
+          <div class="card">
+            <div><span><b>Just Chatting</b></span><span>6 live &middot; 2.3k watching</span></div>
+            <div><span><b>Valorant</b></span><span>3 live &middot; 2.3k watching</span></div>
+            <div><span><b>Elden Ring</b></span><span>2 live &middot; 2.6k watching</span></div>
+            <div><span><b>Minecraft</b></span><span>2 live &middot; 140 watching</span></div>
+            <div><span class="mu">+ 4 more categories</span><span></span></div>
+          </div>
+          <h5><span>Just went live</span></h5>
+          <div class="card"><div><span>pixelfox</span><span class="lv">4m</span></div><div><span>nightowl_tv</span><span class="lv">22m</span></div><div><span>mossy</span><span class="lv">1h 05m</span></div></div>
+          <h5><span>Most watched</span></h5>
+          <div class="card"><div><span>kestrel</span><span class="pu">2.4k</span></div><div><span>ragnarok_</span><span class="pu">1.9k</span></div><div><span>pixelfox</span><span class="pu">1.2k</span></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Where each piece would come from: the picture and name come from your own Twitch account (the picture needs nothing new; the name colour is one extra call that needs no new permission). Everything else comes from the followed-streams data PRISM already loads.</p>
