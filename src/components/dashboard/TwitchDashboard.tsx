@@ -3,6 +3,9 @@ import type { ReactNode } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { useFollowedChannels } from '../../hooks/useFollowedChannels'
 import { useSessionExpiry } from '../../hooks/useSessionExpiry'
+import { useStreamerHistory } from '../../hooks/useStreamerHistory'
+import { useStreamerNumbers } from '../../hooks/useStreamerNumbers'
+import { useTrackerSummary } from '../../hooks/useTrackerSummary'
 import { computeFollowStats, groupCategories, mostWatched, recentlyStarted } from '../../lib/dashboardStats'
 import { sortNewestLiveFirst } from '../../lib/sortLiveFollows'
 import CategoryRows from './CategoryRows'
@@ -11,6 +14,8 @@ import FollowCards from './FollowCards'
 import FollowChips from './FollowChips'
 import IdentityStrip from './IdentityStrip'
 import LiveWall from './LiveWall'
+import StreamerRow from './StreamerRow'
+import ThirtyDayPanels from './ThirtyDayPanels'
 import { useChatColor } from './useChatColor'
 import { useNow } from './useNow'
 import { useWallCap } from './useWallCap'
@@ -63,6 +68,9 @@ function RetryButton({ onClick }: { onClick: () => void }) {
  * The `/twitch` page for a signed-in viewer: who they follow that is live and the
  * figures that go with it. The follows come from the shared follows store (the
  * rail and the Following panel read the same copy), so this adds no polling.
+ * A viewer who is an affiliate or partner also gets their own channel's row and
+ * 30-day panels; for anyone else, and until the profile is known, the streamer
+ * hooks get no id and make no request.
  */
 export default function TwitchDashboard() {
   const { state, dispatch } = useApp()
@@ -74,6 +82,13 @@ export default function TwitchDashboard() {
   const chatColor = useChatColor(userId, onSessionExpired)
   const cap = useWallCap()
   const now = useNow()
+
+  // The same rule as YourStatsPanel. Hooks run on every render, so the gate is an id: null means
+  // "make no request", which is what a non-streamer and a profile that has not loaded both get.
+  const isStreamer = user?.broadcaster_type === 'affiliate' || user?.broadcaster_type === 'partner'
+  const tracker = useTrackerSummary(isStreamer && user ? user.login : null)
+  const numbers = useStreamerNumbers(isStreamer && user ? user.id : null, onSessionExpired)
+  const history = useStreamerHistory(isStreamer && user ? user.id : null, onSessionExpired)
 
   const { data } = follows
   const live = useMemo(() => sortNewestLiveFirst(data.filter((f) => f.isLive)), [data])
@@ -118,10 +133,26 @@ export default function TwitchDashboard() {
     />
   )
 
+  // The viewer's own channel does not depend on whom they follow, so it also shows below
+  // "You don't follow anyone" and above "No one you follow is live".
+  const streamerBlock = isStreamer ? (
+    <>
+      <StreamerRow
+        followers={numbers.followers.data}
+        subscribers={numbers.subscribers.data}
+        tracker={tracker.summary}
+        trackerLoading={tracker.loading}
+        login={user.login}
+      />
+      <ThirtyDayPanels followers={history.followers} videos={history.videos} tracker={tracker.summary} now={now} />
+    </>
+  ) : null
+
   if (data.length === 0) {
     return (
       <div className="flex flex-col gap-4">
         {strip}
+        {streamerBlock}
         <Panel>
           <p>You don&apos;t follow anyone on Twitch yet.</p>
           <DirectoryLink />
@@ -136,6 +167,7 @@ export default function TwitchDashboard() {
     <div className="flex flex-col gap-4">
       {strip}
       <FollowChips stats={stats} more={more} />
+      {streamerBlock}
 
       {live.length === 0 ? (
         <Panel>

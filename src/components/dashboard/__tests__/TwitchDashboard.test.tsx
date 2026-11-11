@@ -5,6 +5,10 @@ import { useFollowedChannels } from '../../../hooks/useFollowedChannels'
 import { useApp } from '../../../contexts/AppContext'
 import type { EnrichedFollow } from '../../../lib/followsStore'
 import type { TwitchUser } from '../../../types/twitch'
+import { useTrackerSummary } from '../../../hooks/useTrackerSummary'
+import { useStreamerNumbers } from '../../../hooks/useStreamerNumbers'
+import { useStreamerHistory } from '../../../hooks/useStreamerHistory'
+import type { TrackerSummary } from '../../../lib/twitchTracker'
 
 const { onSessionExpired } = vi.hoisted(() => ({ onSessionExpired: vi.fn() }))
 
@@ -15,9 +19,15 @@ vi.mock('../../../hooks/useFollowedChannels', async (importOriginal) => {
 vi.mock('../../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../../hooks/useSessionExpiry', () => ({ useSessionExpiry: () => onSessionExpired }))
 vi.mock('../useChatColor', () => ({ useChatColor: () => '#FF7F50' }))
+vi.mock('../../../hooks/useTrackerSummary', () => ({ useTrackerSummary: vi.fn() }))
+vi.mock('../../../hooks/useStreamerNumbers', () => ({ useStreamerNumbers: vi.fn() }))
+vi.mock('../../../hooks/useStreamerHistory', () => ({ useStreamerHistory: vi.fn() }))
 
 const mockFollows = vi.mocked(useFollowedChannels)
 const mockApp = vi.mocked(useApp)
+const mockTracker = vi.mocked(useTrackerSummary)
+const mockNumbers = vi.mocked(useStreamerNumbers)
+const mockHistory = vi.mocked(useStreamerHistory)
 const dispatch = vi.fn()
 const refetch = vi.fn()
 
@@ -100,11 +110,16 @@ function renderDashboard() {
   )
 }
 
+const idle = { data: null, loading: false, error: null }
+
 describe('TwitchDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setApp()
     setFollows()
+    mockTracker.mockReturnValue({ summary: null, loading: false })
+    mockNumbers.mockReturnValue({ followers: idle, subscribers: idle })
+    mockHistory.mockReturnValue({ followers: idle, videos: idle })
   })
 
   it('shows a loading skeleton and no identity strip while the profile has not loaded', () => {
@@ -226,5 +241,159 @@ describe('TwitchDashboard', () => {
     expect(screen.getByText("You don't follow anyone on Twitch yet.")).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Twitch/ })).toHaveAttribute('href', 'https://www.twitch.tv/directory')
     expect(screen.queryByRole('list', { name: 'Follow stats' })).not.toBeInTheDocument()
+  })
+
+  describe('the streamer row and 30-day panels', () => {
+    const DAY = 24 * 60 * 60 * 1000
+    const streamer = (broadcaster_type: TwitchUser['broadcaster_type']): TwitchUser => ({ ...me, broadcaster_type })
+    const liveFollows = [offlineFollow('Quiet'), liveFollow('Newest', 2)]
+
+    const tracker: TrackerSummary = {
+      rank: 18402,
+      minutesStreamed: 2460,
+      avgViewers: 86,
+      maxViewers: 312,
+      hoursWatched: 3500,
+      followersGained: 96,
+      followersTotal: 1284,
+    }
+
+    function days(value: number) {
+      return Array.from({ length: 30 }, (_, i) => {
+        const at = Date.now() - (29 - i) * DAY
+        return { day: `day-${i}`, at, value }
+      })
+    }
+
+    function loadedStreamerData() {
+      mockNumbers.mockReturnValue({
+        followers: { data: 1284, loading: false, error: null },
+        subscribers: { data: 37, loading: false, error: null },
+      })
+      mockHistory.mockReturnValue({
+        followers: {
+          data: { buckets: days(2), total: 1284, reachedCap: false, source: 'twitch' },
+          loading: false,
+          error: null,
+        },
+        videos: {
+          data: {
+            views: [{ at: Date.now() - DAY, value: 40 }],
+            hours: days(1),
+            coverageDays: 30,
+            source: 'twitch',
+          },
+          loading: false,
+          error: null,
+        },
+      })
+    }
+
+    it('shows neither, and makes no TwitchTracker or streamer-history request, for a viewer who is not a streamer', () => {
+      setFollows({ data: liveFollows })
+      renderDashboard()
+
+      expect(screen.queryByRole('region', { name: 'Your channel' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Last 30 days' })).not.toBeInTheDocument()
+      expect(mockTracker.mock.calls.every(([login]) => login === null)).toBe(true)
+      expect(mockNumbers.mock.calls.every(([id]) => id === null)).toBe(true)
+      expect(mockHistory.mock.calls.every(([id]) => id === null)).toBe(true)
+    })
+
+    it.each(['affiliate', 'partner'] as const)('shows both for %s, between the follow chips and the live wall', (type) => {
+      setApp({ user: streamer(type) })
+      setFollows({ data: liveFollows })
+      renderDashboard()
+
+      const chips = screen.getByRole('list', { name: 'Follow stats' })
+      const row = screen.getByRole('region', { name: 'Your channel' })
+      const panels = screen.getByRole('region', { name: 'Last 30 days panels' })
+      const wall = screen.getByRole('region', { name: 'Live follows' })
+      const follows = Node.DOCUMENT_POSITION_FOLLOWING
+      expect(chips.compareDocumentPosition(row) & follows).toBeTruthy()
+      expect(row.compareDocumentPosition(panels) & follows).toBeTruthy()
+      expect(panels.compareDocumentPosition(wall) & follows).toBeTruthy()
+    })
+
+    it('asks TwitchTracker for the signed-in login, and Twitch for the signed-in id, only for a streamer', () => {
+      setApp({ user: streamer('affiliate') })
+      setFollows({ data: liveFollows })
+      renderDashboard()
+
+      expect(mockTracker).toHaveBeenCalledWith('yourname')
+      expect(mockNumbers).toHaveBeenCalledWith('me', onSessionExpired)
+      expect(mockHistory).toHaveBeenCalledWith('me', onSessionExpired)
+    })
+
+    it('gives the streamer hooks the handler that signs the viewer out when the session expires', () => {
+      setApp({ user: streamer('partner') })
+      setFollows({ data: liveFollows })
+      renderDashboard()
+
+      const [, numbersHandler] = mockNumbers.mock.calls[0]
+      const [, historyHandler] = mockHistory.mock.calls[0]
+      numbersHandler()
+      historyHandler()
+
+      expect(onSessionExpired).toHaveBeenCalledTimes(2)
+    })
+
+    it('still shows the Twitch figures and the bar charts when TwitchTracker has nothing', () => {
+      setApp({ user: streamer('affiliate') })
+      setFollows({ data: liveFollows })
+      loadedStreamerData()
+      renderDashboard()
+
+      const row = within(screen.getByRole('region', { name: 'Your channel' }))
+      expect(row.getByText('1,284')).toBeInTheDocument()
+      expect(row.getByText('37')).toBeInTheDocument()
+      expect(row.getAllByText('–')).toHaveLength(6)
+      expect(screen.getByRole('img', { name: /Followers gained per day/ })).toBeInTheDocument()
+      expect(screen.getByRole('img', { name: /Hours streamed per day/ })).toBeInTheDocument()
+    })
+
+    it('shows the TwitchTracker figures when it answers', () => {
+      setApp({ user: streamer('affiliate') })
+      setFollows({ data: liveFollows })
+      loadedStreamerData()
+      mockTracker.mockReturnValue({ summary: tracker, loading: false })
+      renderDashboard()
+
+      const row = within(screen.getByRole('region', { name: 'Your channel' }))
+      expect(row.getByText('#18,402')).toBeInTheDocument()
+      expect(row.getByText('+96')).toBeInTheDocument()
+      expect(screen.getByRole('img', { name: 'Followers gained per day, last 30 days, total 96' })).toBeInTheDocument()
+    })
+
+    it('shows them above the nobody-live card too', () => {
+      setApp({ user: streamer('affiliate') })
+      setFollows({ data: [offlineFollow('A')] })
+      renderDashboard()
+
+      const row = screen.getByRole('region', { name: 'Your channel' })
+      const nobody = screen.getByText('No one you follow is live')
+      expect(row.compareDocumentPosition(nobody) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('shows them for a streamer who follows no one, since the channel figures do not depend on follows', () => {
+      setApp({ user: streamer('affiliate') })
+      setFollows({ data: [] })
+      renderDashboard()
+
+      expect(screen.getByRole('region', { name: 'Your channel' })).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Last 30 days panels' })).toBeInTheDocument()
+      expect(screen.getByText("You don't follow anyone on Twitch yet.")).toBeInTheDocument()
+    })
+
+    it('neither shows nor hides the streamer row while the profile has not loaded, and asks for nothing', () => {
+      setApp({ user: null })
+      renderDashboard()
+
+      expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'Your channel' })).not.toBeInTheDocument()
+      expect(mockTracker.mock.calls.every(([login]) => login === null)).toBe(true)
+      expect(mockNumbers.mock.calls.every(([id]) => id === null)).toBe(true)
+      expect(mockHistory.mock.calls.every(([id]) => id === null)).toBe(true)
+    })
   })
 })
