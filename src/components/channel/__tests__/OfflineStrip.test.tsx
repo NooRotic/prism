@@ -36,6 +36,23 @@ describe('OfflineStrip', () => {
     expect(onShowPlayer).toHaveBeenCalledTimes(1)
   })
 
+  it('says the channel is live when it went live while the viewer was watching something else, and offers a way to the live stream', () => {
+    const onWatchLive = vi.fn()
+    render(<OfflineStrip lastStreamedAt={NOW - DAY} now={NOW} folded={false} live onWatchLive={onWatchLive} onShowPlayer={() => {}} />)
+    const strip = screen.getByTestId('offline-strip')
+    expect(strip).toHaveTextContent('Live now')
+    expect(strip).not.toHaveTextContent('Offline')
+    expect(strip).not.toHaveTextContent('last live')
+    fireEvent.click(screen.getByRole('button', { name: 'Watch live' }))
+    expect(onWatchLive).toHaveBeenCalledTimes(1)
+  })
+
+  it('says only "Live now" when it is live and the player is already on the live stream (no way-to-live button)', () => {
+    render(<OfflineStrip lastStreamedAt={null} now={NOW} folded={false} live onShowPlayer={() => {}} />)
+    expect(screen.getByTestId('offline-strip')).toHaveTextContent('Live now')
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
   it('has no button once the player is shown', () => {
     render(<OfflineStrip lastStreamedAt={NOW - DAY} now={NOW} folded={false} onShowPlayer={() => {}} />)
     expect(screen.queryByRole('button')).toBeNull()

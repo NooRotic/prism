@@ -3,10 +3,16 @@ import { useApp } from '../contexts/AppContext'
 import type { URLDetectionResult } from '../lib/urlDetection'
 
 export interface OfflineLayout {
-  /** The page should use the offline layout: signed in, this channel's data loaded, and it is not live. */
+  /**
+   * The page should use the offline layout: signed in, this channel's data loaded, and it is not
+   * live. A channel that goes live while the viewer has the player unfolded keeps the layout, so
+   * what they are watching is not restarted.
+   */
   offline: boolean
   /** Offline and the viewer has not asked for the player (and has not chosen something to play). */
   folded: boolean
+  /** This channel's data is loaded for the signed-in viewer and the channel is live right now. */
+  live: boolean
   showPlayer: () => void
 }
 
@@ -31,14 +37,16 @@ export function useOfflineLayout(channel: string | undefined): OfflineLayout {
   const { state } = useApp()
   const { profile, isLive } = state.channel
   const channelKey = channel?.toLowerCase() ?? ''
-  const offline =
+  const profileMatches =
     state.auth.isAuthenticated &&
     channelKey !== '' &&
     profile !== null &&
-    profile.login.toLowerCase() === channelKey &&
-    !isLive
+    profile.login.toLowerCase() === channelKey
 
   const [unfolded, setUnfolded] = useState(false)
+  // Not live, or live but the viewer already has the player unfolded: in that case swapping to the
+  // live layout would remount the player (a recording they are watching would start over).
+  const offline = profileMatches && (!isLive || unfolded)
   const [seen, setSeen] = useState({ channelKey, offline })
   // The choice ends when the channel changes or the page stops being offline. Adjusting state
   // while rendering (not in an effect) keeps the unfolded player from flashing for a render.
@@ -51,5 +59,5 @@ export function useOfflineLayout(channel: string | undefined): OfflineLayout {
 
   const showPlayer = () => setUnfolded(true)
   const stillUnfolded = unfolded && seen.channelKey === channelKey && seen.offline === offline
-  return { offline, folded: offline && !stillUnfolded, showPlayer }
+  return { offline, folded: offline && !stillUnfolded, live: profileMatches && isLive, showPlayer }
 }

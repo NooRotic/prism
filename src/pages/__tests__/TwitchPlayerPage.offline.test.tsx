@@ -195,14 +195,47 @@ describe('TwitchPlayerPage: live and offline layouts', () => {
     expect(lastLiveOptions().enabled).toBe(false)
   })
 
-  it('mounts exactly one player when the channel goes live after the viewer unfolded it', () => {
+  it('keeps the player and the chat exactly where they are when the channel goes live after the viewer unfolded the player', () => {
+    mount()
+    signIn()
+    loadChannel('streamer')
+    fireEvent.click(screen.getByRole('button', { name: 'Show player' }))
+    const player = screen.getByTestId('player-host')
+    const frame = chatFrames()[0]
+    scrollTo.mockClear()
+
+    act(() => dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: liveStream }))
+
+    expect(screen.getAllByTestId('player-host')).toHaveLength(1)
+    expect(screen.getByTestId('player-host')).toBe(player)
+    expect(chatFrames()).toHaveLength(1)
+    expect(chatFrames()[0]).toBe(frame)
+    expect(screen.getByTestId('offline-layout')).toBeInTheDocument()
+    expect(screen.queryByTestId('chat-dock')).toBeNull()
+    expect(screen.getByTestId('offline-strip')).toHaveTextContent('Live now')
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(lastLiveOptions().enabled).toBe(false)
+  })
+
+  it('offers "Watch live" when it went live while a recording plays, and points the player at the live stream', () => {
+    mount()
+    signIn()
+    loadChannel('streamer')
+    fireEvent.click(screen.getByRole('button', { name: 'play clip' }))
+    act(() => dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: liveStream }))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch live' }))
+    expect(screen.queryByRole('button', { name: 'Watch live' })).toBeNull()
+    expect(screen.getByTestId('offline-strip')).toHaveTextContent('Live now')
+  })
+
+  it('has no "Watch live" button when it went live while the player is already on the live stream', () => {
     mount()
     signIn()
     loadChannel('streamer')
     fireEvent.click(screen.getByRole('button', { name: 'Show player' }))
     act(() => dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: liveStream }))
-    expect(screen.getAllByTestId('player-host')).toHaveLength(1)
-    expect(screen.getByTestId('chat-dock')).toContainElement(screen.getByTestId('player-host'))
+    expect(screen.getByTestId('offline-strip')).toHaveTextContent('Live now')
+    expect(screen.queryByRole('button', { name: 'Watch live' })).toBeNull()
   })
 
   it('folds again on the next channel after a route change', () => {

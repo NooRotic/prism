@@ -145,13 +145,38 @@ describe('useOfflineLayout: the folded player', () => {
     expect(result.current.layout).toMatchObject({ offline: true, folded: true })
   })
 
-  it('folds again after the channel went live and offline again', () => {
+  it('is not offline once a still-folded channel goes live, and folds again if it goes offline again', () => {
+    const { result } = offlineHook()
+    act(() => result.current.app.dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: liveStream }))
+    expect(result.current.layout).toMatchObject({ offline: false, live: true })
+    act(() => result.current.app.dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: null }))
+    expect(result.current.layout).toMatchObject({ offline: true, folded: true, live: false })
+  })
+
+  it('stays in the offline layout, unfolded, when the channel goes live after the viewer unfolded the player, so what they are watching is not interrupted', () => {
     const { result } = offlineHook()
     act(() => result.current.layout.showPlayer())
     act(() => result.current.app.dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: liveStream }))
+    expect(result.current.layout).toMatchObject({ offline: true, folded: false, live: true })
+  })
+
+  it('leaves the offline layout for good when the viewer who unfolded it moves to another channel', () => {
+    const { result, rerender } = offlineHook()
+    act(() => result.current.layout.showPlayer())
+    act(() => result.current.app.dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: liveStream }))
+    rerender({ route: 'other' })
+    expect(result.current.layout).toMatchObject({ offline: false, folded: false })
+    act(() => loadChannel(result.current.app.dispatch, 'other', liveStream))
+    expect(result.current.layout).toMatchObject({ offline: false })
+  })
+
+  it('leaves the offline layout when the viewer signs out', () => {
+    const { result } = offlineHook()
+    act(() => result.current.layout.showPlayer())
+    act(() => result.current.app.dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: liveStream }))
+    expect(result.current.layout.offline).toBe(true)
+    act(() => result.current.app.dispatch({ type: 'LOGOUT' }))
     expect(result.current.layout.offline).toBe(false)
-    act(() => result.current.app.dispatch({ type: 'UPDATE_CHANNEL_STREAM', stream: null }))
-    expect(result.current.layout).toMatchObject({ offline: true, folded: true })
   })
 
   it('does not unfold on a stale detection of the previous channel after a route change', () => {

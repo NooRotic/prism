@@ -22,14 +22,25 @@ function PageOfflineStrip({
   videos,
   folded,
   onShowPlayer,
+  live,
+  onWatchLive,
 }: {
   videos: TwitchVideo[]
   folded: boolean
   onShowPlayer: () => void
+  live: boolean
+  onWatchLive?: () => void
 }) {
   const now = useNow()
   return (
-    <OfflineStrip lastStreamedAt={lastStreamedAt(videos)} now={now} folded={folded} onShowPlayer={onShowPlayer} />
+    <OfflineStrip
+      lastStreamedAt={lastStreamedAt(videos)}
+      now={now}
+      folded={folded}
+      onShowPlayer={onShowPlayer}
+      live={live}
+      onWatchLive={onWatchLive}
+    />
   )
 }
 
@@ -58,9 +69,20 @@ export default function TwitchPlayerPage() {
   const layout = useOfflineLayout(channel)
   useChannelLive({
     userId: state.channel.profile?.id ?? null,
-    enabled: layout.offline,
+    // Once it is live there is nothing left to wait for (this also covers the viewer who kept the
+    // offline layout because they were watching something when it went live).
+    enabled: layout.offline && !layout.live,
     onSessionExpired,
   })
+
+  // The channel went live while the viewer was watching a recording: offer the way to the live
+  // stream, and leave the player alone until they take it.
+  const playsRecording =
+    player.detection?.platform === 'twitch-clip' || player.detection?.platform === 'twitch-video'
+  const watchLive = () => {
+    const url = `https://twitch.tv/${channel}`
+    dispatch({ type: 'PLAY_URL', url, detection: detectURLType(url) })
+  }
 
   // Set player URL from route param
   useEffect(() => {
@@ -117,6 +139,8 @@ export default function TwitchPlayerPage() {
               videos={state.channel.videos}
               folded={layout.folded}
               onShowPlayer={layout.showPlayer}
+              live={layout.live}
+              onWatchLive={layout.live && playsRecording ? watchLive : undefined}
             />
           }
           player={layout.folded ? null : playerNode}
