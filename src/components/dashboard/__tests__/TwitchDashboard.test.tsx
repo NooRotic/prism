@@ -9,6 +9,8 @@ import { useTrackerSummary } from '../../../hooks/useTrackerSummary'
 import { useStreamerNumbers } from '../../../hooks/useStreamerNumbers'
 import { useStreamerHistory } from '../../../hooks/useStreamerHistory'
 import type { TrackerSummary } from '../../../lib/twitchTracker'
+import { useChannelHistory } from '../../../hooks/useChannelHistory'
+import type { ChannelHistory, HistoryRow } from '../../../lib/historyApi'
 
 const { onSessionExpired } = vi.hoisted(() => ({ onSessionExpired: vi.fn() }))
 
@@ -22,6 +24,36 @@ vi.mock('../useChatColor', () => ({ useChatColor: () => '#FF7F50' }))
 vi.mock('../../../hooks/useTrackerSummary', () => ({ useTrackerSummary: vi.fn() }))
 vi.mock('../../../hooks/useStreamerNumbers', () => ({ useStreamerNumbers: vi.fn() }))
 vi.mock('../../../hooks/useStreamerHistory', () => ({ useStreamerHistory: vi.fn() }))
+vi.mock('../../../hooks/useChannelHistory', () => ({ useChannelHistory: vi.fn() }))
+
+const mockChannelHistory = vi.mocked(useChannelHistory)
+
+const serverRow = (date: string, followersTotal: number): HistoryRow => ({
+  date,
+  rank: 100,
+  minutesStreamed: 600,
+  avgViewers: 50,
+  maxViewers: 90,
+  hoursWatched: 1200,
+  followersChange: 10,
+  followersTotal,
+  ttStatus: 'ok',
+})
+
+const serverHistory: ChannelHistory = {
+  login: 'yourname',
+  displayName: 'YourName',
+  avatarUrl: null,
+  broadcasterType: 'affiliate',
+  language: 'en',
+  category: null,
+  trackedSince: '2026-11-09',
+  lastUpdated: '2026-11-12T03:00:00Z',
+  ttStatus: 'ok',
+  bioLinks: [],
+  latest: serverRow('2026-11-12', 1030),
+  history: [serverRow('2026-11-09', 1000), serverRow('2026-11-10', 1010), serverRow('2026-11-12', 1030)],
+}
 
 const mockFollows = vi.mocked(useFollowedChannels)
 const mockApp = vi.mocked(useApp)
@@ -120,6 +152,7 @@ describe('TwitchDashboard', () => {
     mockTracker.mockReturnValue({ summary: null, loading: false, unavailable: false })
     mockNumbers.mockReturnValue({ followers: idle, subscribers: idle })
     mockHistory.mockReturnValue({ followers: idle, videos: idle })
+    mockChannelHistory.mockReturnValue({ status: 'idle' })
   })
 
   it('shows a loading skeleton and no identity strip while the profile has not loaded', () => {
@@ -314,6 +347,49 @@ describe('TwitchDashboard', () => {
       expect(chips.compareDocumentPosition(row) & follows).toBeTruthy()
       expect(row.compareDocumentPosition(panels) & follows).toBeTruthy()
       expect(panels.compareDocumentPosition(wall) & follows).toBeTruthy()
+    })
+
+    it('adds the history server charts under the streamer block, not instead of its panels, and without a second row of TwitchTracker numbers', () => {
+      setApp({ user: streamer('affiliate') })
+      setFollows({ data: liveFollows })
+      mockChannelHistory.mockReturnValue({ status: 'ready', data: serverHistory })
+      renderDashboard()
+
+      const panels = screen.getByRole('region', { name: 'Last 30 days panels' })
+      const history = screen.getByRole('region', { name: 'Channel history' })
+      const wall = screen.getByRole('region', { name: 'Live follows' })
+      const follows = Node.DOCUMENT_POSITION_FOLLOWING
+      expect(panels.compareDocumentPosition(history) & follows).toBeTruthy()
+      expect(history.compareDocumentPosition(wall) & follows).toBeTruthy()
+      expect(screen.queryByRole('list', { name: 'Channel stats' })).not.toBeInTheDocument()
+      expect(within(history).getAllByRole('img')).toHaveLength(4)
+      expect(mockChannelHistory).toHaveBeenCalledWith('yourname')
+    })
+
+    it('shows nothing extra when the history server has nothing', () => {
+      setApp({ user: streamer('partner') })
+      setFollows({ data: liveFollows })
+      mockChannelHistory.mockReturnValue({ status: 'unavailable' })
+      renderDashboard()
+
+      expect(screen.queryByRole('region', { name: 'Channel history' })).not.toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Last 30 days panels' })).toBeInTheDocument()
+    })
+
+    it('does not ask the history server about a viewer who is not a streamer', () => {
+      setFollows({ data: liveFollows })
+      renderDashboard()
+
+      expect(mockChannelHistory).not.toHaveBeenCalled()
+    })
+
+    it('shows the history charts under the streamer block even when the viewer follows no one', () => {
+      setApp({ user: streamer('affiliate') })
+      setFollows({ data: [] })
+      mockChannelHistory.mockReturnValue({ status: 'ready', data: serverHistory })
+      renderDashboard()
+
+      expect(screen.getByRole('region', { name: 'Channel history' })).toBeInTheDocument()
     })
 
     it('asks TwitchTracker for the signed-in login, and Twitch for the signed-in id, only for a streamer', () => {

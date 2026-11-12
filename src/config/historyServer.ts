@@ -5,8 +5,10 @@
  *
  * HISTORY_ENABLED is the kill switch: false makes no request and every page behaves as it did before the
  * server existed. The server is optional by design; when it is slow or down, nothing on a page changes.
+ * It is off under the test runner, so no test can reach the real server by accident (a test of the history
+ * code mocks this module and switches it on).
  */
-export const HISTORY_ENABLED = true
+export const HISTORY_ENABLED = import.meta.env.MODE !== 'test'
 
 /** Where the server lives. Override with VITE_HISTORY_API_URL (for example a local test server). */
 export const HISTORY_API_URL: string = (

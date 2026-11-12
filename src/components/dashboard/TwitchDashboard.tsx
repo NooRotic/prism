@@ -1,11 +1,13 @@
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { useApp } from '../../contexts/AppContext'
+import { useChannelHistory } from '../../hooks/useChannelHistory'
 import { useFollowedChannels } from '../../hooks/useFollowedChannels'
 import { useSessionExpiry } from '../../hooks/useSessionExpiry'
 import { isStreamerTier, useStreamerStats } from '../../hooks/useStreamerStats'
 import { computeFollowStats, groupCategories, mostWatched, recentlyStarted } from '../../lib/dashboardStats'
 import { sortNewestLiveFirst } from '../../lib/sortLiveFollows'
+import HistoryBlock from '../channel/HistoryBlock'
 import CategoryRows from './CategoryRows'
 import DashboardSkeleton from './DashboardSkeleton'
 import FollowCards from './FollowCards'
@@ -18,6 +20,16 @@ import { useNow } from './useNow'
 import { useWallCap } from './useWallCap'
 
 const TWITCH_DIRECTORY = 'https://www.twitch.tv/directory'
+
+/**
+ * The history server's charts for the viewer's own channel, under the streamer block. They sit beside the
+ * Twitch-sourced panels (which they cannot replace) and add no second row of TwitchTracker numbers; nothing
+ * shows until the server has an answer. Its own component so the history hook runs only for a streamer.
+ */
+function OwnChannelHistory({ login, now }: { login: string; now: number }) {
+  const history = useChannelHistory(login)
+  return <HistoryBlock state={history} now={now} chartsOnly />
+}
 
 function Panel({ children }: { children: ReactNode }) {
   return (
@@ -130,7 +142,10 @@ export default function TwitchDashboard() {
   // The viewer's own channel does not depend on whom they follow, so it also shows below
   // "You don't follow anyone" and above "No one you follow is live".
   const streamerBlock = isStreamerTier(user) ? (
-    <StreamerBlock login={user.login} stats={streamerStats} now={now} />
+    <>
+      <StreamerBlock login={user.login} stats={streamerStats} now={now} />
+      <OwnChannelHistory login={user.login} now={now} />
+    </>
   ) : null
 
   if (data.length === 0) {

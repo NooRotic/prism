@@ -2,10 +2,13 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { resetVisitMemory, useChannelHistory } from '../useChannelHistory'
 import { loadChannelHistory, type ChannelHistory, type HistoryResult } from '../../lib/historyApi'
 
-const flags = vi.hoisted(() => ({ sendVisits: true }))
+const flags = vi.hoisted(() => ({ sendVisits: true, enabled: true }))
 vi.mock('../../config/historyServer', () => ({
   get SEND_VISITS() {
     return flags.sendVisits
+  },
+  get HISTORY_ENABLED() {
+    return flags.enabled
   },
 }))
 vi.mock('../../lib/historyApi', () => ({ loadChannelHistory: vi.fn() }))
@@ -45,6 +48,7 @@ describe('useChannelHistory', () => {
     vi.clearAllMocks()
     resetVisitMemory()
     flags.sendVisits = true
+    flags.enabled = true
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(T0)
     mockLoad.mockResolvedValue(tracked())
@@ -58,6 +62,14 @@ describe('useChannelHistory', () => {
     const { result } = renderHook(() => useChannelHistory(undefined))
 
     expect(result.current).toEqual({ status: 'idle' })
+    expect(mockLoad).not.toHaveBeenCalled()
+  })
+
+  it('is unavailable at once, and makes no request, when the history server is switched off', () => {
+    flags.enabled = false
+    const { result } = renderHook(() => useChannelHistory('alice'))
+
+    expect(result.current).toEqual({ status: 'unavailable' })
     expect(mockLoad).not.toHaveBeenCalled()
   })
 
