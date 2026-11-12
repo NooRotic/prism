@@ -1,0 +1,37 @@
+# Run the server tests:  docker compose -f server/docker-compose.test.yml run --rm php vendor/bin/phpunit
+# MariaDB 10.11 matches the IONOS host. Its data lives in tmpfs, so every start is a clean, fast database.
+services:
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: test
+      MARIADB_DATABASE: prism_test
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      db:
+        condition: service_healthy
+    working_dir: /app
+    environment:
+      TEST_DB_HOST: db
+      TEST_DB_NAME: prism_test
+      TEST_DB_USER: root
+      TEST_DB_PASS: test
+    volumes:
+      - ./:/app
+      # The image's vendor/ (PHPUnit) must not be hidden by the bind mount above.
+      - vendor:/app/vendor
+
+volumes:
+  vendor:
