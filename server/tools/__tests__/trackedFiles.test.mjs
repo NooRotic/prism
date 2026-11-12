@@ -30,6 +30,14 @@ describe('server files and git', () => {
     expect(ignoredAmong(['server/config.php'])).toEqual(['server/config.php'])
   })
 
+  it('ignores a locally prepared copy of the settings file, such as prism-data.config.php', () => {
+    expect(ignoredAmong(['server/prism-data.config.php', 'server/prod.config.php'])).toEqual(['server/prism-data.config.php', 'server/prod.config.php'])
+  })
+
+  it('keeps the committed example config tracked', () => {
+    expect(ignoredAmong(['server/config.example.php'])).toEqual([])
+  })
+
   it('ignores nothing that the deploy would ship, so a fresh clone deploys the same files', () => {
     const shipped = listServerFiles(serverDir).map((f) => `server/${f}`)
     expect(shipped.length).toBeGreaterThan(30)
