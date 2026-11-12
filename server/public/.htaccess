@@ -1,0 +1,10 @@
+# Apache on the IONOS host: no directory listings, no dotfiles, and every other URL goes to the front controller.
+Options -Indexes
+
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]
