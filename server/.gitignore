@@ -1,7 +1,11 @@
 vendor/
 .phpunit.cache/
 composer.lock
+# The private settings file the owner creates on the host. Git matches ignore rules case-insensitively on
+# Windows and macOS, so this rule also swallowed src/Config.php (the class that reads it) and it was never
+# committed: the second line puts that one class back. server/tools/__tests__/trackedFiles.test.mjs guards it.
 config.php
+!/src/Config.php
 *.log
 deploy.config.json
 .env
