@@ -18,7 +18,8 @@ return [
     'allowed_origins' => ['https://prism.nooroticx.tv', 'http://localhost:5000'],
     'tt' => [
         'enabled' => true,
-        // Names PRISM and a public contact address, as TwitchTracker's API guidance asks.
+        // Names PRISM and a public contact address, as TwitchTracker's API guidance asks. The server refuses to start
+        // while this still contains the example.com placeholder.
         'user_agent' => 'PRISM/1.0 (+https://prism.nooroticx.tv; contact: you@example.com)',
         'gap_ms' => 1500,
         'run_budget' => 300,
@@ -29,6 +30,8 @@ return [
         'new_per_hour' => 20,
         'new_per_day' => 200,
         'untracked_recheck_days' => 7,
+        // Twitch lookups per hour for logins never seen before (a flood of made-up names stops here).
+        'lookups_per_hour' => 100,
     ],
     // Kill switches: set to false to switch behaviour off without a redeploy.
     'flags' => [

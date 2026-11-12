@@ -8,6 +8,15 @@ Plan: [docs/superpowers/plans/2026-11-12-history-server.md](../docs/superpowers/
 (`server/public/` becomes `/prism-data/public/`, the only web-reachable part). The real `config.php`
 (Twitch secret, database login) is created by the owner on the host, never committed, and never read by tooling.
 
+## Deploy
+
+`node server/tools/deploy.mjs` lists what would go to the host; add `--go` to upload over password SFTP (pinned host
+key, `IONOS_SSH_PASSWORD` from the environment or a gitignored `.env`; options `--config` and `--env-file`). It never
+uploads `config.php`. Classes go up first and `public/` last, so a request during an upgrade never meets a new front
+controller with old classes. It only adds and replaces files: a file you remove from `server/` stays on the host until
+you delete it by hand. Unlike the owner's inferno recipe there is no scp fallback: without a password it stops with a
+message.
+
 ## Tests
 
 PHP and MariaDB run in Docker, at the same versions as the host (PHP 8.4, MariaDB 10.11). PHPUnit is a dev

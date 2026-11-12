@@ -11,8 +11,9 @@ use PDO;
  *
  * A file is a list of plain statements separated by `;` at the end of a line (no `;` inside a string, no
  * procedures), with `--` comment lines allowed. Each statement runs on its own so an error in a later one is
- * never swallowed. The version is recorded only after the whole file succeeds. DDL cannot be rolled back, so
- * after a failure fix the file and drop any table it half-created before running again.
+ * never swallowed. The version is recorded only after the whole file succeeds. DDL cannot be rolled back, so a
+ * migration must be written to be safe to run again (CREATE TABLE IF NOT EXISTS, INSERT IGNORE): after a failure
+ * fix the cause and run the installer again.
  */
 final class Migrator
 {

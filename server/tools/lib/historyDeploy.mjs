@@ -70,9 +70,20 @@ function isShipped(path) {
   return true
 }
 
-/** The upload plan for a list of files relative to server/: directories parents first, then the files. */
+/** Folders in the order they upload: the classes, migrations and scripts first, the public entry point last. */
+const UPLOAD_ORDER = ['src', 'migrations', 'bin', 'public']
+
+/**
+ * The upload plan for a list of files relative to server/: directories parents first, then the files. Files go
+ * up in UPLOAD_ORDER, so a request that arrives during an upgrade never meets a new front controller with old
+ * classes. The deploy only adds and replaces files; a file removed from server/ stays on the host until deleted by hand.
+ */
 export function planServerUpload(files, remoteDir = 'prism-data') {
-  const kept = files.map((f) => f.split('\\').join('/')).filter(isShipped).sort()
+  const rank = (path) => UPLOAD_ORDER.indexOf(path.split('/')[0])
+  const kept = files
+    .map((f) => f.split('\\').join('/'))
+    .filter(isShipped)
+    .sort((a, b) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0))
   const dirs = new Set([remoteDir])
   for (const file of kept) {
     let d = posix.dirname(file)

@@ -130,6 +130,14 @@ final class ChannelStore
             ]);
     }
 
+    /** Notes that Twitch was asked about this channel just now, without changing anything else (for a gone channel Twitch still cannot find). */
+    public function touchProfileCheck(string $id): void
+    {
+        $this->pdo
+            ->prepare('UPDATE channels SET profile_checked_at = ? WHERE twitch_id = ?')
+            ->execute([Time::datetime($this->clock->nowMs()), $id]);
+    }
+
     public function markGone(string $id): void
     {
         $this->pdo->prepare("UPDATE channels SET status = 'gone' WHERE twitch_id = ?")->execute([$id]);

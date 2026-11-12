@@ -6,6 +6,7 @@ namespace Prism\History;
 
 use Prism\History\Store\BioLinkStore;
 use Prism\History\Store\ChannelStore;
+use Prism\History\Store\JobState;
 use Prism\History\Store\SnapshotStore;
 use Prism\History\Tracker\TrackerClient;
 use Prism\History\Tracker\TrackerResult;
@@ -37,6 +38,7 @@ final class VisitService
         private TtGate $gate,
         private ChannelPayload $payload,
         private Clock $clock,
+        private JobState $state,
     ) {
     }
 
@@ -61,6 +63,9 @@ final class VisitService
         if ($row !== null && !$this->needsResolve($row)) {
             $id = (string) $row['twitch_id'];
         } else {
+            if ($row === null && !$this->takeLookup()) {
+                return new VisitResult(VisitResult::CAP); // made-up names must not be able to use up the Twitch budget
+            }
             try {
                 $user = $this->twitch->usersByLogin([$login])[$login] ?? null;
                 $twitchDown = false;
@@ -74,6 +79,9 @@ final class VisitService
                     return new VisitResult($twitchDown ? VisitResult::UNAVAILABLE : VisitResult::NOT_FOUND);
                 }
                 $id = (string) $row['twitch_id']; // a known channel Twitch cannot confirm right now: answer from the store
+                if ($row['status'] === 'gone' && !$twitchDown) {
+                    $this->channels->touchProfileCheck($id); // Twitch still does not have it: ask again in an hour, not on every visit
+                }
             } else {
                 $stop = $this->adopt($user);
                 if ($stop !== null) {
@@ -125,11 +133,21 @@ final class VisitService
     /** @param array<string,mixed> $row */
     private function needsResolve(array $row): bool
     {
-        if ($row['status'] === 'gone' || $row['profile_checked_at'] === null) {
+        if ($row['profile_checked_at'] === null) {
             return true;
         }
+        $age = $this->clock->nowMs() - Time::parseDatetime((string) $row['profile_checked_at']);
 
-        return $this->clock->nowMs() - Time::parseDatetime((string) $row['profile_checked_at']) >= self::PROFILE_MAX_AGE_MS;
+        // A channel Twitch could not find is looked for again, but at most once an hour; any other profile after a day.
+        return $age >= ($row['status'] === 'gone' ? self::HOUR_MS : self::PROFILE_MAX_AGE_MS);
+    }
+
+    /** Counts one Twitch lookup for a login never seen before in this clock hour; false once the hour's allowance is spent. */
+    private function takeLookup(): bool
+    {
+        $hour = gmdate('YmdH', intdiv($this->clock->nowMs(), 1000));
+
+        return $this->state->incr('twitch_lookups:' . $hour) <= $this->config->lookupsPerHour();
     }
 
     private function newChannelCapReached(): bool
@@ -149,6 +167,10 @@ final class VisitService
         if (!$this->config->ttEnabled()) {
             return false;
         }
+        $channel = $this->channels->findById($id);
+        if ($channel === null || $channel['status'] === 'gone') {
+            return false; // a channel Twitch no longer has is not refreshed
+        }
         $today = Time::date($this->clock->nowMs());
         if (!TtPolicy::mayCall($this->snapshots, $id, $today, $this->config->untrackedRecheckDays())) {
             return false;
@@ -156,8 +178,12 @@ final class VisitService
         if (!$this->gate->acquire(false)) {
             return true;
         }
+        // Another request, or a scheduled run, may have filed today's answer while this one waited for its turn.
+        if ($this->snapshots->hasOkFor($id, Time::date($this->clock->nowMs()))) {
+            return false;
+        }
 
-        $login = (string) ($this->channels->findById($id)['login'] ?? '');
+        $login = (string) $channel['login'];
         $result = $this->tracker->channelSummary($login);
         // Stamp the UTC date the answer arrived on: the gate may have waited past midnight.
         $date = Time::date($this->clock->nowMs());

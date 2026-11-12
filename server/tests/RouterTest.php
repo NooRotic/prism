@@ -268,6 +268,20 @@ final class RouterTest extends DbTestCase
         $this->assertStringNotContainsString('SQLSTATE', $log);
     }
 
+    public function testEveryAnswerCarriesNosniff(): void
+    {
+        $this->call('GET', '/api/channel', ['login' => 'nobody']);
+        $this->call('POST', '/api/visit', [], self::ORIGIN, 'garbage');
+        $this->call('GET', '/api/nope');
+        $this->call('GET', '/api/visit');
+        $this->call('GET', '/api/channel', ['login' => 'a b']);
+
+        $this->assertCount(5, $this->seen);
+        foreach ($this->seen as $response) {
+            $this->assertSame('nosniff', $response->headers['X-Content-Type-Options'] ?? null);
+        }
+    }
+
     public function testNoResponseEverContainsAConfigSecret(): void
     {
         $this->world->addUser('1', 'alice');

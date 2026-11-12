@@ -126,6 +126,20 @@ final class ChannelStoreTest extends DbTestCase
         $this->assertSame('Just Chatting', $this->row('1')['category']);
     }
 
+    public function testTouchProfileCheckStampsTheTimeAndNothingElse(): void
+    {
+        $this->channels->insertTracked(Fixtures::user('1', 'alice'), Fixtures::info('1'));
+        $this->channels->markGone('1');
+        $this->clock->advanceMs(self::HOUR_MS);
+
+        $this->channels->touchProfileCheck('1');
+
+        $row = $this->row('1');
+        $this->assertSame('2026-11-12 04:00:00', $row['profile_checked_at']);
+        $this->assertSame('gone', $row['status']);
+        $this->assertSame('2026-11-12 03:00:00', $row['last_visited_at']);
+    }
+
     public function testApplyProfileRevivesAGoneChannel(): void
     {
         $this->channels->insertTracked(Fixtures::user('1', 'alice'), null);

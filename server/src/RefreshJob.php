@@ -12,13 +12,16 @@ use Prism\History\Tracker\TrackerResult;
 use Prism\History\Tracker\TtGate;
 use Prism\History\Twitch\TwitchClient;
 use Prism\History\Twitch\TwitchUnavailable;
+use Throwable;
 
 /**
  * One scheduled run. It is small and safe to repeat: it only picks up tracking channels that still lack a good
  * (ok) snapshot for today, so a failed or unfinished channel is simply taken by the next run and a rerun the
- * same day does nothing. It stops being refreshed for channels nobody has visited for the tail window (dormant),
- * re-reads Twitch profiles (renames, links, and channels Twitch no longer finds) at most every 12 hours, and
- * asks TwitchTracker under the one TT rule through the shared gate. The log line holds counts only.
+ * same day does nothing. Only one run goes at a time (a second one stops at once as already_running). It stops
+ * being refreshed for channels nobody has visited for the tail window (dormant), re-reads Twitch profiles
+ * (renames, links, and channels Twitch no longer finds) at most every 12 hours, and asks TwitchTracker under the
+ * one TT rule through the shared gate. One bad channel never stops the run, ten failures in a row do, and
+ * Twitch being down does not stop the TT numbers. The log line holds counts only.
  */
 final class RefreshJob
 {
@@ -26,6 +29,8 @@ final class RefreshJob
     private const PROFILE_REFRESH_MS = 12 * 3_600_000;
     /** At most this many profiles are read per run (ten Helix calls). */
     private const MAX_PROFILES_PER_RUN = 1000;
+    /** This many failed TT calls in a row end the run: TwitchTracker or the database is not answering. */
+    private const MAX_CONSECUTIVE_FAILURES = 10;
 
     public function __construct(
         private Config $config,
@@ -37,6 +42,7 @@ final class RefreshJob
         private TtGate $gate,
         private Logger $logger,
         private Clock $clock,
+        private RunLock $lock,
     ) {
     }
 
@@ -54,20 +60,33 @@ final class RefreshJob
             'stopped_by' => 'done',
         ];
 
-        $this->gate->resetRun();
-        $counts['dormant'] = $this->channels->markDormantOlderThan($this->config->tailDays());
-        $due = $this->channels->trackingWithoutOkSnapshotFor(Time::date($this->clock->nowMs()));
-
-        try {
-            $this->refreshProfiles($due, $counts);
-        } catch (TwitchUnavailable) {
-            $counts['stopped_by'] = 'twitch_unavailable';
+        if (!$this->lock->acquire()) {
+            $counts['stopped_by'] = 'already_running';
 
             return $this->finish($counts);
         }
 
-        if ($this->config->ttEnabled()) {
-            $this->fetchTt($due, $counts);
+        try {
+            $this->gate->resetRun();
+            $counts['dormant'] = $this->channels->markDormantOlderThan($this->config->tailDays());
+            $due = $this->channels->trackingWithoutOkSnapshotFor(Time::date($this->clock->nowMs()));
+
+            // Profiles are a nice-to-have: with Twitch down the TT numbers (which need only the stored login) still go on.
+            $twitchDown = false;
+            try {
+                $this->refreshProfiles($due, $counts);
+            } catch (TwitchUnavailable) {
+                $twitchDown = true;
+            }
+
+            if ($this->config->ttEnabled()) {
+                $this->fetchTt($due, $counts);
+            }
+            if ($twitchDown && $counts['stopped_by'] === 'done') {
+                $counts['stopped_by'] = 'twitch_unavailable';
+            }
+        } finally {
+            $this->lock->release();
         }
 
         return $this->finish($counts);
@@ -130,32 +149,62 @@ final class RefreshJob
         }
 
         $processed = 0;
+        $failuresInARow = 0;
         foreach ($eligible as $channel) {
             if (!$this->gate->acquire(true)) {
-                $counts['stopped_by'] = $this->gate->isPaused() ? 'rate_limited' : 'budget';
-                break;
-            }
-
-            $result = $this->tracker->channelSummary((string) $channel['login']);
-            $date = Time::date($this->clock->nowMs()); // the UTC day this answer arrived on
-            $processed++;
-
-            if ($result->kind === TrackerResult::RATE_LIMITED) {
-                $this->gate->pauseForRestOfDay($result->retryAfter);
-                $counts['stopped_by'] = 'rate_limited';
+                $counts['stopped_by'] = match ($this->gate->lastRefusal()) {
+                    'paused' => 'rate_limited',
+                    'timeout' => 'gate_busy',
+                    default => 'budget',
+                };
                 break;
             }
 
             $id = (string) $channel['twitch_id'];
-            if ($result->kind === TrackerResult::OK) {
-                $this->snapshots->upsert($id, $date, $result->summary ?? [], 'ok');
-                $counts['tt_ok']++;
-            } elseif ($result->kind === TrackerResult::UNTRACKED) {
-                $this->snapshots->upsert($id, $date, [], 'untracked');
-                $counts['tt_untracked']++;
-            } else {
-                $this->snapshots->upsert($id, $date, [], 'error');
+            // A visit, or an overlapping run, may have filed today's answer while this run waited for its turn: skip it.
+            if ($this->snapshots->hasOkFor($id, Time::date($this->clock->nowMs()))) {
+                continue;
+            }
+            $processed++;
+
+            try {
+                $result = $this->tracker->channelSummary((string) $channel['login']);
+                $date = Time::date($this->clock->nowMs()); // the UTC day this answer arrived on
+
+                if ($result->kind === TrackerResult::RATE_LIMITED) {
+                    $this->gate->pauseForRestOfDay($result->retryAfter);
+                    $counts['stopped_by'] = 'rate_limited';
+                    break;
+                }
+
+                if ($result->kind === TrackerResult::OK) {
+                    $this->snapshots->upsert($id, $date, $result->summary ?? [], 'ok');
+                    $counts['tt_ok']++;
+                    $failuresInARow = 0;
+                } elseif ($result->kind === TrackerResult::UNTRACKED) {
+                    $this->snapshots->upsert($id, $date, [], 'untracked');
+                    $counts['tt_untracked']++;
+                    $failuresInARow = 0;
+                } else {
+                    $this->snapshots->upsert($id, $date, [], 'error');
+                    $counts['tt_error']++;
+                    $failuresInARow++;
+                }
+            } catch (Throwable $e) {
+                // One bad channel must not stop the run or wedge the queue behind it: note it, file an error row, go on.
                 $counts['tt_error']++;
+                $failuresInARow++;
+                $this->logger->info('channel_error', ['type' => $e::class]);
+                try {
+                    $this->snapshots->upsert($id, Time::date($this->clock->nowMs()), [], 'error');
+                } catch (Throwable) {
+                    // even the error row could not be written; the channel is simply due again next run
+                }
+            }
+
+            if ($failuresInARow >= self::MAX_CONSECUTIVE_FAILURES) {
+                $counts['stopped_by'] = 'tt_unreachable';
+                break;
             }
         }
 

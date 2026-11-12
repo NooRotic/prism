@@ -13,7 +13,7 @@ use Prism\History\Http\HttpResponse;
  */
 final class World
 {
-    public const UA = 'PRISM/1.0 (+https://prism.nooroticx.tv; contact: test@example.com)';
+    public const UA = 'PRISM/1.0 (+https://prism.nooroticx.tv; contact: test@prism-tests.invalid)';
     public const SECRET = 'SECRET-xyz-never-in-output';
 
     public FakeHttp $http;
@@ -27,13 +27,23 @@ final class World
     /** The status every Helix users request gets; anything but 200 makes Twitch look down. */
     public int $usersStatus = 200;
 
+    /** @var list<string> logins for which the TwitchTracker route blows up with an exception, to test a run that meets a bad channel */
+    public array $ttThrowsFor = [];
+
     public function __construct()
     {
         $this->http = new FakeHttp();
         $this->http->route('POST https://id.twitch.tv/oauth2/token', FakeHttp::json(['access_token' => 'TOKEN', 'expires_in' => 5_000_000]));
         $this->http->route('GET https://api.twitch.tv/helix/users', fn (array $r): HttpResponse => $this->users($r['url']));
         $this->http->route('GET https://api.twitch.tv/helix/channels', fn (array $r): HttpResponse => $this->channels($r['url']));
-        $this->http->route('GET https://twitchtracker.com/api/channels/summary/', fn (array $r): HttpResponse => $this->tt[substr($r['url'], strlen('https://twitchtracker.com/api/channels/summary/'))] ?? FakeHttp::json('{}'));
+        $this->http->route('GET https://twitchtracker.com/api/channels/summary/', function (array $r): HttpResponse {
+            $login = substr($r['url'], strlen('https://twitchtracker.com/api/channels/summary/'));
+            if (in_array($login, $this->ttThrowsFor, true)) {
+                throw new \RuntimeException('simulated failure for ' . $login);
+            }
+
+            return $this->tt[$login] ?? FakeHttp::json('{}');
+        });
     }
 
     /** @param array<string,mixed> $extra Helix fields to override */
