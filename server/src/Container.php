@@ -28,34 +28,72 @@ final class Container
         ?Clock $clock = null,
         ?Sleeper $sleeper = null,
     ): Router {
+        $s = self::services($config, $pdo, $http, $clock, $sleeper);
+        $visits = new VisitService(
+            $config,
+            $s['channels'],
+            $s['snapshots'],
+            $s['links'],
+            $s['twitch'],
+            $s['tracker'],
+            $s['gate'],
+            $s['payload'],
+            $s['clock'],
+        );
+
+        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger']);
+    }
+
+    public static function refreshJob(
+        Config $config,
+        PDO $pdo,
+        ?HttpClient $http = null,
+        ?Clock $clock = null,
+        ?Sleeper $sleeper = null,
+    ): RefreshJob {
+        $s = self::services($config, $pdo, $http, $clock, $sleeper);
+
+        return new RefreshJob(
+            $config,
+            $s['channels'],
+            $s['snapshots'],
+            $s['links'],
+            $s['twitch'],
+            $s['tracker'],
+            $s['gate'],
+            $s['logger'],
+            $s['clock'],
+        );
+    }
+
+    /** @return array{clock:Clock,channels:ChannelStore,snapshots:SnapshotStore,links:BioLinkStore,twitch:TwitchClient,tracker:TrackerClient,gate:TtGate,payload:ChannelPayload,logger:Logger} */
+    private static function services(Config $config, PDO $pdo, ?HttpClient $http, ?Clock $clock, ?Sleeper $sleeper): array
+    {
         $clock ??= new SystemClock();
         $http ??= new CurlHttp();
         $state = new JobState($pdo, $clock);
         $channels = new ChannelStore($pdo, $clock);
         $snapshots = new SnapshotStore($pdo, $clock);
         $links = new BioLinkStore($pdo, $clock);
-        $payload = new ChannelPayload($channels, $snapshots, $links, $clock);
-        $gate = new TtGate(
-            $pdo,
-            $clock,
-            $sleeper ?? new SystemSleeper(),
-            $state,
-            $config->ttGapMs(),
-            $config->ttRunBudget(),
-            $config->ttDayBudget(),
-        );
-        $visits = new VisitService(
-            $config,
-            $channels,
-            $snapshots,
-            $links,
-            new TwitchClient($http, $state, $clock, $config->twitchClientId(), $config->twitchClientSecret()),
-            new TrackerClient($http, $config->ttUserAgent()),
-            $gate,
-            $payload,
-            $clock,
-        );
 
-        return new Router($config, $visits, $channels, $payload, new Logger($config->logPath(), $clock));
+        return [
+            'clock' => $clock,
+            'channels' => $channels,
+            'snapshots' => $snapshots,
+            'links' => $links,
+            'twitch' => new TwitchClient($http, $state, $clock, $config->twitchClientId(), $config->twitchClientSecret()),
+            'tracker' => new TrackerClient($http, $config->ttUserAgent()),
+            'gate' => new TtGate(
+                $pdo,
+                $clock,
+                $sleeper ?? new SystemSleeper(),
+                $state,
+                $config->ttGapMs(),
+                $config->ttRunBudget(),
+                $config->ttDayBudget(),
+            ),
+            'payload' => new ChannelPayload($channels, $snapshots, $links, $clock),
+            'logger' => new Logger($config->logPath(), $clock),
+        ];
     }
 }

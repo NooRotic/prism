@@ -121,6 +121,18 @@ final class TtGateTest extends DbTestCase
         $this->assertTrue($gate->acquire(false));
     }
 
+    public function testIsPausedReflectsThePause(): void
+    {
+        $gate = $this->gate();
+        $this->assertFalse($gate->isPaused());
+
+        $gate->pauseForRestOfDay(null);
+        $this->assertTrue($gate->isPaused());
+
+        $this->clock->set(FakeClock::at('2026-11-13T00:00:00Z')->nowMs());
+        $this->assertFalse($gate->isPaused());
+    }
+
     public function testARetryAfterShorterThanTheRestOfTheDayStillPausesToMidnight(): void
     {
         $gate = $this->gate();

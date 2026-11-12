@@ -74,6 +74,12 @@ final class TtGate
         $this->state->set(self::PAUSED_UNTIL, (string) $until);
     }
 
+    /** True while a 429 pause is in force. */
+    public function isPaused(): bool
+    {
+        return $this->clock->nowMs() < (int) ($this->state->get(self::PAUSED_UNTIL) ?? '0');
+    }
+
     /** Starts a new scheduled run: its budget counts from zero again. */
     public function resetRun(): void
     {
