@@ -97,8 +97,21 @@ final class SnapshotStoreTest extends DbTestCase
 
         $this->assertSame(['2026-11-11', '2026-11-12'], array_column($this->snapshots->history('1', 3), 'date'));
         $this->assertSame(['2026-11-07', '2026-11-11', '2026-11-12'], array_column($this->snapshots->history('1', null), 'date'));
-        $this->assertSame(['2026-11-12'], array_column($this->snapshots->history('1', 1), 'date'));
+        $this->assertSame(['2026-11-11', '2026-11-12'], array_column($this->snapshots->history('1', 1), 'date'));
         $this->assertSame([], $this->snapshots->history('999', 90));
+    }
+
+    /**
+     * Growth over N days compares today with the row dated N days earlier, so a window of N days must reach
+     * back to that date: N days before today is inside it, N + 1 days before is not.
+     */
+    public function testHistoryWindowReachesBackExactlyNDaysBeforeToday(): void
+    {
+        foreach (['2026-11-12', '2026-11-09', '2026-11-08'] as $date) {
+            $this->snapshots->upsert('1', $date, ['rank' => 5], 'ok');
+        }
+
+        $this->assertSame(['2026-11-09', '2026-11-12'], array_column($this->snapshots->history('1', 3), 'date'));
     }
 
     public function testHasOkForIgnoresErrorAndUntrackedRows(): void
