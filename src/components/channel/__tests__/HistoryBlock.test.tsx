@@ -129,6 +129,39 @@ describe('HistoryBlock', () => {
     expect(screen.queryByRole('list', { name: 'Channel stats' })).not.toBeInTheDocument()
   })
 
+  /** What the server really sends for a channel TwitchTracker does not know: a newest row that is all nulls. */
+  const UNTRACKED_ROW = (): HistoryRow =>
+    row(0, {
+      ttStatus: 'untracked',
+      rank: null,
+      minutesStreamed: null,
+      avgViewers: null,
+      maxViewers: null,
+      hoursWatched: null,
+      followersChange: null,
+      followersTotal: null,
+    })
+
+  it('for a channel TwitchTracker does not track shows the notice and no chips or empty panels', () => {
+    const state = ready(channel([UNTRACKED_ROW()], { ttStatus: 'untracked', lastUpdated: null }))
+    render(<HistoryBlock state={state} now={NOW} />)
+
+    expect(screen.getByText('TwitchTracker does not track this channel yet')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'TwitchTracker' })).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Channel stats' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Total followers' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Rank' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: ROLLING_TITLES.viewers })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: ROLLING_TITLES.hours })).not.toBeInTheDocument()
+  })
+
+  it('with chartsOnly renders nothing for a channel TwitchTracker does not track', () => {
+    const state = ready(channel([UNTRACKED_ROW()], { ttStatus: 'untracked', lastUpdated: null }))
+    const { container } = render(<HistoryBlock state={state} now={NOW} chartsOnly />)
+
+    expect(container).toBeEmptyDOMElement()
+  })
+
   it('says nothing about TT when the status is ok or none', () => {
     render(<HistoryBlock state={ready(channel(rows(5), { ttStatus: 'ok' }))} now={NOW} />)
 
@@ -177,6 +210,13 @@ describe('HistoryBlock', () => {
     expect(within(rank).getByText(/30d up 30/)).toBeInTheDocument()
     expect(within(rank).queryByText(/90d/)).not.toBeInTheDocument()
     expect(within(rank).getByText(/lower is better/i)).toBeInTheDocument()
+  })
+
+  it('shows 90-day growth once the history holds the row dated 90 days back (the server default window)', () => {
+    render(<HistoryBlock state={ready(channel(rows(91)))} now={NOW} />)
+
+    expect(within(panel('Total followers')).getByText(/90d \+900/)).toBeInTheDocument()
+    expect(within(panel('Rank')).getByText(/90d up 90/)).toBeInTheDocument()
   })
 
   it('says down when a rank got worse and no change when it did not move', () => {

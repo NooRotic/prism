@@ -182,7 +182,9 @@ function chartFor(seriesList: SeriesPoint[][], label: (first: SeriesPoint, last:
 export default function HistoryBlock({ state, now, chartsOnly = false }: HistoryBlockProps) {
   if (state.status !== 'ready') return null
   const data = state.data
-  const latest = data.latest
+  // Figures come only from a row TwitchTracker actually answered. For a channel it does not know the server's
+  // newest row is an all-null 'untracked' one, which must not turn into seven dash chips and four empty panels.
+  const latest = data.latest !== null && data.latest.ttStatus === 'ok' ? data.latest : null
   if (chartsOnly && latest === null) return null
 
   const followers = seriesOf(data.history, 'followersTotal')
