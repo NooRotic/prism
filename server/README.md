@@ -17,10 +17,22 @@ controller with old classes. It only adds and replaces files: a file you remove 
 you delete it by hand. Unlike the owner's inferno recipe there is no scp fallback: without a password it stops with a
 message.
 
+## IONOS host notes
+
+- **Which PHP.** The scripts in `bin/` are command line only (they exit unless `PHP_SAPI` is `cli`). On this host the
+  default `php` is 4.4.9 and `php8.4` is the CGI build, so use **`/usr/bin/php8.4-cli`** for the install script, the
+  cron job and `remove-channel.php`. Over SSH the working directory is the webspace root, so
+  `/usr/bin/php8.4-cli prism-data/bin/install.php` creates the tables.
+- **Database.** Each database has its own login in the IONOS panel, and `db.name` in `config.php` must be the
+  database's own name (`dbs` and digits), not its description. A login that is valid but not allowed into the named
+  database fails with MySQL error 1044 (the server reports only "Database connection failed" by design).
+- **Contact address.** `tt.user_agent` must carry a real contact address; the server refuses the example one.
+
 ## Tests
 
-PHP and MariaDB run in Docker, at the same versions as the host (PHP 8.4, MariaDB 10.11). PHPUnit is a dev
-dependency of the test image only.
+PHP runs in Docker at the host's version (8.4) and MariaDB at 10.11. The host's database is MariaDB 11.8, which the
+panel chose by default: every table pins its own collation (`utf8mb4_unicode_ci`), but the suite has not been run
+against 11.8. PHPUnit is a dev dependency of the test image only.
 
 ```bash
 docker compose -f server/docker-compose.test.yml run --rm php vendor/bin/phpunit
