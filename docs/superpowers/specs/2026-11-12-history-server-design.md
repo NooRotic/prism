@@ -38,7 +38,7 @@ snapshots, which needs a small server that remembers. That server is this projec
 
 - Hammering TT or Twitch: bursts, ignoring a 429, retry storms.
 - Leaking the Twitch client secret or the database login: committed, web-reachable, logged, or printed in an error.
-- Storing anything that identifies a visitor beyond a short-lived hashed counter (see Trust model).
+- Storing anything about a visitor: no IP, no hash of one, no counter, nothing.
 - Charts that pretend. A gap, a channel TT does not track, or stale data must look like exactly that.
 - A database filling up with made-up channels.
 
@@ -50,7 +50,7 @@ snapshots, which needs a small server that remembers. That server is this projec
   verified from the host on 2026-11-12.
 - **Address.** `https://prism-data.nooroticx.tv`, bound to `/prism-data/public` (verified: valid HTTPS, root files not
   served). Only `public/` is web-reachable. Everything else lives beside it.
-- **Secrets.** Twitch client id and secret, the database login and a salt live in `/prism-data/config.php`, outside
+- **Secrets.** Twitch client id and secret, and the database login live in `/prism-data/config.php`, outside
   `public/`. The owner creates it. No agent reads or prints it. A `config.example.php` with placeholders is committed;
   the real file never is.
 - **Deploy.** Password SFTP with `ssh2`, pinned host key, `IONOS_SSH_PASSWORD` from the environment or a gitignored
@@ -60,7 +60,7 @@ snapshots, which needs a small server that remembers. That server is this projec
   if not, the one-time installer runs from a guarded URL under `public/` and is deleted straight after.
 - **Cross-origin.** The app is on `https://prism.nooroticx.tv` (and `http://localhost:5000` in development), the server on
   another origin. The allowed origins live in config. The allowlist only stops other websites' browsers; any script can fake
-  the header, so the real defences are the Twitch check, the per-visitor limit and the global caps.
+  the header, so the real defences are the Twitch check and the global caps.
 - **TT etiquette.** Own User-Agent naming PRISM plus a contact address, hard budget per run, stop on the first 429.
   TT's `robots.txt` disallows `/api/*` while its footer points users at this "basic API". The owner chose to use the
   documented API and is emailing TT; the budget and kill switch exist so it can be paused instantly.
@@ -76,9 +76,11 @@ snapshots, which needs a small server that remembers. That server is this projec
 - Daily snapshots build the history. Bio links are kept.
 - **Tracking lifecycle (option B).** Once someone opens a channel it is tracked. The server refreshes it daily on its own
   until nobody has opened it for about 30 days. The 30 days is a tuning knob.
-- **Trust model.** (1) A visit counts only if the login is a real Twitch channel, checked with Twitch. (2) One visitor can
-  add only a few new channels per hour. (3) The server answers only PRISM's own origins. (4) It stores nothing about
-  visitors. The Twitch client secret sits in a private file the owner creates.
+- **Trust model.** (1) A visit counts only if the login is a real Twitch channel, checked with Twitch. (2) Global caps on
+  new channels per hour and per day. (3) The server answers only PRISM's own origins. (4) It stores nothing about
+  visitors, none at all. The Twitch client secret sits in a private file the owner creates. The owner dropped the earlier
+  per-visitor limit on 2026-11-12 so that no visitor data exists to be questioned; if real usage shows abuse, it is
+  revisited then.
 - **No waiting on TT (2026-11-12).** The daily TT job is switched on at launch. The owner sends the courtesy email to
   contact@twitchtracker.com in parallel. A visible "Data: TwitchTracker" credit linking to the channel's TT page appears
   wherever its numbers are shown.
@@ -99,8 +101,8 @@ failures. The server:
 2. If the channel is known, updates `last_visited_at` (written at most once an hour per channel). If its login was last
    confirmed with Twitch more than a day ago, it re-resolves the login first, so a channel that was renamed, whose old
    login someone else then took, is not answered with the wrong row. The `login` column is therefore not unique.
-3. If unknown, applies the per-visitor new-channel limit, asks Twitch, and inserts the channel only if it is real. A
-   global cap on new channels per day is the backstop.
+3. If unknown, asks Twitch and inserts the channel only if it is real, and only while the global new-channel caps (per hour
+   and per day) have room. When a cap is full the visit still answers; the channel is simply not tracked yet.
 4. **Fetches TT on demand.** If TT may be called for the channel (the rule below), the visit calls it right then, so a first
    visit shows numbers in about two seconds. This holds for a known channel that has no snapshot for today as well.
 5. Answers with the same payload as the read API, so the page needs one request.
@@ -114,14 +116,13 @@ time of the last TT call and the next one waits until at least 1.5 seconds later
 about three seconds, it answers with the profile only and `tt_status: pending`, and the next visit or run fills the numbers
 in. The kill switch, the 429 stop and the budgets below apply to every call, whichever path made it.
 
-**Per-visitor limit.** It needs some key. The proposal is a salted hash of the client IP, kept as an hourly counter that is
-deleted within two hours. No IP, user agent or any other visitor detail is stored. The owner approved "stores nothing
-about visitors"; this short-lived hashed counter would be the one exception, and a hashed IP can still count as personal
-data in some regions. **Open for the owner:** keep the counter and add a one-line privacy note to PRISM (recommended), or
-drop the per-visitor limit and rely on the Twitch check plus the global cap. Which header carries the real client IP on
-IONOS shared hosting is unknown; it is checked with a probe on the host before the limit is built.
+**No per-visitor limit (owner decision, 2026-11-12).** The server stores nothing about visitors: no IP, no hash of one, no
+counter. The protection is the Twitch check, the global caps on new channels (per hour and per day) and the kill switch.
+The accepted trade-off: one script that types real channel names can use up a cap and keep other visitors' new channels
+from being tracked until it resets. Known channels, the profiles and the rest of the app keep working, and the page falls
+back to today's behavior. If real usage shows abuse, a per-visitor limit can be added later as a contained change.
 
-**Numbers (my calls, all config values).** 5 new channels per visitor per hour. 200 new channels per day overall. TT calls
+**Numbers (my calls, all config values).** 20 new channels per hour and 200 per day overall, shared by everyone. TT calls
 at least 1.5 seconds apart. At most 300 TT calls per scheduled run and 1,500 per UTC day in total, visit-triggered calls
 included. Built for up to about 1,000 tracked channels (about 25 minutes of TT calls a day); beyond that, revisit.
 
@@ -150,7 +151,6 @@ day, the per-run budget becomes the daily capacity, which is enough at the state
   error); `fetched_at`.
 - **bio_links**: Twitch id, platform (youtube, kick), url, first seen, last seen.
 - **blocked_channels**: channels removed on request, so they are not tracked again.
-- **visit_limits**: hashed key, hour, count. Short-lived.
 - **job state**: the cached Twitch token, the last run's counts (no secrets, no request bodies), and the on/off flags.
 
 History is kept indefinitely (about 365 small rows per channel per year).
@@ -183,7 +183,7 @@ at read time and never stored, and only for the two point-in-time series: total 
 - The server is optional. If it is down or slow, every page behaves as it does today.
 
 ### Operations
-- **Kill switches.** Config flags turn the TT job and the visit endpoint off without a redeploy.
+- **Kill switches.** Config flags turn the TT job, new-channel tracking and the visit endpoint off without a redeploy.
 - **Budget.** Hard caps on TT calls per run and per UTC day (visit-triggered calls count), one shared gate spacing every
   call, and a stop on the first 429.
 - **Logs.** Counts and statuses only, in a file outside `public/`. Never a secret, never a request body.
@@ -218,7 +218,7 @@ components and copy.
 ## Needed from the owner, at build time
 
 - Create the new database in the IONOS panel.
-- Create `/prism-data/config.php` (Twitch client id and secret, database login, salt, allowed origins). Never pasted into
+- Create `/prism-data/config.php` (Twitch client id and secret, database login, allowed origins). Never pasted into
   chat.
 - OK to pull the PHP and MariaDB Docker images for tests.
 - Create the scheduled cron job in the panel (every few hours, within the host's limit), or OK for it to be set over SSH.
