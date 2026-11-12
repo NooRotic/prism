@@ -6,6 +6,8 @@ composer.lock
 # committed: the second line puts that one class back. server/tools/__tests__/trackedFiles.test.mjs guards it.
 config.php
 !/src/Config.php
+# A locally prepared copy of the settings file (for example prism-data.config.php) holds the same secrets.
+*.config.php
 *.log
 deploy.config.json
 .env
