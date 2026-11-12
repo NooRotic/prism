@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-// The scheduled refresh, run by cron: php /prism-data/bin/refresh.php. Command line only.
+// The scheduled refresh, run by cron: <php-cli> /prism-data/bin/refresh.php. Command line only. On IONOS the
+// binary is /usr/bin/php8.4-cli: plain `php` is 4.4 there and `php8.4` is the CGI build, which fails this check.
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
     exit;

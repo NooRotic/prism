@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-// Removes a channel on its streamer's request: php /prism-data/bin/remove-channel.php <login>.
+// Removes a channel on its streamer's request: <php-cli> /prism-data/bin/remove-channel.php <login>
+// (on IONOS the php-cli binary is /usr/bin/php8.4-cli, see server/README.md).
 // Deletes every channel row with that login (with its snapshots and links) and blocks it from being tracked
 // again. A login nobody tracks prints zero and changes nothing. Command line only.
 if (PHP_SAPI !== 'cli') {
