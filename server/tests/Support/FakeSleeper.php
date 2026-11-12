@@ -14,6 +14,9 @@ final class FakeSleeper implements Sleeper
     /** @var list<int> */
     public array $calls = [];
 
+    /** @var (callable(int):void)|null runs while "sleeping", to stand in for another process acting in the meantime */
+    public $onSleep = null;
+
     public function __construct(private FakeClock $clock)
     {
     }
@@ -23,5 +26,8 @@ final class FakeSleeper implements Sleeper
         $this->calls[] = $ms;
         $this->totalMs += $ms;
         $this->clock->advanceMs($ms);
+        if ($this->onSleep !== null) {
+            ($this->onSleep)($ms);
+        }
     }
 }

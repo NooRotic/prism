@@ -166,6 +166,56 @@ final class TtGateTest extends DbTestCase
         $this->assertFalse($gate->acquire(false));
     }
 
+    public function testAScheduledRunWaitsLongerThanAVisitForItsTurn(): void
+    {
+        $this->pdo->prepare('UPDATE tt_gate SET last_call_ms = ? WHERE id = 1')->execute([$this->clock->nowMs() + 10_000]);
+        $gate = $this->gate();
+
+        $this->assertFalse($gate->acquire(false));
+        $this->assertSame('timeout', $gate->lastRefusal());
+        $this->assertSame(0, $this->sleeper->totalMs);
+
+        $this->assertTrue($gate->acquire(true));
+        $this->assertNull($gate->lastRefusal());
+        $this->assertGreaterThanOrEqual(11_500, $this->sleeper->totalMs);
+    }
+
+    public function testAScheduledRunStillGivesUpIfTheGateStaysBusyForMinutes(): void
+    {
+        $this->pdo->prepare('UPDATE tt_gate SET last_call_ms = ? WHERE id = 1')->execute([$this->clock->nowMs() + 300_000]);
+        $gate = $this->gate();
+
+        $this->assertFalse($gate->acquire(true));
+        $this->assertSame('timeout', $gate->lastRefusal());
+    }
+
+    public function testARefusalSaysWhy(): void
+    {
+        $gate = $this->gate(1500, 1, 2);
+        $this->assertNull($gate->lastRefusal());
+
+        $this->assertTrue($gate->acquire(true));
+        $this->assertFalse($gate->acquire(true));
+        $this->assertSame('run_budget', $gate->lastRefusal());
+
+        $this->assertTrue($gate->acquire(false));
+        $this->assertFalse($gate->acquire(false));
+        $this->assertSame('day_budget', $gate->lastRefusal());
+
+        $paused = $this->gate();
+        $paused->pauseForRestOfDay(null);
+        $this->assertFalse($paused->acquire(false));
+        $this->assertSame('paused', $paused->lastRefusal());
+    }
+
+    public function testAMissingGateRowIsAnErrorNotASilentTimeout(): void
+    {
+        $this->pdo->exec('DELETE FROM tt_gate');
+
+        $this->expectException(\RuntimeException::class);
+        $this->gate()->acquire(false);
+    }
+
     public function testTwoGateInstancesOnOneDatabaseShareTheGap(): void
     {
         $first = $this->gate();

@@ -1,7 +1,9 @@
 -- PRISM history server, first schema. All times are UTC. See docs/superpowers/specs/2026-11-12-history-server-design.md.
 -- (schema_migrations itself is created by the Migrator.)
+-- Every statement is safe to run again (IF NOT EXISTS, INSERT IGNORE), so the installer can simply be re-run after a
+-- partial failure, on a host with no SQL console.
 
-CREATE TABLE channels (
+CREATE TABLE IF NOT EXISTS channels (
   twitch_id VARCHAR(20) NOT NULL,
   login VARCHAR(25) NOT NULL,
   display_name VARCHAR(50) NOT NULL DEFAULT '',
@@ -22,15 +24,16 @@ CREATE TABLE channels (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- One row per channel per UTC date. The TT figures are trailing 30-day aggregates; followers_change is a net change and can be negative.
-CREATE TABLE snapshots (
+-- Every number is BIGINT so a surprising TT answer is stored, never refused (a refused row would stall the daily run).
+CREATE TABLE IF NOT EXISTS snapshots (
   twitch_id VARCHAR(20) NOT NULL,
   snap_date DATE NOT NULL,
-  tt_rank INT NULL,
-  minutes_streamed INT NULL,
-  avg_viewers INT NULL,
-  max_viewers INT NULL,
+  tt_rank BIGINT NULL,
+  minutes_streamed BIGINT NULL,
+  avg_viewers BIGINT NULL,
+  max_viewers BIGINT NULL,
   hours_watched BIGINT NULL,
-  followers_change INT NULL,
+  followers_change BIGINT NULL,
   followers_total BIGINT NULL,
   tt_status ENUM('ok','untracked','error') NOT NULL,
   fetched_at DATETIME NOT NULL,
@@ -38,7 +41,7 @@ CREATE TABLE snapshots (
   CONSTRAINT fk_snapshots_channel FOREIGN KEY (twitch_id) REFERENCES channels (twitch_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE bio_links (
+CREATE TABLE IF NOT EXISTS bio_links (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   twitch_id VARCHAR(20) NOT NULL,
   platform ENUM('youtube','kick') NOT NULL,
@@ -50,7 +53,7 @@ CREATE TABLE bio_links (
   CONSTRAINT fk_bio_links_channel FOREIGN KEY (twitch_id) REFERENCES channels (twitch_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE blocked_channels (
+CREATE TABLE IF NOT EXISTS blocked_channels (
   twitch_id VARCHAR(20) NOT NULL,
   login VARCHAR(25) NOT NULL,
   blocked_at DATETIME NOT NULL,
@@ -58,7 +61,7 @@ CREATE TABLE blocked_channels (
   KEY idx_blocked_login (login)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE job_state (
+CREATE TABLE IF NOT EXISTS job_state (
   k VARCHAR(64) NOT NULL,
   v TEXT NOT NULL,
   updated_at DATETIME NOT NULL,
@@ -66,10 +69,10 @@ CREATE TABLE job_state (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- The shared TwitchTracker gate: one row holding the time of the last call.
-CREATE TABLE tt_gate (
+CREATE TABLE IF NOT EXISTS tt_gate (
   id TINYINT UNSIGNED NOT NULL,
   last_call_ms BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO tt_gate (id, last_call_ms) VALUES (1, 0);
+INSERT IGNORE INTO tt_gate (id, last_call_ms) VALUES (1, 0);

@@ -7,9 +7,11 @@ namespace Prism\History\Tests;
 use PDO;
 use Prism\History\Container;
 use Prism\History\RefreshJob;
+use Prism\History\RunLock;
 use Prism\History\Store\BioLinkStore;
 use Prism\History\Store\ChannelStore;
 use Prism\History\Store\SnapshotStore;
+use Prism\History\Tests\Support\Database;
 use Prism\History\Tests\Support\DbTestCase;
 use Prism\History\Tests\Support\FakeClock;
 use Prism\History\Tests\Support\FakeSleeper;
@@ -277,16 +279,134 @@ final class RefreshJobTest extends DbTestCase
         $this->assertSame(0, $this->snapshotCount());
     }
 
-    public function testTwitchDownEndsTheRunWithoutChangingSnapshots(): void
+    public function testTwitchDownDoesNotStopTheTtNumbersAndTheRunSaysSo(): void
     {
         $this->track('1', 'alice');
         $this->world->usersStatus = 503;
+        $this->world->answerTt('alice', World::summary());
 
         $counts = $this->job()->run();
 
         $this->assertSame('twitch_unavailable', $counts['stopped_by']);
+        $this->assertSame(0, $counts['profiles']);
+        $this->assertSame(1, $counts['tt_ok']);
+        $this->assertSame(1, $this->snapshotCount());
+    }
+
+    public function testAnOverlappingRunDoesNothing(): void
+    {
+        $this->track('1', 'alice');
+        $this->world->answerTt('alice', World::summary());
+        $other = Database::pdo();
+        $other->query("SELECT GET_LOCK('" . RunLock::NAME . "', 0)")->fetchColumn();
+
+        $counts = $this->job()->run();
+
+        $this->assertSame('already_running', $counts['stopped_by']);
+        $this->assertSame(0, $counts['tt_ok']);
         $this->assertSame(0, $this->world->ttCalls());
-        $this->assertSame(0, $this->snapshotCount());
+        $this->assertSame(0, $this->world->twitchUserCalls());
+        $this->assertStringContainsString('stopped_by=already_running', (string) file_get_contents($this->logPath));
+
+        $other->query("SELECT RELEASE_LOCK('" . RunLock::NAME . "')")->fetchColumn();
+        $this->assertSame('done', $this->job()->run()['stopped_by']);
+    }
+
+    public function testTheLockIsFreeAgainAfterARunAndAfterAFailure(): void
+    {
+        $this->track('1', 'alice');
+        $this->world->ttThrowsFor = ['alice'];
+        $other = Database::pdo();
+
+        $this->job()->run();
+
+        $this->assertSame('1', (string) $other->query("SELECT GET_LOCK('" . RunLock::NAME . "', 0)")->fetchColumn());
+    }
+
+    public function testAChannelAnsweredByAnotherProcessDuringTheRunIsNotAskedAgain(): void
+    {
+        foreach (['1' => 'a', '2' => 'b', '3' => 'c'] as $id => $login) {
+            $this->track((string) $id, $login);
+            $this->world->answerTt($login, World::summary());
+        }
+        // While the run waits its turn for b, a visit files c's answer for today.
+        $this->sleeper->onSleep = function (): void {
+            $this->snapshots->upsert('3', '2026-11-12', World::summary(), 'ok');
+        };
+
+        $counts = $this->job()->run();
+
+        $this->assertSame(2, $this->world->ttCalls());
+        $this->assertSame(2, $counts['tt_ok']);
+        $this->assertSame(1, $counts['tt_skipped']);
+        $this->assertSame('done', $counts['stopped_by']);
+        $this->assertSame(3, $this->snapshotCount());
+    }
+
+    public function testOneFailingChannelDoesNotStopTheRun(): void
+    {
+        foreach (['1' => 'badone', '2' => 'goodtwo', '3' => 'goodthree'] as $id => $login) {
+            $this->track((string) $id, $login);
+            $this->world->answerTt($login, World::summary());
+        }
+        $this->world->ttThrowsFor = ['badone'];
+
+        $counts = $this->job()->run();
+
+        $this->assertSame(2, $counts['tt_ok']);
+        $this->assertSame(1, $counts['tt_error']);
+        $this->assertSame('done', $counts['stopped_by']);
+        $this->assertSame('error', $this->snapshots->latest('1')['tt_status']);
+        $log = (string) file_get_contents($this->logPath);
+        $this->assertStringContainsString('channel_error', $log);
+        $this->assertStringContainsString('RuntimeException', $log);
+        $this->assertStringNotContainsString('simulated', $log);
+    }
+
+    public function testTenFailuresInARowStopTheRun(): void
+    {
+        for ($i = 1; $i <= 12; $i++) {
+            $this->track((string) $i, 'chan' . $i);
+            $this->world->answerTt('chan' . $i, 'oops', 500);
+        }
+
+        $counts = $this->job()->run();
+
+        $this->assertSame('tt_unreachable', $counts['stopped_by']);
+        $this->assertSame(10, $this->world->ttCalls());
+        $this->assertSame(10, $counts['tt_error']);
+        $this->assertSame(2, $counts['tt_skipped']);
+    }
+
+    public function testAnAnswerBreaksTheStreakOfFailures(): void
+    {
+        // Zero-padded ids, because ids are text and the run takes them in text order: 01..09 fail, 10 answers, 11..19 fail.
+        for ($i = 1; $i <= 19; $i++) {
+            $this->track(sprintf('%02d', $i), 'chan' . $i);
+            if ($i === 10) {
+                $this->world->answerTt('chan' . $i, World::summary());
+            } else {
+                $this->world->answerTt('chan' . $i, 'oops', 500);
+            }
+        }
+
+        $counts = $this->job()->run();
+
+        $this->assertSame('done', $counts['stopped_by']);
+        $this->assertSame(18, $counts['tt_error']);
+        $this->assertSame(1, $counts['tt_ok']);
+    }
+
+    public function testAGateThatStaysBusyStopsTheRunAsGateBusyNotAsBudget(): void
+    {
+        $this->track('1', 'alice');
+        $this->pdo->prepare('UPDATE tt_gate SET last_call_ms = ? WHERE id = 1')->execute([$this->clock->nowMs() + 600_000]);
+
+        $counts = $this->job()->run();
+
+        $this->assertSame('gate_busy', $counts['stopped_by']);
+        $this->assertSame(0, $this->world->ttCalls());
+        $this->assertSame(1, $counts['tt_skipped']);
     }
 
     public function testTheLogLineHasCountsOnlyAndNoSecretsOrLogins(): void

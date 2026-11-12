@@ -125,6 +125,17 @@ final class FrontControllerTest extends DbTestCase
         $this->assertStringNotContainsString('not/here', $response->body);
     }
 
+    public function testTheFrontControllerTurnsErrorDisplayOffBeforeDoingAnythingElse(): void
+    {
+        $code = (string) file_get_contents(self::PUBLIC_DIR . '/index.php');
+        $statements = array_values(array_filter(
+            array_map('trim', explode("\n", preg_replace('~//.*$~m', '', $code) ?? '')),
+            static fn (string $line): bool => $line !== '' && !str_starts_with($line, '<?php') && !str_starts_with($line, 'declare('),
+        ));
+
+        $this->assertSame("ini_set('display_errors', '0');", $statements[0]);
+    }
+
     public function testHtaccessDisablesIndexesAndRoutesEverythingToTheFrontController(): void
     {
         $htaccess = (string) file_get_contents(self::PUBLIC_DIR . '/.htaccess');

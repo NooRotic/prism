@@ -17,9 +17,38 @@ final class ConfigTest extends TestCase
             'db' => ['host' => 'dbhost', 'name' => 'dbname', 'user' => 'dbuser', 'pass' => 'dbpass'],
             'twitch' => ['client_id' => 'cid', 'client_secret' => 'S3CRET'],
             'allowed_origins' => ['https://prism.nooroticx.tv', 'http://localhost:5000'],
-            'tt' => ['user_agent' => 'PRISM/1.0 (+https://prism.nooroticx.tv; contact: test@example.com)'],
+            'tt' => ['user_agent' => 'PRISM/1.0 (+https://prism.nooroticx.tv; contact: test@prism-tests.invalid)'],
             'log_path' => '/tmp/prism-history-test.log',
         ];
+    }
+
+    public function testAPlaceholderContactInTheUserAgentIsRefused(): void
+    {
+        foreach (['PRISM/1.0 (contact: you@example.com)', 'PRISM/1.0 (+https://EXAMPLE.COM)'] as $agent) {
+            $a = $this->base();
+            $a['tt']['user_agent'] = $agent;
+
+            try {
+                Config::fromArray($a);
+                $this->fail('A placeholder contact must be refused');
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('tt.user_agent', $e->getMessage());
+            }
+        }
+    }
+
+    public function testLookupsPerHourDefaultsToOneHundredMayBeZeroButNotNegative(): void
+    {
+        $this->assertSame(100, Config::fromArray($this->base())->lookupsPerHour());
+
+        $zero = $this->base();
+        $zero['tracking']['lookups_per_hour'] = 0;
+        $this->assertSame(0, Config::fromArray($zero)->lookupsPerHour());
+
+        $negative = $this->base();
+        $negative['tracking']['lookups_per_hour'] = -1;
+        $this->expectException(InvalidArgumentException::class);
+        Config::fromArray($negative);
     }
 
     public function testFromArrayAppliesDefaults(): void

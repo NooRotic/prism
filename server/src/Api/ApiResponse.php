@@ -22,7 +22,7 @@ final class ApiResponse
     {
         return new self(
             $status,
-            ['Content-Type' => 'application/json; charset=utf-8'] + $headers,
+            ['Content-Type' => 'application/json; charset=utf-8', 'X-Content-Type-Options' => 'nosniff'] + $headers,
             json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         );
     }

@@ -75,13 +75,24 @@ describe('planServerUpload', () => {
   })
 
   it('ships exactly the service code, migrations and the public folder, htaccess included', () => {
-    expect(planServerUpload(everything).files.map((f) => f.local)).toEqual([
+    expect([...planServerUpload(everything).files.map((f) => f.local)].sort()).toEqual([
       'bin/install.php',
       'migrations/001_schema.sql',
       'public/.htaccess',
       'public/index.php',
       'src/Api/Router.php',
       'src/Config.php',
+    ])
+  })
+
+  it('uploads the classes first and the public folder last, so a request during an upgrade never meets a new controller with old classes', () => {
+    expect(planServerUpload(everything).files.map((f) => f.local)).toEqual([
+      'src/Api/Router.php',
+      'src/Config.php',
+      'migrations/001_schema.sql',
+      'bin/install.php',
+      'public/.htaccess',
+      'public/index.php',
     ])
   })
 
@@ -124,7 +135,7 @@ describe('listServerFiles', () => {
 
     const files = planServerUpload(listServerFiles(dir)).files.map((f) => f.local)
 
-    expect(files).toEqual(['bin/b.php', 'public/.htaccess', 'public/index.php', 'src/A.php'])
+    expect(files).toEqual(['src/A.php', 'bin/b.php', 'public/.htaccess', 'public/index.php'])
   })
 
   it('tolerates folders that do not exist', () => {

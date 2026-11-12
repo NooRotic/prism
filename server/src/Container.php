@@ -39,6 +39,7 @@ final class Container
             $s['gate'],
             $s['payload'],
             $s['clock'],
+            $s['state'],
         );
 
         return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger']);
@@ -69,10 +70,11 @@ final class Container
             $s['gate'],
             $s['logger'],
             $s['clock'],
+            new RunLock($pdo),
         );
     }
 
-    /** @return array{clock:Clock,channels:ChannelStore,snapshots:SnapshotStore,links:BioLinkStore,twitch:TwitchClient,tracker:TrackerClient,gate:TtGate,payload:ChannelPayload,logger:Logger} */
+    /** @return array{clock:Clock,state:JobState,channels:ChannelStore,snapshots:SnapshotStore,links:BioLinkStore,twitch:TwitchClient,tracker:TrackerClient,gate:TtGate,payload:ChannelPayload,logger:Logger} */
     private static function services(Config $config, PDO $pdo, ?HttpClient $http, ?Clock $clock, ?Sleeper $sleeper): array
     {
         $clock ??= new SystemClock();
@@ -84,6 +86,7 @@ final class Container
 
         return [
             'clock' => $clock,
+            'state' => $state,
             'channels' => $channels,
             'snapshots' => $snapshots,
             'links' => $links,

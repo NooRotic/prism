@@ -61,6 +61,7 @@ final class VisitServiceTest extends DbTestCase
             $gate,
             new ChannelPayload($this->channels, $this->snapshots, $this->links, $this->clock),
             $this->clock,
+            $this->state,
         );
     }
 
@@ -399,10 +400,78 @@ final class VisitServiceTest extends DbTestCase
         $this->world->addUser('1', 'alice');
         $this->channels->insertTracked(Fixtures::user('1', 'alice'), null);
         $this->channels->markGone('1');
+        $this->clock->advanceMs(2 * 3_600_000);
 
         $this->service()->visit('alice');
 
         $this->assertSame('tracking', $this->pdo->query('SELECT status FROM channels')->fetchColumn());
+    }
+
+    public function testAGoneChannelIsLookedUpAtMostOnceAnHourAndGetsNoTtCall(): void
+    {
+        $this->channels->insertTracked(Fixtures::user('1', 'alice'), null);
+        $this->channels->markGone('1');
+        $this->clock->advanceMs(2 * 3_600_000);
+        $service = $this->service();
+
+        $first = $service->visit('alice');
+        $second = $service->visit('alice');
+
+        $this->assertSame(VisitResult::OK, $first->outcome);
+        $this->assertSame(VisitResult::OK, $second->outcome);
+        $this->assertSame(1, $this->world->twitchUserCalls());
+        $this->assertSame(0, $this->world->ttCalls());
+        $this->assertSame('gone', $this->pdo->query('SELECT status FROM channels')->fetchColumn());
+
+        $this->clock->advanceMs(3_600_000 + 1000);
+        $service->visit('alice');
+        $this->assertSame(2, $this->world->twitchUserCalls());
+    }
+
+    public function testAVisitDoesNotCallTtWhenAnotherProcessAnsweredWhileItWaitedForItsTurn(): void
+    {
+        $this->world->addUser('1', 'alice');
+        $this->world->addUser('2', 'bob');
+        $this->world->answerTt('alice', World::summary());
+        $this->world->answerTt('bob', World::summary());
+        $service = $this->service();
+        $service->visit('alice');
+
+        // Bob's visit has to wait for the gap; meanwhile a scheduled run files Bob's answer for today.
+        $this->sleeper->onSleep = function (): void {
+            $this->snapshots->upsert('2', '2026-11-12', World::summary(), 'ok');
+        };
+        $result = $service->visit('bob');
+
+        $this->assertSame(1, $this->world->ttCalls());
+        $this->assertSame('ok', $result->payload['tt_status']);
+        $this->assertSame(1, (int) $this->pdo->query("SELECT COUNT(*) FROM snapshots WHERE twitch_id = '2'")->fetchColumn());
+    }
+
+    public function testMadeUpLoginsCannotDrainTheTwitchBudget(): void
+    {
+        $service = $this->service(['tracking' => ['lookups_per_hour' => 3, 'new_per_hour' => 100, 'new_per_day' => 1000]]);
+
+        foreach (['aaa', 'bbb', 'ccc'] as $login) {
+            $this->assertSame(VisitResult::NOT_FOUND, $service->visit($login)->outcome, $login);
+        }
+        $callsBefore = $this->world->twitchUserCalls();
+
+        $this->assertSame(VisitResult::CAP, $service->visit('ddd')->outcome);
+        $this->assertSame($callsBefore, $this->world->twitchUserCalls());
+
+        $this->clock->advanceMs(3_600_000);
+        $this->assertSame(VisitResult::NOT_FOUND, $service->visit('ddd')->outcome);
+    }
+
+    public function testKnownChannelsNeverUseTheLookupBudget(): void
+    {
+        $this->channels->insertTracked(Fixtures::user('1', 'alice'), null);
+        $this->world->addUser('1', 'alice');
+        $service = $this->service(['tracking' => ['lookups_per_hour' => 0]]);
+
+        $this->assertSame(VisitResult::OK, $service->visit('alice')->outcome);
+        $this->assertSame(VisitResult::CAP, $service->visit('someonenew')->outcome);
     }
 
     public function testNoSecretReachesAnyRequestBodyOutsideTheTokenCall(): void

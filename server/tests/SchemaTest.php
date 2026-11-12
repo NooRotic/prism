@@ -90,6 +90,33 @@ final class SchemaTest extends DbTestCase
         $this->assertSame('0', (string) $this->pdo->query('SELECT COUNT(*) FROM bio_links')->fetchColumn());
     }
 
+    public function testEverySnapshotNumberHoldsAnyValueTtCouldPlausiblySend(): void
+    {
+        $this->channel('1', 'alice');
+        $huge = 9_000_000_000;
+        $this->pdo->prepare(
+            'INSERT INTO snapshots (twitch_id, snap_date, tt_rank, minutes_streamed, avg_viewers, max_viewers, hours_watched, followers_change, followers_total, tt_status, fetched_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        )->execute(['1', '2026-11-12', $huge, $huge, $huge, $huge, $huge, -$huge, $huge, 'ok', '2026-11-12 03:00:00']);
+
+        $row = $this->pdo->query('SELECT tt_rank, minutes_streamed, avg_viewers, max_viewers, followers_change FROM snapshots')->fetch(PDO::FETCH_ASSOC);
+
+        $this->assertSame([$huge, $huge, $huge, $huge, -$huge], array_map('intval', array_values($row)));
+    }
+
+    public function testTheFirstMigrationCanBeRunAgainAfterAPartialFailure(): void
+    {
+        $this->channel('1', 'alice');
+        $this->snapshot('1', '2026-11-12');
+        $this->pdo->exec("DELETE FROM schema_migrations WHERE version = '001_schema'");
+
+        $applied = (new \Prism\History\Migrator($this->pdo, __DIR__ . '/../migrations'))->run();
+
+        $this->assertSame(['001_schema'], $applied);
+        $this->assertSame('1', (string) $this->pdo->query('SELECT COUNT(*) FROM tt_gate')->fetchColumn());
+        $this->assertSame('1', (string) $this->pdo->query('SELECT COUNT(*) FROM snapshots')->fetchColumn());
+    }
+
     public function testSnapshotNumbersKeepTheirSignAndSize(): void
     {
         $this->channel('1', 'alice');

@@ -29,26 +29,39 @@ final class TtGate
         private int $runBudget,
         private int $dayBudget,
         private int $maxWaitMs = 3000,
+        private int $runMaxWaitMs = 30_000,
     ) {
     }
 
+    private ?string $lastRefusal = null;
+
     /**
      * Waits for a turn, counts the call and returns true; or returns false (paused, a budget is spent, or no
-     * turn within maxWaitMs) without counting anything. A scheduled run passes true so the run budget applies.
+     * turn in time) without counting anything. A scheduled run passes true: the run budget applies and it may
+     * wait longer (a batch can afford to, a visit cannot). After a false, lastRefusal() says why.
      */
     public function acquire(bool $forScheduledRun): bool
     {
+        $this->lastRefusal = null;
         $now = $this->clock->nowMs();
         if ($now < (int) ($this->state->get(self::PAUSED_UNTIL) ?? '0')) {
+            $this->lastRefusal = 'paused';
+
             return false;
         }
         if ((int) ($this->state->get(self::dayKey($now)) ?? '0') >= $this->dayBudget) {
+            $this->lastRefusal = 'day_budget';
+
             return false;
         }
         if ($forScheduledRun && (int) ($this->state->get(self::RUN_CALLS) ?? '0') >= $this->runBudget) {
+            $this->lastRefusal = 'run_budget';
+
             return false;
         }
-        if (!$this->claimTurn()) {
+        if (!$this->claimTurn($forScheduledRun ? max($this->maxWaitMs, $this->runMaxWaitMs) : $this->maxWaitMs)) {
+            $this->lastRefusal = 'timeout';
+
             return false;
         }
 
@@ -74,6 +87,12 @@ final class TtGate
         $this->state->set(self::PAUSED_UNTIL, (string) $until);
     }
 
+    /** Why the last acquire() said no: paused, day_budget, run_budget or timeout; null after a yes. */
+    public function lastRefusal(): ?string
+    {
+        return $this->lastRefusal;
+    }
+
     /** True while a 429 pause is in force. */
     public function isPaused(): bool
     {
@@ -86,7 +105,7 @@ final class TtGate
         $this->state->delete(self::RUN_CALLS);
     }
 
-    private function claimTurn(): bool
+    private function claimTurn(int $maxWaitMs): bool
     {
         $claim = $this->pdo->prepare('UPDATE tt_gate SET last_call_ms = :now WHERE id = 1 AND last_call_ms <= :cutoff');
         $waited = 0;
@@ -96,9 +115,13 @@ final class TtGate
             if ($claim->rowCount() === 1) {
                 return true;
             }
-            $last = (int) $this->pdo->query('SELECT last_call_ms FROM tt_gate WHERE id = 1')->fetchColumn();
-            $wait = max(1, $last + $this->gapMs - $now);
-            if ($waited + $wait > $this->maxWaitMs) {
+            $last = $this->pdo->query('SELECT last_call_ms FROM tt_gate WHERE id = 1')->fetchColumn();
+            if ($last === false) {
+                // A half-applied install: fail loudly instead of timing out as if the gate were merely busy.
+                throw new \RuntimeException('The TT gate row is missing: run the installer');
+            }
+            $wait = max(1, (int) $last + $this->gapMs - $now);
+            if ($waited + $wait > $maxWaitMs) {
                 return false;
             }
             $this->sleeper->sleepMs($wait);
