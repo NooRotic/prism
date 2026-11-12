@@ -40,6 +40,15 @@ final class ChannelStore
         return $row === false ? null : $row;
     }
 
+    /** Every channel id that has this login (a login can repeat after a rename), in id order. @return list<string> */
+    public function idsByLogin(string $login): array
+    {
+        $stmt = $this->pdo->prepare('SELECT twitch_id FROM channels WHERE login = ? ORDER BY twitch_id');
+        $stmt->execute([strtolower($login)]);
+
+        return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     /** Starts tracking a channel. Safe to call twice, including from two requests at once: the second changes nothing. */
     public function insertTracked(TwitchUser $user, ?TwitchChannelInfo $info): void
     {
