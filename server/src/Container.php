@@ -44,6 +44,12 @@ final class Container
         return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger']);
     }
 
+    /** The schema migrator over the migrations/ folder that ships next to src/. */
+    public static function migrator(Config $config, PDO $pdo): Migrator
+    {
+        return new Migrator($pdo, dirname(__DIR__) . '/migrations');
+    }
+
     public static function refreshJob(
         Config $config,
         PDO $pdo,
