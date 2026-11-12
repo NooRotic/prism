@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { SEND_VISITS } from '../config/historyServer'
+import { HISTORY_ENABLED, SEND_VISITS } from '../config/historyServer'
 import { loadChannelHistory, type ChannelHistory, type HistoryResult } from '../lib/historyApi'
 
 export type ChannelHistoryState =
@@ -36,7 +36,7 @@ export function useChannelHistory(login: string | undefined): ChannelHistoryStat
   const [loaded, setLoaded] = useState<Loaded | null>(null)
 
   useEffect(() => {
-    if (!login) return
+    if (!login || !HISTORY_ENABLED) return
     const key = login.toLowerCase()
     const controller = new AbortController()
     let cancelled = false
@@ -57,6 +57,7 @@ export function useChannelHistory(login: string | undefined): ChannelHistoryStat
   }, [login])
 
   if (!login) return { status: 'idle' }
+  if (!HISTORY_ENABLED) return { status: 'unavailable' }
   if (loaded?.login !== login.toLowerCase()) return { status: 'loading' }
   switch (loaded.result.kind) {
     case 'tracked':
