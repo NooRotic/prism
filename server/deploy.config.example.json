@@ -1,0 +1,9 @@
+{
+  "ssh": {
+    "host": "ssh.example.invalid",
+    "user": "u00000000",
+    "port": 22,
+    "hostKeySha256": ["SHA256:replace-with-the-server-host-key-fingerprint"],
+    "remoteDir": "prism-data"
+  }
+}
