@@ -190,6 +190,14 @@ GitHub Pages via GitHub Actions on push to `main`. Vite builds to `dist/`, SPA r
 
 Live at [prism.nooroticx.tv](https://prism.nooroticx.tv)
 
+## History server
+
+TwitchTracker's own API gives only 30-day summaries, so PRISM keeps its own history. A small PHP service in [`server/`](server/) (running at `prism-data.nooroticx.tv`, a separate address from the app) remembers one snapshot per channel per day for every channel a visitor opens, and keeps refreshing a channel daily until nobody has opened it for 30 days. Channel pages and the dashboard then show TwitchTracker's 30-day numbers plus charts that grow from the day tracking began, always with a visible "Data: TwitchTracker" credit. It stores nothing about visitors, and when it is down every page looks exactly as it did without it.
+
+- **Environment:** `VITE_HISTORY_API_URL` (defaults to the live server) and `VITE_HISTORY_SEND_VISITS=1`. Production builds report which channel was opened (that is what starts tracking it); development builds only read, so working on localhost cannot add channels to the production database.
+- **Server tests** (PHP 8.4 and MariaDB 10.11 in Docker): `docker compose -f server/docker-compose.test.yml run --rm php vendor/bin/phpunit`. Deploying and running it: [`server/README.md`](server/README.md).
+- **Design and plan:** [`docs/superpowers/specs/2026-11-12-history-server-design.md`](docs/superpowers/specs/2026-11-12-history-server-design.md), [`docs/superpowers/plans/2026-11-12-history-server.md`](docs/superpowers/plans/2026-11-12-history-server.md).
+
 ## License
 
 MIT

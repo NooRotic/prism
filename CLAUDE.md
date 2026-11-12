@@ -19,6 +19,9 @@
 - `src/lib/twitchAuth.ts` - OAuth Implicit Grant Flow
 - `src/contexts/AppContext.tsx` - Global state
 - `src/components/player/PlayerHost.tsx` - Video player with fallback chain
+- `src/lib/historyApi.ts` - history server client (visit + read); never throws, the server is optional
+- `src/hooks/useChannelHistory.ts` - a channel's history; also reports the visit that starts tracking it
+- `server/` - the PHP history service (runs at prism-data.nooroticx.tv, separate from this app); see `server/README.md` and `docs/superpowers/specs/2026-11-12-history-server-design.md`
 
 ## Design Spec
 Full spec at `docs/superpowers/specs/2026-04-06-prism-design.md`
