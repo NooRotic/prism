@@ -55,8 +55,12 @@ snapshots, which needs a small server that remembers. That server is this projec
   the real file never is.
 - **Deploy.** Password SFTP with `ssh2`, pinned host key, `IONOS_SSH_PASSWORD` from the environment or a gitignored
   `.env` (the recipe in the owner's `IONOS-SFTP-DEPLOY.md`; reference implementation in `inferno-map/modern-edition/tools`).
+  Host, user and host-key pins come from a gitignored deploy config, never the repo. The deploy never uploads, reads or
+  overwrites `/prism-data/config.php`. Whether SSH shell commands (not just SFTP) are allowed on the account is unverified;
+  if not, the one-time installer runs from a guarded URL under `public/` and is deleted straight after.
 - **Cross-origin.** The app is on `https://prism.nooroticx.tv` (and `http://localhost:5000` in development), the server on
-  another origin. The allowed origins live in config.
+  another origin. The allowed origins live in config. The allowlist only stops other websites' browsers; any script can fake
+  the header, so the real defences are the Twitch check, the per-visitor limit and the global caps.
 - **TT etiquette.** Own User-Agent naming PRISM plus a contact address, hard budget per run, stop on the first 429.
   TT's `robots.txt` disallows `/api/*` while its footer points users at this "basic API". The owner chose to use the
   documented API and is emailing TT; the budget and kill switch exist so it can be paused instantly.
@@ -88,32 +92,59 @@ Twitch, and updates the stored login if the channel was renamed. If Twitch no lo
 and stops being refreshed.
 
 ### Visit
-`POST /api/visit` with `{ login }`, sent by PRISM when a channel page opens. The page never waits on it and ignores
+`POST /api/visit` with `{ login }`, sent by PRISM to signed-in and signed-out viewers alike (production builds only, see
+the front end) when a channel page opens. The page never waits on it and ignores
 failures. The server:
 1. Rejects anything not matching `^[a-z0-9_]{1,25}$`, and any blocked channel.
-2. If the channel is known, updates `last_visited_at` (written at most once an hour per channel) and answers.
+2. If the channel is known, updates `last_visited_at` (written at most once an hour per channel). If its login was last
+   confirmed with Twitch more than a day ago, it re-resolves the login first, so a channel that was renamed, whose old
+   login someone else then took, is not answered with the wrong row. The `login` column is therefore not unique.
 3. If unknown, applies the per-visitor new-channel limit, asks Twitch, and inserts the channel only if it is real. A
    global cap on new channels per day is the backstop.
+4. **Fetches TT on demand.** If TT may be called for the channel (the rule below), the visit calls it right then, so a first
+   visit shows numbers in about two seconds. This holds for a known channel that has no snapshot for today as well.
+5. Answers with the same payload as the read API, so the page needs one request.
 
-**Per-visitor limit.** It needs some key. The key is a salted hash of the client IP, kept as an hourly counter that is
-deleted within two hours. No IP, user agent or any other visitor detail is stored. (Owner-approved wording was "stores
-nothing about visitors"; this short-lived hashed counter is my call and is the one exception.)
+**The one TT rule.** TT is called for a channel only if it has no `ok` snapshot for today's UTC date (an `error` snapshot
+does not count). A channel last answered `untracked` is not asked again for 7 days. The scheduled job and the visit path
+follow the same rule, so TT calls per channel per day never exceed one.
 
-### Daily refresh
-A cron job runs once a day (about 03:00 UTC is my guess). For every channel visited within the tail window it:
+**The TT gate.** Every TT call, from a visit or from the scheduled job, passes one shared gate: a database lock records the
+time of the last TT call and the next one waits until at least 1.5 seconds later. If a visit cannot get its turn within
+about three seconds, it answers with the profile only and `tt_status: pending`, and the next visit or run fills the numbers
+in. The kill switch, the 429 stop and the budgets below apply to every call, whichever path made it.
+
+**Per-visitor limit.** It needs some key. The proposal is a salted hash of the client IP, kept as an hourly counter that is
+deleted within two hours. No IP, user agent or any other visitor detail is stored. The owner approved "stores nothing
+about visitors"; this short-lived hashed counter would be the one exception, and a hashed IP can still count as personal
+data in some regions. **Open for the owner:** keep the counter and add a one-line privacy note to PRISM (recommended), or
+drop the per-visitor limit and rely on the Twitch check plus the global cap. Which header carries the real client IP on
+IONOS shared hosting is unknown; it is checked with a probe on the host before the limit is built.
+
+**Numbers (my calls, all config values).** 5 new channels per visitor per hour. 200 new channels per day overall. TT calls
+at least 1.5 seconds apart. At most 300 TT calls per scheduled run and 1,500 per UTC day in total, visit-triggered calls
+included. Built for up to about 1,000 tracked channels (about 25 minutes of TT calls a day); beyond that, revisit.
+
+### Scheduled refresh
+A cron job runs every few hours; the exact frequency is bounded by the host's cron limit, which is still to be checked.
+Every run is small and safe to repeat. Each run takes the channels visited within the tail window that still lack today's
+snapshot, longest-unrefreshed first, up to the per-run budget. For each it:
 - refreshes the Twitch profile (batched Get Users and Get Channels): display name, avatar, broadcaster type, language,
   current category;
-- fetches the TT channel summary, calls spaced out, within the per-run budget;
+- fetches the TT channel summary under the one TT rule and the shared gate;
 - reads YouTube and Kick links out of the bio text;
 - writes one snapshot row per channel per UTC date. Re-running the same day updates the row, so a rerun is safe.
 
-TT answering `{}` records the day as "untracked" (TT does not track that channel yet). A network error or non-200 records
-"error" and is retried once later the same day. The first 429 ends the run and is recorded. If the host limits cron run
-time, the run takes the channels refreshed longest ago first and finishes the rest next run.
+Because a run only picks up channels that still lack a good snapshot for today, "retry" and "catch up" need nothing special:
+a failed or unfinished channel is simply taken by the next run. TT answering `{}` records the day as "untracked" (TT does
+not track that channel yet). A network error or non-200 records "error". The first 429 ends the run, is recorded, and
+pauses all TT calls for the rest of that UTC day (or the `Retry-After` time if longer). If the host only allows one run a
+day, the per-run budget becomes the daily capacity, which is enough at the stated scale.
 
 ### What is stored
 - **channels**: Twitch id (key), login, display name, avatar url, broadcaster type, account created, language, current
-  category, first seen, last visited, tracked since, status (tracking, gone).
+  category, first seen, last visited, tracked since, status (tracking, dormant, gone). Dormant means the tail window passed with no visit and refreshing stopped;
+  the next visit makes it tracking again, and the history shows the stretch in between as a gap.
 - **snapshots**: (Twitch id, UTC date) key; TT `rank`, `minutes_streamed`, `avg_viewers`, `max_viewers`,
   `hours_watched`, `followers` (net 30-day change, can be negative), `followers_total`; `tt_status` (ok, untracked,
   error); `fetched_at`.
@@ -125,22 +156,36 @@ time, the run takes the channels refreshed longest ago first and finishes the re
 History is kept indefinitely (about 365 small rows per channel per year).
 
 ### Read API
-`GET /api/channel?login=<login>&days=<n>` returns the profile, the latest snapshot, the daily history (default 90 days,
-`days=all` allowed), `tracked_since`, `last_updated` and `tt_status`. It is cacheable for a few minutes. An unknown
-channel answers 404 with `{ tracked: false }`; the page then sends the visit. Growth over 7, 30 and 90 days is computed
-from the history on the client or at read time and never stored.
+`GET /api/channel?login=<login>&days=<n>` returns the profile (with its bio links), the latest snapshot, the daily history
+(default 90 days, `days=all` allowed), `tracked_since`, `last_updated` and `tt_status` (ok, untracked, error, or pending
+when the TT gate was busy). It is cacheable for a few minutes. An unknown channel answers 404 with `{ tracked: false }`;
+the page then sends the visit, whose answer carries the same payload. Growth is computed from the history on the client or
+at read time and never stored, and only for the two point-in-time series: total followers and rank.
 
 ### PRISM front end
-- A `historyApi` client and hooks. The channel page, both live and in the offline-layout stats slot, shows the TT 30-day
-  numbers with the credit, and four charts: total followers, rank (lower is better), average and peak viewers, hours
-  watched. Fewer than two points shows the numbers only plus "tracking since <date>". Data older than two days carries a
-  stale badge.
-- The dashboard's own-channel row keeps its fresh browser TT call; server history supplies the charts.
+- A `historyApi` client and hooks, and a new history block: the TT 30-day numbers with the credit, then charts (total
+  followers, rank where lower is better, average and peak viewers, hours watched). It shows for **any channel the server
+  tracks, to signed-in and signed-out viewers alike**, in the offline layout's existing stats slot and in the equivalent
+  place on the live layout.
+- **On the viewer's own affiliate or partner channel** the existing `StreamerBlock` stays exactly as it is: fresh browser TT
+  numbers plus the three Twitch-sourced 30-day panels. The history block shows only its charts there, never a second row
+  of TT numbers. `ThirtyDayPanels` and `useStreamerHistory` are kept, because they use Twitch's own per-day data, which the
+  server cannot reproduce. On the dashboard, server history is added alongside them, not instead of them.
+- **The charts say what TT's numbers are.** `avg_viewers`, `max_viewers`, `hours_watched` and `minutes_streamed` are each a
+  trailing 30-day figure, not a daily one. Their charts are titled "rolling 30 days" and never read as daily values. Only
+  total followers and rank are point-in-time. Growth over 7, 30 and 90 days is shown for those two only; the rolling
+  figures get a trend line and no growth percentage.
+- Fewer than two points shows the numbers only plus "tracking since <date>". A gap in the snapshots is drawn as a gap. Data
+  older than two days carries a stale badge. A channel TT does not track reads "TwitchTracker does not track this channel
+  yet".
+- Visit pings are sent from production builds only. A development build (localhost) reads but never writes rows, so a dev
+  machine cannot fill the production database. A flag can switch them on for a deliberate test.
 - The server is optional. If it is down or slow, every page behaves as it does today.
 
 ### Operations
 - **Kill switches.** Config flags turn the TT job and the visit endpoint off without a redeploy.
-- **Budget.** A hard cap on TT calls per run; stop on the first 429.
+- **Budget.** Hard caps on TT calls per run and per UTC day (visit-triggered calls count), one shared gate spacing every
+  call, and a stop on the first 429.
 - **Logs.** Counts and statuses only, in a file outside `public/`. Never a secret, never a request body.
 - **Install.** A one-time, idempotent script creates the tables. It is uploaded, run once, then deleted, because there is
   no SQL console. Later changes ship as numbered migrations through the same runner.
@@ -176,5 +221,5 @@ components and copy.
 - Create `/prism-data/config.php` (Twitch client id and secret, database login, salt, allowed origins). Never pasted into
   chat.
 - OK to pull the PHP and MariaDB Docker images for tests.
-- Create the daily cron job in the panel, or OK for it to be set over SSH.
+- Create the scheduled cron job in the panel (every few hours, within the host's limit), or OK for it to be set over SSH.
 - Send the TT email.
