@@ -214,6 +214,24 @@ final class RouterTest extends DbTestCase
         }
     }
 
+    /**
+     * The page shows 7, 30 and 90 day growth from the default answer, and growth over 90 days needs the row dated
+     * 90 days before the newest one. The default window must therefore reach that far back, and no further.
+     */
+    public function testDefaultWindowIncludesTheRowNinetyDaysBack(): void
+    {
+        $channels = new ChannelStore($this->pdo, $this->clock);
+        $snapshots = new SnapshotStore($this->pdo, $this->clock);
+        $channels->insertTracked(Fixtures::user('1', 'alice'), null);
+        foreach (['2026-08-13', '2026-08-14', '2026-11-12'] as $date) {
+            $snapshots->upsert('1', $date, ['rank' => 8], 'ok');
+        }
+
+        $dates = array_column($this->json($this->call('GET', '/api/channel', ['login' => 'alice']))['history'], 'date');
+
+        $this->assertSame(['2026-08-14', '2026-11-12'], $dates);
+    }
+
     public function testGetWithABadOrMissingLoginIs400(): void
     {
         foreach ([[], ['login' => 'a b'], ['login' => ''], ['login' => str_repeat('a', 26)]] as $query) {

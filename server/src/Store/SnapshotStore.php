@@ -88,7 +88,8 @@ final class SnapshotStore
     }
 
     /**
-     * Oldest first. `$days` is the last N UTC calendar days including today; null means every row.
+     * Oldest first. The window reaches back `$days` UTC days from today: it holds today and the row dated exactly
+     * N days earlier, because growth over N days compares those two. Null means every row.
      *
      * @return list<array<string,mixed>>
      */
@@ -98,7 +99,7 @@ final class SnapshotStore
             $stmt = $this->pdo->prepare('SELECT ' . self::COLUMNS . ' FROM snapshots WHERE twitch_id = ? ORDER BY snap_date ASC');
             $stmt->execute([$id]);
         } else {
-            $from = Time::date($this->clock->nowMs() - (max(1, $days) - 1) * self::DAY_MS);
+            $from = Time::date($this->clock->nowMs() - max(1, $days) * self::DAY_MS);
             $stmt = $this->pdo->prepare('SELECT ' . self::COLUMNS . ' FROM snapshots WHERE twitch_id = ? AND snap_date >= ? ORDER BY snap_date ASC');
             $stmt->execute([$id, $from]);
         }
