@@ -1,0 +1,11 @@
+# Test image for the PRISM history server: PHP 8.4 (the host runs 8.4) plus PHPUnit.
+# PHPUnit is installed in a Composer stage so the PHP image needs no extra system packages.
+FROM composer:2 AS vendor
+WORKDIR /app
+COPY composer.json ./
+RUN composer install --no-interaction --no-progress --prefer-dist
+
+FROM php:8.4-cli
+RUN docker-php-ext-install pdo_mysql
+WORKDIR /app
+COPY --from=vendor /app/vendor /app/vendor

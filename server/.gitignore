@@ -1,0 +1,7 @@
+vendor/
+.phpunit.cache/
+composer.lock
+config.php
+*.log
+deploy.config.json
+.env
