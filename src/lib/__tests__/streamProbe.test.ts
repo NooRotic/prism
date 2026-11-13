@@ -103,6 +103,55 @@ describe('probeStream', () => {
     expect(seen?.aborted).toBe(true)
   })
 
+  describe('a body that never ends', () => {
+    // A video file or a radio stream answers 200 and keeps sending. The probe must take only the
+    // start of it, not wait for the end and report the address as unreachable.
+    function endlessBody(first: string) {
+      const encoder = new TextEncoder()
+      const cancel = vi.fn(async () => {})
+      let reads = 0
+      const read = vi.fn(async () => {
+        reads += 1
+        return { done: false, value: encoder.encode(reads === 1 ? first : 'x'.repeat(4096)) }
+      })
+      const text = vi.fn(async () => {
+        throw new Error('the whole body must not be read')
+      })
+      const response = { ok: true, status: 200, text, body: { getReader: () => ({ read, cancel }) } }
+      return { response: response as unknown as Response, read, cancel, text }
+    }
+
+    it('says a video file tried as HLS is not a playlist, instead of unreachable', async () => {
+      const { response, cancel, text, read } = endlessBody('\u0000\u0000\u0000 ftypisom' + 'y'.repeat(2000))
+      const fetchFn = fetchReturning(response)
+      expect(await probeStream('https://h/video', 'hls', { ...https, fetchFn })).toEqual({ kind: 'not-playlist' })
+      expect(cancel).toHaveBeenCalled()
+      expect(text).not.toHaveBeenCalled()
+      expect(read.mock.calls.length).toBeLessThan(5)
+    })
+
+    it('accepts an HLS playlist from the first chunk and stops reading', async () => {
+      const { response, cancel } = endlessBody('#EXTM3U\n#EXT-X-VERSION:3\n')
+      const fetchFn = fetchReturning(response)
+      expect(await probeStream('https://h/live', 'hls', { ...https, fetchFn })).toEqual({ kind: 'ok' })
+      expect(cancel).toHaveBeenCalled()
+    })
+
+    it('puts a playlist that arrives in small chunks back together', async () => {
+      const encoder = new TextEncoder()
+      const chunks = ['#EXT', 'M3U\n', '#EXT-X-VERSION:3\n' + 'z'.repeat(1100)]
+      const cancel = vi.fn(async () => {})
+      const read = vi.fn(async () => {
+        const next = chunks.shift()
+        return next === undefined ? { done: true, value: undefined } : { done: false, value: encoder.encode(next) }
+      })
+      const response = { ok: true, status: 200, body: { getReader: () => ({ read, cancel }) } } as unknown as Response
+      expect(await probeStream('https://h/live', 'hls', { ...https, fetchFn: fetchReturning(response) })).toEqual({
+        kind: 'ok',
+      })
+    })
+  })
+
   it('accepts an mp4 on a 2xx without reading the body', async () => {
     const { response, text } = reply(200, 'binary')
     const fetchFn = fetchReturning(response)

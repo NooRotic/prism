@@ -22,6 +22,29 @@ export interface ProbeOptions {
 const HLS_HEAD_CHARS = 1024
 const DASH_HEAD_CHARS = 2048
 
+/**
+ * The first `maxChars` characters of a response body. A guessed-HLS address can be a video file or
+ * a stream that never ends, so the body is read chunk by chunk and abandoned once there is enough,
+ * rather than downloaded until the timeout and misreported as unreachable.
+ */
+async function readHead(response: Response, maxChars: number): Promise<string> {
+  const reader = response.body?.getReader()
+  if (!reader) return (await response.text()).slice(0, maxChars)
+
+  const decoder = new TextDecoder()
+  let head = ''
+  try {
+    while (head.length < maxChars) {
+      const { done, value } = await reader.read()
+      if (done) break
+      head += decoder.decode(value, { stream: true })
+    }
+  } finally {
+    void Promise.resolve(reader.cancel()).catch(() => {})
+  }
+  return head.slice(0, maxChars)
+}
+
 export async function probeStream(
   url: string,
   kind: StreamKind,
@@ -42,7 +65,7 @@ export async function probeStream(
     if (!response.ok) return { kind: 'http', status: response.status }
     if (kind === 'mp4') return { kind: 'ok' }
 
-    const text = await response.text()
+    const text = await readHead(response, kind === 'hls' ? HLS_HEAD_CHARS : DASH_HEAD_CHARS)
     if (kind === 'hls') {
       const head = text.slice(0, HLS_HEAD_CHARS).replace(/^[\u{FEFF}\s]+/u, '')
       return head.startsWith('#EXTM3U') ? { kind: 'ok' } : { kind: 'not-playlist' }
