@@ -9,6 +9,9 @@ import { logger } from '../../lib/logger'
 
 type Player = ReturnType<typeof videojs>
 
+/** How long a stream may go without loading its first data before the page is told. */
+const STALL_MS = 12_000
+
 /**
  * Video.js player wrapping HLS (via VHS) and native MP4.
  *
@@ -27,6 +30,8 @@ export default function VideoJSPlayer({
   onPause,
   onEnded,
   onPlaybackBlocked,
+  onStall,
+  onPlaying,
 }: PlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<Player | null>(null)
@@ -38,6 +43,8 @@ export default function VideoJSPlayer({
     onPause,
     onEnded,
     onPlaybackBlocked,
+    onStall,
+    onPlaying,
   })
 
   useEffect(() => {
@@ -58,12 +65,19 @@ export default function VideoJSPlayer({
     videoEl.className = 'video-js vjs-big-play-centered'
     container.appendChild(videoEl)
 
-    let readyFired = false
-    const loadTimeout = setTimeout(() => {
-      if (!readyFired) {
-        cb.current.onError?.('Stream failed to load within 10 seconds')
-      }
-    }, 10_000)
+    // video.js fires `ready` right after it initialises, long before any media has loaded, so
+    // "started" means the first data arrived (or playback began), not `ready`.
+    let started = false
+    const stallTimer = setTimeout(() => {
+      if (started) return
+      // A stall is not a failure: the player keeps loading, so only tell the page when it listens.
+      if (cb.current.onStall) cb.current.onStall()
+      else cb.current.onError?.('Stream failed to load within 12 seconds')
+    }, STALL_MS)
+    const markStarted = () => {
+      started = true
+      clearTimeout(stallTimer)
+    }
 
     const player = videojs(videoEl, {
       controls: true,
@@ -81,9 +95,13 @@ export default function VideoJSPlayer({
 
     playerRef.current = player
 
+    player.on('loadeddata', markStarted)
+    player.on('playing', () => {
+      markStarted()
+      cb.current.onPlaying?.()
+    })
+
     player.on('ready', () => {
-      readyFired = true
-      clearTimeout(loadTimeout)
       cb.current.onReady?.()
       player.play()?.catch((err: Error) => {
         // AbortError fires when play() is interrupted by another action
@@ -107,7 +125,7 @@ export default function VideoJSPlayer({
       const err = player.error()
       if (err?.code === 4) {
         cb.current.onPlaybackBlocked?.()
-        cb.current.onError?.('Source not supported or autoplay denied')
+        cb.current.onError?.('Video.js could not use this source (code 4)')
         return
       }
       cb.current.onError?.(
@@ -184,7 +202,7 @@ export default function VideoJSPlayer({
     }, 1000)
 
     return () => {
-      clearTimeout(loadTimeout)
+      clearTimeout(stallTimer)
       window.clearInterval(metricsInterval)
       setPlayerMetrics(null)
       if (player && !player.isDisposed()) {

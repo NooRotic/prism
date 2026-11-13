@@ -24,7 +24,7 @@ import FallbackCard from './FallbackCard'
 // (removeChild errors during engine switches) and shows FallbackCard
 // instead of a white screen.
 class PlayerErrorBoundary extends Component<
-  { children: ReactNode; fallback: ReactNode },
+  { children: ReactNode; fallback: () => ReactNode },
   { hasError: boolean }
 > {
   state = { hasError: false }
@@ -35,7 +35,7 @@ class PlayerErrorBoundary extends Component<
     logger.error('[PlayerErrorBoundary] caught:', info.componentStack)
   }
   render() {
-    if (this.state.hasError) return this.props.fallback
+    if (this.state.hasError) return this.props.fallback()
     return this.props.children
   }
 }
@@ -49,6 +49,12 @@ const YouTubePlayer = lazy(() => import('./YouTubePlayer'))
 interface PlayerHostProps {
   url: string
   detection: URLDetectionResult
+  /** Replaces the fallback card when no engine can play; gets the last error. */
+  renderError?: (error: string | null) => ReactNode
+  /** Forwarded to the player: the stream has not started after a while. */
+  onStall?: () => void
+  /** Forwarded to the player: playback is running. */
+  onPlaying?: () => void
 }
 
 const PLAYER_LOADING_FALLBACK = (
@@ -93,7 +99,13 @@ function getContentId(detection: URLDetectionResult): string | null {
   )
 }
 
-export default function PlayerHost({ url, detection }: PlayerHostProps) {
+export default function PlayerHost({
+  url,
+  detection,
+  renderError,
+  onStall,
+  onPlaying,
+}: PlayerHostProps) {
   const { state, dispatch } = useApp()
   const { debugMode } = state.player
 
@@ -198,7 +210,16 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
     onError: handleError,
     onOffline: handleOffline,
     onOnline: handleOnline,
+    onStall,
+    onPlaying,
   }
+
+  const renderFallback = () =>
+    renderError ? (
+      renderError(errorReason)
+    ) : (
+      <FallbackCard detection={detection} error={errorReason} />
+    )
 
   const renderPlayer = () => {
     switch (activeEngine) {
@@ -234,7 +255,7 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
         )
       case 'fallback':
       default:
-        return <FallbackCard detection={detection} error={errorReason} />
+        return renderFallback()
     }
   }
 
@@ -247,7 +268,7 @@ export default function PlayerHost({ url, detection }: PlayerHostProps) {
       <div id="player-host-inner" className="relative w-full h-full">
       <PlayerErrorBoundary
         key={url}
-        fallback={<FallbackCard detection={detection} error={errorReason} />}
+        fallback={renderFallback}
       >
         {renderPlayer()}
       </PlayerErrorBoundary>

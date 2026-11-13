@@ -9,9 +9,11 @@ import type { PlayerProps } from '../../../types/player'
 // Capture props passed to each mocked player so tests can drive the callbacks.
 const sdkProps: PlayerProps[] = []
 const iframeProps: PlayerProps[] = []
+const vjsProps: PlayerProps[] = []
 // Lets a single test force a render crash inside the player so the error
 // boundary path is exercised.
 const sdkBehavior = { throwOnRender: false }
+const vjsBehavior = { throwOnRender: false }
 
 vi.mock('../TwitchEmbedPlayer', () => ({
   default: (props: PlayerProps) => {
@@ -33,7 +35,11 @@ vi.mock('../YouTubePlayer', () => ({
 }))
 
 vi.mock('../VideoJSPlayer', () => ({
-  default: () => <div data-testid="mock-videojs" />,
+  default: (props: PlayerProps) => {
+    vjsProps.push(props)
+    if (vjsBehavior.throwOnRender) throw new Error('simulated player crash')
+    return <div data-testid="mock-videojs" />
+  },
 }))
 
 vi.mock('../DashJSPlayer', () => ({
@@ -84,7 +90,9 @@ describe('PlayerHost', () => {
   beforeEach(() => {
     sdkProps.length = 0
     iframeProps.length = 0
+    vjsProps.length = 0
     sdkBehavior.throwOnRender = false
+    vjsBehavior.throwOnRender = false
   })
 
   afterEach(() => {
@@ -200,5 +208,75 @@ describe('PlayerHost', () => {
 
     warn.mockRestore()
     err.mockRestore()
+  })
+})
+
+describe('PlayerHost on an HLS stream', () => {
+  const hlsDetection: URLDetectionResult = {
+    type: 'hls',
+    originalUrl: 'https://h/a.m3u8',
+    playableUrl: 'https://h/a.m3u8',
+  }
+
+  function renderHls(extra: Partial<React.ComponentProps<typeof PlayerHost>> = {}) {
+    return render(
+      <AppProvider>
+        <PlayerHost url={hlsDetection.originalUrl} detection={hlsDetection} {...extra} />
+      </AppProvider>,
+    )
+  }
+
+  beforeEach(() => {
+    vjsProps.length = 0
+    vjsBehavior.throwOnRender = false
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('hands a custom error view the player error instead of the fallback card', async () => {
+    const renderError = vi.fn((error: string | null) => <div data-testid="custom-error">{error}</div>)
+    renderHls({ renderError })
+    await screen.findByTestId('mock-videojs')
+
+    act(() => { vjsProps[vjsProps.length - 1].onError!('boom') })
+
+    expect(await screen.findByTestId('custom-error')).toHaveTextContent('boom')
+    expect(renderError).toHaveBeenCalledWith('boom')
+    expect(screen.queryByText('Unable to Play')).not.toBeInTheDocument()
+  })
+
+  it('shows the custom error view too when the player crashes while rendering', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vjsBehavior.throwOnRender = true
+
+    renderHls({ renderError: () => <div data-testid="custom-error" /> })
+
+    expect(await screen.findByTestId('custom-error')).toBeInTheDocument()
+    expect(screen.queryByText('Unable to Play')).not.toBeInTheDocument()
+    warn.mockRestore()
+    err.mockRestore()
+  })
+
+  it('keeps the fallback card when no custom error view is given', async () => {
+    renderHls()
+    await screen.findByTestId('mock-videojs')
+
+    act(() => { vjsProps[vjsProps.length - 1].onError!('boom') })
+
+    expect(await screen.findByText('Unable to Play')).toBeInTheDocument()
+  })
+
+  it('forwards the stall and playing handlers to the player', async () => {
+    const onStall = vi.fn()
+    const onPlaying = vi.fn()
+    renderHls({ onStall, onPlaying })
+    await screen.findByTestId('mock-videojs')
+
+    const props = vjsProps[vjsProps.length - 1]
+    expect(props.onStall).toBe(onStall)
+    expect(props.onPlaying).toBe(onPlaying)
   })
 })
