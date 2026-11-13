@@ -13,6 +13,7 @@ import {
   saveSearchEntry,
 } from '../../lib/searchHistory'
 import { buildStreamPath } from '../../lib/routes'
+import { toStreamAddress } from '../../lib/streamSource'
 import { SearchSuggestions } from './SearchSuggestions'
 import { QuickLinks } from './QuickLinks'
 
@@ -124,9 +125,13 @@ export function SmartUrlInput() {
         det.type === 'mp4' ||
         det.type === 'unknown'
       ) {
-        // Everything that looks like an address but is not Twitch or YouTube goes to the
-        // player page. An address whose type is not recognised is tried as HLS there.
-        navigate(buildStreamPath(url))
+        // An http(s) address that is not Twitch or YouTube goes to the player page, where one
+        // whose type is not recognised is tried as HLS. Text that is not an address (a name with
+        // a dot in it, another scheme) keeps the old behaviour and plays nothing; a bare
+        // host/path is only completed when its ending already says it is a stream.
+        const address = toStreamAddress(url, det.type !== 'unknown')
+        if (address) navigate(buildStreamPath(address))
+        else dispatch({ type: 'PLAY_URL', url, detection: det })
       } else {
         // Fallback: dispatch PLAY_URL for unknown types (keeps existing behavior)
         dispatch({ type: 'PLAY_URL', url, detection: det })

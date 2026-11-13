@@ -142,6 +142,24 @@ describe('SmartUrlInput routing of pasted links', () => {
     expect(screen.getByTestId('location')).toHaveTextContent(`/hls-dash/custom?url=${encodeURIComponent(url)}`)
   })
 
+  it('adds https:// to a bare host and path that names a stream', async () => {
+    await paste('cdn.example.com/live/a.m3u8')
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      `/hls-dash/custom?url=${encodeURIComponent('https://cdn.example.com/live/a.m3u8')}`,
+    )
+  })
+
+  it.each([
+    ['a name with a dot and a space', 'Dr. Disrespect'],
+    ['a game name with dots', 'S.T.A.L.K.E.R. 2'],
+    ['a javascript: address', 'javascript:alert(1)'],
+    ['a bare host with no stream ending', 'example.com/foo'],
+    ['an rtmp address', 'rtmp://h/live.m3u8'],
+  ])('does not open the player for %s', async (_label, text) => {
+    await paste(text)
+    expect(screen.getByTestId('location').textContent).toBe('/')
+  })
+
   it('still sends a Twitch address to the Twitch page', async () => {
     await paste('https://twitch.tv/xqc')
     expect(screen.getByTestId('location')).toHaveTextContent('/twitch/xqc')
