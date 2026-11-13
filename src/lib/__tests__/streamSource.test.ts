@@ -45,11 +45,21 @@ describe('resolveStreamSource', () => {
     expect(source?.guessedKind).toBe(true)
   })
 
-  it('lets as= force the type and clears the guess', () => {
+  it('lets as= force the type and still marks an unrecognised address, so the other kinds stay on offer', () => {
     const source = resolveStreamSource('custom', params('url=https%3A%2F%2Fh%2Flive%2Fplaylist&as=dash'))
     expect(source?.detection.type).toBe('dash')
     expect(source?.kind).toBe('dash')
+    expect(source?.guessedKind).toBe(true)
+  })
+
+  it('does not call an address a guess when its own ending names the type', () => {
+    const source = resolveStreamSource('custom', params('url=https%3A%2F%2Fh%2Fx.m3u8&as=dash'))
+    expect(source?.kind).toBe('dash')
     expect(source?.guessedKind).toBe(false)
+  })
+
+  it('does not let as= turn a Twitch address into a stream', () => {
+    expect(resolveStreamSource('custom', params('url=https%3A%2F%2Ftwitch.tv%2Fxqc&as=hls'))).toBeNull()
   })
 
   it('knows an mp4 address', () => {

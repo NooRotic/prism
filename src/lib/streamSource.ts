@@ -29,17 +29,14 @@ export function resolveStreamSource(
   const url = demoUrl ?? params.get('url')
   if (!url) return null
 
-  const forced = demoUrl ? null : parseStreamKind(params.get('as'))
-  const detection = forced ? detectURLTypeAs(url, forced) : detectURLType(url)
+  const detected = detectURLType(url)
+  if (detected.type === 'twitch' || detected.type === 'youtube') return null
 
-  switch (detection.type) {
-    case 'hls':
-    case 'dash':
-    case 'mp4':
-      return { url, detection, kind: detection.type, guessedKind: false }
-    case 'unknown':
-      return { url, detection: detectURLTypeAs(url, 'hls'), kind: 'hls', guessedKind: true }
-    default:
-      return null
-  }
+  // An address whose text names no type stays "guessed" even after the visitor forces one, so the
+  // other kinds remain on offer if the first choice does not play.
+  const guessedKind = detected.type === 'unknown'
+  const forced = demoUrl ? null : parseStreamKind(params.get('as'))
+  const kind: StreamKind = forced ?? (detected.type === 'unknown' ? 'hls' : detected.type)
+
+  return { url, detection: detectURLTypeAs(url, kind), kind, guessedKind }
 }
