@@ -15,6 +15,10 @@ export interface PlayerProps {
   onEnded?: () => void
   /** Fires when the browser blocks autoplay (policy). Usually triggers fallback. */
   onPlaybackBlocked?: () => void
+  /** The stream has not started after a while. The player keeps loading; this only tells the page. */
+  onStall?: () => void
+  /** Playback is running (fires again after a rebuffer). */
+  onPlaying?: () => void
 }
 
 export interface PlayerHostState {
