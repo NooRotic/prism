@@ -44,7 +44,7 @@ export async function probeStream(
 
     const text = await response.text()
     if (kind === 'hls') {
-      const head = text.slice(0, HLS_HEAD_CHARS).replace(/^[﻿\s]+/, '')
+      const head = text.slice(0, HLS_HEAD_CHARS).replace(/^[\u{FEFF}\s]+/u, '')
       return head.startsWith('#EXTM3U') ? { kind: 'ok' } : { kind: 'not-playlist' }
     }
     return text.slice(0, DASH_HEAD_CHARS).toUpperCase().includes('<MPD')

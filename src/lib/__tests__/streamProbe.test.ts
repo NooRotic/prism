@@ -45,7 +45,7 @@ describe('probeStream', () => {
   })
 
   it('accepts an HLS playlist that starts with a byte order mark and a blank line', async () => {
-    const fetchFn = fetchReturning(reply(200, '﻿\n#EXTM3U\n').response)
+    const fetchFn = fetchReturning(reply(200, '\u{FEFF}\n#EXTM3U\n').response)
     expect(await probeStream('https://h/a.m3u8', 'hls', { ...https, fetchFn })).toEqual({ kind: 'ok' })
   })
 
