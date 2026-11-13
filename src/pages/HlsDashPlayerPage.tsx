@@ -1,39 +1,64 @@
-import { useEffect } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
-import { Tv } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
-import { detectURLType, getSourceColor, getURLTypeDisplayName } from '../lib/urlDetection'
-import { getDemoById } from '../config/demoContent'
+import { getSourceColor, getURLTypeDisplayName, type StreamKind } from '../lib/urlDetection'
+import { buildStreamPath, CUSTOM_STREAM_ID } from '../lib/routes'
+import { resolveStreamSource, type StreamSource } from '../lib/streamSource'
 import PlayerHost from '../components/player/PlayerHost'
+import { StreamErrorCard, StreamStallNotice } from '../components/player/StreamStatus'
 import DebugPanel from '../components/layout/DebugPanel'
 
-export default function HlsDashPlayerPage() {
-  const { streamId } = useParams<{ streamId: string }>()
-  const [searchParams] = useSearchParams()
-  const { state, dispatch } = useApp()
-  const { player } = state
+function StreamNotFound({ streamId, hasUrl }: { streamId: string | undefined; hasUrl: boolean }) {
+  let message: string
+  if (streamId && streamId !== CUSTOM_STREAM_ID) message = `No stream called “${streamId}”.`
+  else if (!hasUrl) message = 'No stream address was given.'
+  else message = "That address isn't an HLS, DASH or MP4 stream."
 
-  useEffect(() => {
-    // Priority: route param (demo entry) → query param (arbitrary URL)
-    let url: string | null = null
-    if (streamId) {
-      const demo = getDemoById(streamId)
-      url = demo ? demo.url : null
-    }
-    if (!url) {
-      url = searchParams.get('url')
-    }
-    if (!url) return
+  return (
+    <div className="flex flex-col items-center gap-3 w-full max-w-5xl mx-auto px-4 md:px-6 pt-12 pb-8 text-center">
+      <p className="text-lg" style={{ color: 'var(--text-primary)' }}>
+        {message}
+      </p>
+      <Link to="/hls-dash" className="text-sm underline" style={{ color: 'var(--accent-hls)' }}>
+        Browse the HLS / DASH demos
+      </Link>
+    </div>
+  )
+}
 
-    const detection = detectURLType(url)
-    if (state.player.currentUrl !== url) {
-      dispatch({ type: 'PLAY_URL', url, detection })
-    }
-  }, [streamId, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+function StreamPlayer({ source }: { source: StreamSource }) {
+  const navigate = useNavigate()
+  const { url, detection, kind, guessedKind } = source
+  // Retrying remounts the player; a stall notice belongs to one attempt at one address, and this
+  // component is remounted (see the key at the call site) whenever the address or type changes.
+  const [attempt, setAttempt] = useState(0)
+  const [stalled, setStalled] = useState(false)
 
-  const detection = player.detection
-  const accentColor = detection ? getSourceColor(detection) : 'var(--accent-hls)'
-  const typeLabel = detection ? getURLTypeDisplayName(detection) : 'HLS/DASH'
+  const retry = useCallback(() => {
+    setStalled(false)
+    setAttempt((n) => n + 1)
+  }, [])
+  const tryAs = useCallback(
+    (next: StreamKind) => navigate(buildStreamPath(url, next), { replace: true }),
+    [navigate, url],
+  )
+  const onStall = useCallback(() => setStalled(true), [])
+  const onPlaying = useCallback(() => setStalled(false), [])
+  const renderError = useCallback(
+    (error: string | null) => (
+      <StreamErrorCard
+        url={url}
+        kind={kind}
+        guessedKind={guessedKind}
+        playerError={error}
+        onRetry={retry}
+        onTryAs={tryAs}
+      />
+    ),
+    [url, kind, guessedKind, retry, tryAs],
+  )
+
+  const accentColor = getSourceColor(detection)
 
   return (
     <div className="flex flex-col gap-4 w-full max-w-5xl mx-auto px-4 md:px-6 pt-4 pb-8">
@@ -43,14 +68,14 @@ export default function HlsDashPlayerPage() {
           className="text-lg font-bold font-heading uppercase tracking-wider"
           style={{ color: accentColor }}
         >
-          {typeLabel} Player
+          {getURLTypeDisplayName(detection)} Player
         </h2>
         <span
           className="text-xs truncate font-mono"
           style={{ color: 'var(--text-muted)' }}
-          title={player.currentUrl}
+          title={url}
         >
-          {player.currentUrl}
+          {url}
         </span>
       </div>
 
@@ -63,19 +88,54 @@ export default function HlsDashPlayerPage() {
           boxShadow: `0 0 20px ${accentColor}22`,
         }}
       >
-        {player.currentUrl && player.detection ? (
-          <PlayerHost url={player.currentUrl} detection={player.detection} />
-        ) : (
-          <div className="flex items-center justify-center w-full h-full" style={{ color: 'var(--text-muted)' }}>
-            <div className="flex flex-col items-center gap-2">
-              <Tv size={32} />
-              <span className="text-sm">Loading stream...</span>
-            </div>
-          </div>
-        )}
+        <PlayerHost
+          key={attempt}
+          url={url}
+          detection={detection}
+          renderError={renderError}
+          onStall={onStall}
+          onPlaying={onPlaying}
+        />
       </div>
+
+      {stalled && (
+        <StreamStallNotice
+          url={url}
+          kind={kind}
+          guessedKind={guessedKind}
+          onRetry={retry}
+          onTryAs={tryAs}
+        />
+      )}
 
       <DebugPanel />
     </div>
   )
+}
+
+export default function HlsDashPlayerPage() {
+  const { streamId } = useParams<{ streamId: string }>()
+  const [searchParams] = useSearchParams()
+  const { state, dispatch } = useApp()
+
+  // Render from what the address asks for, not from the app's player state: that state still holds
+  // the previous stream for one frame after a navigation.
+  const source = useMemo(
+    () => resolveStreamSource(streamId, searchParams),
+    [streamId, searchParams],
+  )
+
+  // The rest of the app (debug panel, floating window) reads what is playing from app state.
+  useEffect(() => {
+    if (!source) return
+    if (
+      state.player.currentUrl !== source.url ||
+      state.player.detection?.type !== source.detection.type
+    ) {
+      dispatch({ type: 'PLAY_URL', url: source.url, detection: source.detection })
+    }
+  }, [source]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!source) return <StreamNotFound streamId={streamId} hasUrl={searchParams.has('url')} />
+  return <StreamPlayer key={`${source.url}|${source.detection.type}`} source={source} />
 }
