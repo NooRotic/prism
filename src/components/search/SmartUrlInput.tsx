@@ -12,6 +12,7 @@ import {
   getSearchHistory,
   saveSearchEntry,
 } from '../../lib/searchHistory'
+import { buildStreamPath } from '../../lib/routes'
 import { SearchSuggestions } from './SearchSuggestions'
 import { QuickLinks } from './QuickLinks'
 
@@ -117,8 +118,15 @@ export function SmartUrlInput() {
       } else if (det.type === 'youtube') {
         const ytId = det.metadata?.videoId ?? extractYouTubeVideoId(url)
         navigate(ytId ? `/youtube/${ytId}` : `/youtube/${encodeURIComponent(url)}`)
-      } else if (det.type === 'hls' || det.type === 'dash') {
-        navigate(`/hls-dash?url=${encodeURIComponent(url)}`)
+      } else if (
+        det.type === 'hls' ||
+        det.type === 'dash' ||
+        det.type === 'mp4' ||
+        det.type === 'unknown'
+      ) {
+        // Everything that looks like an address but is not Twitch or YouTube goes to the
+        // player page. An address whose type is not recognised is tried as HLS there.
+        navigate(buildStreamPath(url))
       } else {
         // Fallback: dispatch PLAY_URL for unknown types (keeps existing behavior)
         dispatch({ type: 'PLAY_URL', url, detection: det })

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from '../../../contexts/AppContext'
 import { SmartUrlInput } from '../SmartUrlInput'
 
@@ -108,5 +108,52 @@ describe('SmartUrlInput', () => {
 
     // Input should no longer have focus
     expect(input).not.toHaveFocus()
+  })
+})
+
+function LocationSpy() {
+  const location = useLocation()
+  return <div data-testid="location">{location.pathname + location.search}</div>
+}
+
+describe('SmartUrlInput routing of pasted links', () => {
+  async function paste(value: string) {
+    render(
+      <MemoryRouter>
+        <AppProvider>
+          <SmartUrlInput />
+          <LocationSpy />
+        </AppProvider>
+      </MemoryRouter>,
+    )
+    const user = userEvent.setup()
+    await user.type(screen.getByPlaceholderText('Paste URL or type channel name...'), value)
+    await user.keyboard('{Enter}')
+  }
+
+  it.each([
+    ['an HLS playlist', 'https://x.test/a.m3u8'],
+    ['a DASH manifest', 'https://x.test/a.mpd'],
+    ['an mp4', 'https://x.test/v.mp4'],
+    ['an address with no recognisable ending', 'https://x.test/live/playlist'],
+    ['a web page', 'https://example.com/foo'],
+  ])('opens the player page for %s', async (_label, url) => {
+    await paste(url)
+    expect(screen.getByTestId('location')).toHaveTextContent(`/hls-dash/custom?url=${encodeURIComponent(url)}`)
+  })
+
+  it('still sends a Twitch address to the Twitch page', async () => {
+    await paste('https://twitch.tv/xqc')
+    expect(screen.getByTestId('location')).toHaveTextContent('/twitch/xqc')
+  })
+
+  it('still sends a plain word to the Twitch page', async () => {
+    await paste('xqc')
+    expect(screen.getByTestId('location')).toHaveTextContent('/twitch/xqc')
+  })
+
+  it('still sends a YouTube address to the YouTube page', async () => {
+    await paste('https://youtu.be/abc12345678')
+    expect(screen.getByTestId('location')).toHaveTextContent('/youtube/abc12345678')
   })
 })
