@@ -5,6 +5,8 @@ import type { StreamKind } from '../../lib/urlDetection'
 
 const KIND_LABEL: Record<StreamKind, string> = { hls: 'HLS', dash: 'DASH', mp4: 'MP4' }
 const ALL_KINDS: StreamKind[] = ['hls', 'dash', 'mp4']
+/** With its article, for a sentence: "an HLS stream", "a DASH stream". */
+const KIND_WITH_ARTICLE: Record<StreamKind, string> = { hls: 'an HLS', dash: 'a DASH', mp4: 'an MP4' }
 
 /**
  * Asks the pasted address what is wrong with it. The result is tied to the address it was
@@ -30,7 +32,7 @@ function useStreamProbe(url: string, kind: StreamKind): ProbeResult | null {
 function explain(result: ProbeResult, kind: StreamKind): string {
   switch (result.kind) {
     case 'ok':
-      return `The address answers and looks like a ${KIND_LABEL[kind]} stream, but the player could not use it. The video format may not be supported in this browser, or the stream's media files may be blocked.`
+      return `The address answers and looks like ${KIND_WITH_ARTICLE[kind]} stream, so the problem is further along: the video format may not be supported in this browser, or the stream's own playlists or media files may be missing or blocked.`
     case 'http':
       return `The server answered ${result.status}. The address may be wrong, expired, or need a sign-in.`
     case 'not-playlist':
