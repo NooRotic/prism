@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveStreamSource } from '../streamSource'
+import { resolveStreamSource, toStreamAddress } from '../streamSource'
 
 const params = (query: string) => new URLSearchParams(query)
 
@@ -74,5 +74,47 @@ describe('resolveStreamSource', () => {
     expect(
       resolveStreamSource('custom', params('url=https%3A%2F%2Fyoutube.com%2Fwatch%3Fv%3Dabc')),
     ).toBeNull()
+  })
+})
+
+describe('resolveStreamSource and addresses that are not http(s)', () => {
+  it.each([
+    ['a javascript: address', 'javascript:alert(1)'],
+    ['a path on this site', '/etc/passwd'],
+    ['an address with no scheme', 'example.com/a.m3u8'],
+    ['an ftp address', 'ftp://h/a.m3u8'],
+    ['a data: address', 'data:text/plain,hi'],
+  ])('gives null for %s', (_label, address) => {
+    expect(resolveStreamSource('custom', params(`url=${encodeURIComponent(address)}`))).toBeNull()
+  })
+
+  it('accepts an upper-case scheme', () => {
+    expect(resolveStreamSource('custom', params('url=HTTPS%3A%2F%2Fh%2Fa.m3u8'))?.kind).toBe('hls')
+  })
+})
+
+describe('toStreamAddress', () => {
+  it('keeps an http(s) address, trimmed', () => {
+    expect(toStreamAddress('  https://h/a.m3u8 ', false)).toBe('https://h/a.m3u8')
+    expect(toStreamAddress('http://h/a.m3u8', false)).toBe('http://h/a.m3u8')
+  })
+
+  it.each([false, true])('turns text with spaces into no address (bare allowed: %s)', (allowBare) => {
+    expect(toStreamAddress('Dr. Disrespect', allowBare)).toBeNull()
+    expect(toStreamAddress('S.T.A.L.K.E.R. 2', allowBare)).toBeNull()
+  })
+
+  it.each([false, true])('refuses other schemes (bare allowed: %s)', (allowBare) => {
+    expect(toStreamAddress('javascript:alert(1)', allowBare)).toBeNull()
+    expect(toStreamAddress('rtmp://h/live.m3u8', allowBare)).toBeNull()
+  })
+
+  it('adds https:// to a bare host and path only when that is allowed', () => {
+    expect(toStreamAddress('cdn.example.com/live.m3u8', true)).toBe('https://cdn.example.com/live.m3u8')
+    expect(toStreamAddress('cdn.example.com/live.m3u8', false)).toBeNull()
+  })
+
+  it('does not treat a single word as a host', () => {
+    expect(toStreamAddress('xqc', true)).toBeNull()
   })
 })
