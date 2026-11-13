@@ -64,6 +64,22 @@ describe('StreamErrorCard diagnosis', () => {
     expect(explanation).toHaveAttribute('data-probe-result', result.kind)
   })
 
+  it.each([
+    ['hls', /an HLS stream/],
+    ['dash', /a DASH stream/],
+    ['mp4', /an MP4 stream/],
+  ] as const)('uses the right article for a %s address that answers fine', async (kind, pattern) => {
+    probe.mockResolvedValue({ kind: 'ok' })
+    render(card({ kind }))
+    expect(await screen.findByTestId('probe-explanation')).toHaveTextContent(pattern)
+  })
+
+  it('does not claim the player gave up when the address answers fine', async () => {
+    probe.mockResolvedValue({ kind: 'ok' })
+    render(card())
+    expect(await screen.findByTestId('probe-explanation')).not.toHaveTextContent(/could not use it/)
+  })
+
   it('names the status of a failed response', async () => {
     probe.mockResolvedValue({ kind: 'http', status: 404 })
     render(card())
