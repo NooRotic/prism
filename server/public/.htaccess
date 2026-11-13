@@ -5,6 +5,7 @@ Options -Indexes
   Require all denied
 </FilesMatch>
 
+# The target is the absolute URL path on purpose: the relative form 'index.php' gave the IONOS Apache a 500 on every routed URL.
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^ index.php [L]
+RewriteRule ^ /index.php [L]

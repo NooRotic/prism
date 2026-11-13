@@ -141,7 +141,10 @@ final class FrontControllerTest extends DbTestCase
         $htaccess = (string) file_get_contents(self::PUBLIC_DIR . '/.htaccess');
 
         $this->assertStringContainsString('Options -Indexes', $htaccess);
-        $this->assertStringContainsString('RewriteRule ^ index.php [L]', $htaccess);
         $this->assertStringContainsString('Require all denied', $htaccess);
+        // The target must be the absolute URL path. The relative form 'index.php' made IONOS's Apache answer every
+        // routed URL (and so every API call) with its own 500 page, while /index.php called directly worked.
+        $this->assertStringContainsString('RewriteRule ^ /index.php [L]', $htaccess);
+        $this->assertStringNotContainsString('RewriteRule ^ index.php', $htaccess);
     }
 }
