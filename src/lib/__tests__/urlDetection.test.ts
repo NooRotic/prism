@@ -8,6 +8,8 @@ import {
   getSourceColor,
   getURLTypeDisplayName,
   extractYouTubeVideoId,
+  detectURLTypeAs,
+  parseStreamKind,
 } from '../urlDetection'
 
 describe('detectURLType', () => {
@@ -331,5 +333,22 @@ describe('extractYouTubeVideoId', () => {
 
   it('returns null for bare youtube.com with no path', () => {
     expect(extractYouTubeVideoId('youtube.com')).toBeNull()
+  })
+})
+
+describe('detectURLTypeAs', () => {
+  it.each(['hls', 'dash', 'mp4'] as const)('forces the %s type on an address with no extension', (kind) => {
+    const url = 'https://h/live/playlist'
+    expect(detectURLTypeAs(url, kind)).toEqual({ type: kind, originalUrl: url, playableUrl: url })
+  })
+})
+
+describe('parseStreamKind', () => {
+  it.each(['hls', 'dash', 'mp4'] as const)('maps %s to itself', (kind) => {
+    expect(parseStreamKind(kind)).toBe(kind)
+  })
+
+  it.each(['HLS', 'x', '', null])('gives null for %j', (value) => {
+    expect(parseStreamKind(value)).toBeNull()
   })
 })

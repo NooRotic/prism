@@ -18,6 +18,19 @@ export type PlayerEngine =
   | 'reactplayer'
   | 'fallback'
 
+/** The kinds of address the HLS/DASH page can play: what the player is told to expect. */
+export type StreamKind = 'hls' | 'dash' | 'mp4'
+
+/** Reads a `?as=` value. Exact lowercase match only; anything else is no override. */
+export function parseStreamKind(value: string | null): StreamKind | null {
+  return value === 'hls' || value === 'dash' || value === 'mp4' ? value : null
+}
+
+/** Treats an address as the given kind, for links whose text does not say what they are. */
+export function detectURLTypeAs(url: string, kind: StreamKind): URLDetectionResult {
+  return { type: kind, originalUrl: url, playableUrl: url }
+}
+
 const YOUTUBE_ID_PATTERNS: Array<{ regex: RegExp; idGroup: number }> = [
   { regex: /youtube\.com\/watch\?.*v=([^&]+)/, idGroup: 1 },
   { regex: /youtu\.be\/([^?/]+)/, idGroup: 1 },
