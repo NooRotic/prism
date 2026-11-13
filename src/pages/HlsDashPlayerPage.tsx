@@ -26,6 +26,14 @@ function StreamNotFound({ streamId, hasUrl }: { streamId: string | undefined; ha
   )
 }
 
+/** Lets the page know the error view is on screen, so the stall notice can step aside. */
+function ReportOnMount({ onMount }: { onMount: () => void }) {
+  useEffect(() => {
+    onMount()
+  }, [onMount])
+  return null
+}
+
 function StreamPlayer({ source }: { source: StreamSource }) {
   const navigate = useNavigate()
   const { url, detection, kind, guessedKind } = source
@@ -33,9 +41,12 @@ function StreamPlayer({ source }: { source: StreamSource }) {
   // component is remounted (see the key at the call site) whenever the address or type changes.
   const [attempt, setAttempt] = useState(0)
   const [stalled, setStalled] = useState(false)
+  // Once the player has given up, the error card already says what the stall notice would.
+  const [failed, setFailed] = useState(false)
 
   const retry = useCallback(() => {
     setStalled(false)
+    setFailed(false)
     setAttempt((n) => n + 1)
   }, [])
   const tryAs = useCallback(
@@ -44,18 +55,22 @@ function StreamPlayer({ source }: { source: StreamSource }) {
   )
   const onStall = useCallback(() => setStalled(true), [])
   const onPlaying = useCallback(() => setStalled(false), [])
+  const markFailed = useCallback(() => setFailed(true), [])
   const renderError = useCallback(
     (error: string | null) => (
-      <StreamErrorCard
-        url={url}
-        kind={kind}
-        guessedKind={guessedKind}
-        playerError={error}
-        onRetry={retry}
-        onTryAs={tryAs}
-      />
+      <>
+        <ReportOnMount onMount={markFailed} />
+        <StreamErrorCard
+          url={url}
+          kind={kind}
+          guessedKind={guessedKind}
+          playerError={error}
+          onRetry={retry}
+          onTryAs={tryAs}
+        />
+      </>
     ),
-    [url, kind, guessedKind, retry, tryAs],
+    [url, kind, guessedKind, retry, tryAs, markFailed],
   )
 
   const accentColor = getSourceColor(detection)
@@ -98,7 +113,7 @@ function StreamPlayer({ source }: { source: StreamSource }) {
         />
       </div>
 
-      {stalled && (
+      {stalled && !failed && (
         <StreamStallNotice
           url={url}
           kind={kind}
