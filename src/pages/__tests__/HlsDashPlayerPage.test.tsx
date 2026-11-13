@@ -180,6 +180,30 @@ describe('HlsDashPlayerPage', () => {
     expect(screen.queryByTestId('stall-notice')).not.toBeInTheDocument()
   })
 
+  it('shows only the error card when a stalled stream then fails', async () => {
+    renderAt(buildStreamPath('https://h/x.m3u8'))
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'stall' }))
+    expect(screen.getByTestId('stall-notice')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'fail' }))
+
+    expect(await screen.findByTestId('error-card')).toBeInTheDocument()
+    expect(screen.queryByTestId('stall-notice')).not.toBeInTheDocument()
+  })
+
+  it('does not bring the stall notice back beside the error card', async () => {
+    renderAt(buildStreamPath('https://h/x.m3u8'))
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'fail' }))
+    await screen.findByTestId('error-card')
+    await user.click(screen.getByRole('button', { name: 'stall' }))
+
+    expect(screen.queryByTestId('stall-notice')).not.toBeInTheDocument()
+  })
+
   it('starts the player over on Retry and clears the stall notice', async () => {
     renderAt(buildStreamPath('https://h/x.m3u8'))
     const user = userEvent.setup()
