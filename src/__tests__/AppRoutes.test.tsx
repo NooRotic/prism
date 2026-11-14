@@ -12,6 +12,7 @@ vi.mock('../pages/TwitchPlayerPage', () => ({ default: () => <div>twitch player 
 vi.mock('../pages/YoutubePlayerPage', () => ({ default: () => <div>youtube player page</div> }))
 vi.mock('../pages/HlsDashPlayerPage', () => ({ default: () => <div>hls dash player page</div> }))
 vi.mock('../pages/ChatPopoutPage', () => ({ default: () => <div>chat pop-out page</div> }))
+vi.mock('../pages/AdminPage', () => ({ default: () => <div>admin page</div> }))
 
 function Layout() {
   return (
@@ -65,4 +66,17 @@ describe('AppRoutes: the pages that exist', () => {
     expect(screen.getByText('chat pop-out page')).toBeInTheDocument()
     expect(screen.queryByTestId('layout')).not.toBeInTheDocument()
   })
+})
+
+describe('AppRoutes: the admin page', () => {
+  it.each([['/admin'], ['/admin/'], ['/admin/usage'], ['/admin/channels']])(
+    '%s shows the admin page on its own (loaded when needed), outside the layout and never as not found',
+    async (path) => {
+      renderAt(path)
+
+      expect(await screen.findByText('admin page')).toBeInTheDocument()
+      expect(screen.queryByTestId('layout')).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument()
+    },
+  )
 })
