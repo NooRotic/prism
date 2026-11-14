@@ -51,6 +51,65 @@ final class ConfigTest extends TestCase
         Config::fromArray($negative);
     }
 
+    public function testAdminIsOffUntilBothIdsAreSet(): void
+    {
+        $this->assertFalse(Config::fromArray($this->base())->adminActive());
+
+        $ownerOnly = $this->base();
+        $ownerOnly['admin'] = ['owner_twitch_id' => '1000'];
+        $this->assertFalse(Config::fromArray($ownerOnly)->adminActive());
+
+        $clientOnly = $this->base();
+        $clientOnly['admin'] = ['frontend_client_id' => 'front'];
+        $this->assertFalse(Config::fromArray($clientOnly)->adminActive());
+
+        $both = $this->base();
+        $both['admin'] = ['owner_twitch_id' => '1000', 'frontend_client_id' => 'front'];
+        $c = Config::fromArray($both);
+        $this->assertTrue($c->adminActive());
+        $this->assertTrue($c->adminEnabled());
+        $this->assertSame('1000', $c->adminOwnerTwitchId());
+        $this->assertSame('front', $c->adminFrontendClientId());
+
+        $both['admin']['enabled'] = false;
+        $off = Config::fromArray($both);
+        $this->assertFalse($off->adminEnabled());
+        $this->assertFalse($off->adminActive());
+    }
+
+    public function testAnIntegerOwnerIdIsReadAsText(): void
+    {
+        $a = $this->base();
+        $a['admin'] = ['owner_twitch_id' => 1000, 'frontend_client_id' => 'front'];
+
+        $this->assertSame('1000', Config::fromArray($a)->adminOwnerTwitchId());
+    }
+
+    public function testMalformedAdminKeysTurnAdminOffAndDoNotThrow(): void
+    {
+        $cases = [
+            ['owner_twitch_id' => [], 'frontend_client_id' => 'front'],
+            ['owner_twitch_id' => 'abc', 'frontend_client_id' => 'front'],
+            ['owner_twitch_id' => '', 'frontend_client_id' => 'front'],
+            ['owner_twitch_id' => str_repeat('1', 21), 'frontend_client_id' => 'front'],
+            ['owner_twitch_id' => '1000', 'frontend_client_id' => []],
+            ['owner_twitch_id' => '1000', 'frontend_client_id' => ''],
+            ['owner_twitch_id' => '1000', 'frontend_client_id' => 'front', 'enabled' => 'yes'],
+        ];
+        foreach ($cases as $admin) {
+            $a = $this->base();
+            $a['admin'] = $admin;
+
+            $c = Config::fromArray($a);
+
+            $this->assertFalse($c->adminActive(), json_encode($admin));
+            $this->assertSame(1500, $c->ttDayBudget());
+        }
+        $notAnArray = $this->base();
+        $notAnArray['admin'] = 'on';
+        $this->assertFalse(Config::fromArray($notAnArray)->adminActive());
+    }
+
     public function testFromArrayAppliesDefaults(): void
     {
         $c = Config::fromArray($this->base());

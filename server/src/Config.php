@@ -149,6 +149,42 @@ final class Config
         return $this->requireString('log_path');
     }
 
+    /**
+     * The admin keys never throw and are not read by check(): a wrong value switches the admin side off, it does
+     * not make the public API answer 500 (the owner edits this file by hand on the host).
+     */
+    public function adminEnabled(): bool
+    {
+        $value = $this->value('admin.enabled');
+
+        return $value === null ? true : $value === true;
+    }
+
+    /** The owner's numeric Twitch id, or null when it is missing or not 1 to 20 digits. */
+    public function adminOwnerTwitchId(): ?string
+    {
+        $value = $this->value('admin.owner_twitch_id');
+        if (is_int($value) && $value > 0) {
+            $value = (string) $value;
+        }
+
+        return is_string($value) && preg_match('/^\d{1,20}$/', $value) === 1 ? $value : null;
+    }
+
+    /** The Twitch client id PRISM's own pages sign in with (public, not a secret), or null. */
+    public function adminFrontendClientId(): ?string
+    {
+        $value = $this->value('admin.frontend_client_id');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /** True only when the admin side is switched on and both ids are set. */
+    public function adminActive(): bool
+    {
+        return $this->adminEnabled() && $this->adminOwnerTwitchId() !== null && $this->adminFrontendClientId() !== null;
+    }
+
     /** Reads every setting once, so a bad config fails when it is loaded, not on first use. */
     private function check(): void
     {
