@@ -185,6 +185,21 @@ final class Config
         return $this->adminEnabled() && $this->adminOwnerTwitchId() !== null && $this->adminFrontendClientId() !== null;
     }
 
+    /**
+     * Where the visitor snapshot and the playlist import files live: outside public/, so Apache never serves them
+     * as plain files. Never throws and is not read by check(): a wrong value means the default.
+     */
+    public function playlistDataDir(): string
+    {
+        return $this->stringOr('playlist.data_dir', dirname(__DIR__) . '/data');
+    }
+
+    /** Where the copied channel pictures are written: inside public/, so Apache serves them straight. */
+    public function playlistLogoDir(): string
+    {
+        return $this->stringOr('playlist.logo_dir', dirname(__DIR__) . '/public/logos');
+    }
+
     /** Reads every setting once, so a bad config fails when it is loaded, not on first use. */
     private function check(): void
     {
@@ -238,6 +253,13 @@ final class Config
         }
 
         return $value;
+    }
+
+    private function stringOr(string $path, string $default): string
+    {
+        $value = $this->value($path);
+
+        return is_string($value) && $value !== '' ? $value : $default;
     }
 
     private function intOr(string $path, int $default, int $min): int

@@ -161,6 +161,58 @@ final class SchemaTest extends DbTestCase
         $this->assertSame('4', (string) $this->pdo->query('SELECT n FROM usage_counters')->fetchColumn());
     }
 
+    private function stream(string $id, string $publicId, string $state = 'new'): void
+    {
+        $this->pdo->prepare(
+            'INSERT INTO streams (id, public_id, url, name, groups_json, kind, state, source, added_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        )->execute([$id, $publicId, 'https://example.test/' . $id . '.m3u8', 'Name ' . $id, '["Other"]', 'hls', $state, 'test', '2026-11-12 03:00:00']);
+    }
+
+    public function testStreamsTableExists(): void
+    {
+        $this->assertContains('streams', $this->pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN));
+
+        $this->stream(str_repeat('a', 64), str_repeat('a', 12));
+        $row = $this->pdo->query('SELECT state, state_reason, pinned, is_default, logo_tries, country, logo_file FROM streams')->fetch(PDO::FETCH_ASSOC);
+
+        $this->assertSame('new', $row['state']);
+        $this->assertNull($row['state_reason']);
+        $this->assertSame([0, 0, 0], [(int) $row['pinned'], (int) $row['is_default'], (int) $row['logo_tries']]);
+        $this->assertNull($row['country']);
+        $this->assertNull($row['logo_file']);
+    }
+
+    public function testStreamPublicIdIsUnique(): void
+    {
+        $this->stream(str_repeat('a', 64), str_repeat('a', 12));
+
+        $this->expectException(PDOException::class);
+        $this->stream(str_repeat('b', 64), str_repeat('a', 12));
+    }
+
+    public function testStreamStateRejectsUnknownValues(): void
+    {
+        foreach (['new', 'working', 'suspect', 'dead', 'removed', 'unplayable', 'held'] as $i => $state) {
+            $this->stream(str_pad((string) $i, 64, '0'), str_pad((string) $i, 12, '0'), $state);
+        }
+        $this->assertSame('7', (string) $this->pdo->query('SELECT COUNT(*) FROM streams')->fetchColumn());
+
+        $this->expectException(PDOException::class);
+        $this->stream(str_repeat('f', 64), str_repeat('f', 12), 'bogus');
+    }
+
+    public function testThirdMigrationCanBeRunAgain(): void
+    {
+        $this->stream(str_repeat('a', 64), str_repeat('a', 12), 'working');
+        $this->pdo->exec("DELETE FROM schema_migrations WHERE version = '003_streams'");
+
+        $applied = (new \Prism\History\Migrator($this->pdo, __DIR__ . '/../migrations'))->run();
+
+        $this->assertSame(['003_streams'], $applied);
+        $this->assertSame('working', $this->pdo->query('SELECT state FROM streams')->fetchColumn());
+    }
+
     public function testSnapshotNumbersKeepTheirSignAndSize(): void
     {
         $this->channel('1', 'alice');

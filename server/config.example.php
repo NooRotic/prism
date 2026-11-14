@@ -42,6 +42,13 @@ return [
         'owner_twitch_id' => '',
         'frontend_client_id' => '',
     ],
+    // Optional. Where the playlist keeps its files. The defaults (the data folder next to this file, and the public/logos
+    // folder of the server) are right for the IONOS layout; set them only if you moved things. Never inside public/ for
+    // data_dir, or Apache would serve the snapshot as a plain file without the origin check.
+    // 'playlist' => [
+    //     'data_dir' => '/prism-data/data',
+    //     'logo_dir' => '/prism-data/public/logos',
+    // ],
     // Kill switches: set to false to switch behaviour off without a redeploy.
     'flags' => [
         'visits_enabled' => true,
