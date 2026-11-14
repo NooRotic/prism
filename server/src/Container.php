@@ -8,6 +8,7 @@ use PDO;
 use Prism\History\Admin\AdminController;
 use Prism\History\Admin\AdminGuard;
 use Prism\History\Admin\AdminReports;
+use Prism\History\Admin\ChannelAdmin;
 use Prism\History\Admin\TokenCache;
 use Prism\History\Api\Router;
 use Prism\History\Http\CurlHttp;
@@ -63,18 +64,19 @@ final class Container
             $cap,
             $s['clock'],
         );
+        $audit = new AuditStore($pdo, $s['clock']);
         $reports = new AdminReports(
             $config,
             $s['counters'],
             $attempts,
-            new AuditStore($pdo, $s['clock']),
+            $audit,
             $s['state'],
             $s['gate'],
             $s['channels'],
             $s['clock'],
         );
 
-        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports));
+        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit)));
     }
 
     /** The schema migrator over the migrations/ folder that ships next to src/. */

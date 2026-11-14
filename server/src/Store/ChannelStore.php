@@ -208,6 +208,73 @@ final class ChannelStore
         return $stmt->fetchAll();
     }
 
+    /**
+     * Channels whose login or display name contains the text (an empty text matches all), most recently visited
+     * first, each with the status of its newest TwitchTracker snapshot. `%` and `_` in the text mean themselves.
+     *
+     * @return list<array{twitch_id:string,login:string,display_name:string,status:string,tracked_since:string,last_visited_at:string,tt_status:?string}>
+     */
+    public function search(string $text, int $limit): array
+    {
+        $like = '%' . addcslashes($text, '%_\\') . '%';
+        $stmt = $this->pdo->prepare(
+            'SELECT c.twitch_id, c.login, c.display_name, c.status, c.tracked_since, c.last_visited_at,
+                    (SELECT s.tt_status FROM snapshots s WHERE s.twitch_id = c.twitch_id ORDER BY s.snap_date DESC LIMIT 1) AS tt_status
+             FROM channels c
+             WHERE (:empty = 1 OR c.login LIKE :like_login OR c.display_name LIKE :like_name)
+             ORDER BY c.last_visited_at DESC, c.twitch_id ASC
+             LIMIT :n',
+        );
+        $stmt->bindValue('empty', $text === '' ? 1 : 0, PDO::PARAM_INT);
+        $stmt->bindValue('like_login', $like);
+        $stmt->bindValue('like_name', $like);
+        $stmt->bindValue('n', max(1, $limit), PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_map(static fn (array $r): array => [
+            'twitch_id' => (string) $r['twitch_id'],
+            'login' => (string) $r['login'],
+            'display_name' => (string) $r['display_name'],
+            'status' => (string) $r['status'],
+            'tracked_since' => (string) $r['tracked_since'],
+            'last_visited_at' => (string) $r['last_visited_at'],
+            'tt_status' => $r['tt_status'] === null ? null : (string) $r['tt_status'],
+        ], $stmt->fetchAll());
+    }
+
+    /** @return list<array{twitch_id:string,login:string,blocked_at:string}> newest first */
+    public function blocked(int $limit): array
+    {
+        $stmt = $this->pdo->prepare('SELECT twitch_id, login, blocked_at FROM blocked_channels ORDER BY blocked_at DESC, twitch_id ASC LIMIT :n');
+        $stmt->bindValue('n', max(1, $limit), PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_map(static fn (array $r): array => [
+            'twitch_id' => (string) $r['twitch_id'],
+            'login' => (string) $r['login'],
+            'blocked_at' => (string) $r['blocked_at'],
+        ], $stmt->fetchAll());
+    }
+
+    /** @return array{twitch_id:string,login:string,blocked_at:string}|null */
+    public function findBlocked(string $id): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT twitch_id, login, blocked_at FROM blocked_channels WHERE twitch_id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        return $row === false ? null : ['twitch_id' => (string) $row['twitch_id'], 'login' => (string) $row['login'], 'blocked_at' => (string) $row['blocked_at']];
+    }
+
+    /** Lifts a block; false when there was none. */
+    public function unblock(string $id): bool
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM blocked_channels WHERE twitch_id = ?');
+        $stmt->execute([$id]);
+
+        return $stmt->rowCount() > 0;
+    }
+
     /** Deletes the channel; its snapshots and bio links go with it (foreign keys cascade). */
     public function remove(string $id): void
     {
