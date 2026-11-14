@@ -11,6 +11,7 @@ import {
   redactText,
   setAvoidedFormats,
   setPlaybackInspection,
+  setPlaybackSoundBlocked,
   setPlaybackStatus,
   subscribePlayback,
   usePlaybackLog,
@@ -74,6 +75,18 @@ describe('playbackWriter', () => {
 
     expect(getPlaybackSnapshot()).toMatchObject({ status: 'playing', inspection: { readyState: 4 } })
     expect(getPlaybackSnapshot().entries.at(-1)?.message).toBe('loadstart')
+  })
+
+  it('says the sound was blocked only for its own session', () => {
+    beginPlayback({ url: 'https://one.test/a.m3u8', kind: 'hls' })
+    const old = playbackWriter()
+    beginPlayback({ url: 'https://two.test/b.m3u8', kind: 'hls' })
+    const current = playbackWriter()
+
+    old.setSoundBlocked(true)
+    expect(getPlaybackSnapshot().soundBlocked).toBe(false)
+    current.setSoundBlocked(true)
+    expect(getPlaybackSnapshot().soundBlocked).toBe(true)
   })
 
   it('stops writing once another session began, so an old engine cannot touch the next stream', () => {
@@ -178,6 +191,22 @@ describe('the playback log', () => {
     expect(getPlaybackSnapshot().session).toBe(first + 1)
     endPlayback()
     expect(getPlaybackSnapshot().session).toBe(0)
+  })
+
+  it('tracks whether the browser blocked the sound: set, cleared, reset by the next session, ignored while idle', () => {
+    setPlaybackSoundBlocked(true)
+    expect(getPlaybackSnapshot().soundBlocked).toBe(false)
+
+    beginPlayback({ url: 'https://h.test/a.m3u8', kind: 'hls' })
+    expect(getPlaybackSnapshot().soundBlocked).toBe(false)
+    setPlaybackSoundBlocked(true)
+    expect(getPlaybackSnapshot().soundBlocked).toBe(true)
+    setPlaybackSoundBlocked(false)
+    expect(getPlaybackSnapshot().soundBlocked).toBe(false)
+
+    setPlaybackSoundBlocked(true)
+    beginPlayback({ url: 'https://h.test/b.m3u8', kind: 'hls' })
+    expect(getPlaybackSnapshot().soundBlocked).toBe(false)
   })
 
   it('goes back to idle, with nothing left, when the session ends', () => {

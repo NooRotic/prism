@@ -23,12 +23,14 @@ export interface PlaybackSnapshot {
   entries: readonly PlaybackEntry[]
   /** The state of the player (media element, rendition) taken when it last failed. */
   inspection: Record<string, unknown> | null
+  /** True while the video plays muted because the browser refused to start it with sound; the page offers to turn it on. */
+  soundBlocked: boolean
   /** Video formats this page has stopped asking for after a decode failure. Outlives a session. */
   avoided: readonly string[]
 }
 
 const MAX_ENTRIES = 300
-const IDLE: PlaybackSnapshot = { session: 0, status: 'idle', attempts: 0, url: null, kind: null, startedAt: null, entries: [], inspection: null, avoided: [] }
+const IDLE: PlaybackSnapshot = { session: 0, status: 'idle', attempts: 0, url: null, kind: null, startedAt: null, entries: [], inspection: null, soundBlocked: false, avoided: [] }
 
 let snapshot: PlaybackSnapshot = IDLE
 let sessions = 0
@@ -55,6 +57,7 @@ export function beginPlayback(info: { url: string; kind: string }): void {
     startedAt: now,
     entries: [entry(0, 'info', 'session', 'Attempt 1: session started')],
     inspection: null,
+    soundBlocked: false,
     avoided: snapshot.avoided,
   })
 }
@@ -92,6 +95,12 @@ export function setPlaybackStatus(status: PlaybackStatus): void {
 export function setPlaybackInspection(data: Record<string, unknown>): void {
   if (snapshot.status === 'idle') return
   publish({ ...snapshot, inspection: data })
+}
+
+/** Says whether the video is playing muted only because the browser refused sound. Ignored while no session runs. */
+export function setPlaybackSoundBlocked(blocked: boolean): void {
+  if (snapshot.status === 'idle' || snapshot.soundBlocked === blocked) return
+  publish({ ...snapshot, soundBlocked: blocked })
 }
 
 /** Records which video formats the page now avoids. Works with no session, and outlives sessions. */
@@ -167,6 +176,7 @@ export interface PlaybackWriter {
   log: (level: PlaybackLevel, source: string, message: string, data?: Record<string, unknown>) => void
   setStatus: (status: PlaybackStatus) => void
   setInspection: (data: Record<string, unknown>) => void
+  setSoundBlocked: (blocked: boolean) => void
 }
 
 /**
@@ -187,6 +197,9 @@ export function playbackWriter(): PlaybackWriter {
     },
     setInspection: (data) => {
       if (live()) setPlaybackInspection(data)
+    },
+    setSoundBlocked: (blocked) => {
+      if (live()) setPlaybackSoundBlocked(blocked)
     },
   }
 }

@@ -105,6 +105,21 @@ describe('DashJSPlayer and the playback log', () => {
     expect(onPlaybackBlocked).toHaveBeenCalledTimes(1)
   })
 
+  it('says the sound was blocked when it had to start muted, and clears that once the video is unmuted', async () => {
+    const { container } = render(<DashJSPlayer url={URL_OF} detection={detection} />)
+    await waitFor(() => expect(dash.player.initialize).toHaveBeenCalled())
+    const video = container.querySelector('video')!
+
+    dash.handlers.playbackNotAllowed()
+    expect(getPlaybackSnapshot().soundBlocked).toBe(true)
+
+    video.dispatchEvent(new Event('volumechange'))
+    expect(getPlaybackSnapshot().soundBlocked).toBe(true)
+    video.muted = false
+    video.dispatchEvent(new Event('volumechange'))
+    expect(getPlaybackSnapshot().soundBlocked).toBe(false)
+  })
+
   it('moves the session to playing when the video starts playing', async () => {
     const { container } = render(<DashJSPlayer url={URL_OF} detection={detection} />)
     await waitFor(() => expect(dash.player.initialize).toHaveBeenCalled())

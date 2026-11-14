@@ -1,21 +1,26 @@
 import { useEffect } from 'react'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach } from 'vitest'
 import StreamPlayerPanel from '../StreamPlayerPanel'
-import { endPlayback, getPlaybackSnapshot, logPlayback } from '../../../lib/playbackLog'
+import { endPlayback, getPlaybackSnapshot, logPlayback, setPlaybackSoundBlocked } from '../../../lib/playbackLog'
 import { resolveStreamSource } from '../../../lib/streamSource'
 
 // When `failWith` is set, the stand-in player gives up at once, so the panel shows its error view.
 // When `logOnRender` is set it also writes one line to the playback log from an effect, as a real engine would.
-const mocks = vi.hoisted(() => ({ failWith: null as string | null, logOnRender: false }))
+const mocks = vi.hoisted(() => ({ failWith: null as string | null, logOnRender: false, withVideo: false }))
 vi.mock('../PlayerHost', () => ({
   default: function MockPlayerHost({ renderError }: { renderError?: (error: string | null) => React.ReactNode }) {
     useEffect(() => {
       if (mocks.logOnRender) logPlayback('info', 'test', 'player rendered')
     }, [])
-    return <div data-testid="player-host">{mocks.failWith !== null && renderError ? renderError(mocks.failWith) : null}</div>
+    return (
+      <div data-testid="player-host">
+        {mocks.failWith !== null && renderError ? renderError(mocks.failWith) : null}
+        {mocks.withVideo && <video data-testid="video" />}
+      </div>
+    )
   },
 }))
 vi.mock('../StreamStatus', () => ({
@@ -51,6 +56,7 @@ function renderPanel(props: Partial<React.ComponentProps<typeof StreamPlayerPane
 
 afterEach(() => {
   mocks.failWith = null
+  mocks.withVideo = false
   endPlayback()
 })
 
@@ -118,6 +124,54 @@ describe('StreamPlayerPanel: the playback log', () => {
     const snapshot = getPlaybackSnapshot()
     expect(snapshot.attempts).toBe(2)
     expect(snapshot.entries.map((entry) => entry.message)).toEqual(expect.arrayContaining(['Retry pressed', 'Attempt 2: retrying']))
+  })
+})
+
+describe('StreamPlayerPanel: sound blocked by the browser', () => {
+  it('says nothing about sound while the sound is fine', () => {
+    mocks.withVideo = true
+    renderPanel()
+
+    expect(screen.queryByText(/playing muted/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Turn sound on' })).toBeNull()
+  })
+
+  it('says it is playing muted, and why, with a Turn sound on button, once the browser blocked the sound', () => {
+    mocks.withVideo = true
+    renderPanel()
+
+    act(() => setPlaybackSoundBlocked(true))
+
+    expect(screen.getByText(/playing muted/i)).toBeInTheDocument()
+    expect(screen.getByText(/does not allow sound until you click/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Turn sound on' })).toBeInTheDocument()
+  })
+
+  it('turns the sound on from the button: unmutes the video, raises a volume of zero, and takes the notice away', async () => {
+    mocks.withVideo = true
+    renderPanel()
+    const video = screen.getByTestId('video') as HTMLVideoElement
+    video.muted = true
+    video.volume = 0
+    act(() => setPlaybackSoundBlocked(true))
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Turn sound on' }))
+
+    expect(video.muted).toBe(false)
+    expect(video.volume).toBe(1)
+    expect(screen.queryByText(/playing muted/i)).toBeNull()
+    expect(getPlaybackSnapshot().soundBlocked).toBe(false)
+  })
+
+  it('takes the notice away by itself when the engine says the sound is on (the player controls were used)', () => {
+    mocks.withVideo = true
+    renderPanel()
+    act(() => setPlaybackSoundBlocked(true))
+    expect(screen.getByText(/playing muted/i)).toBeInTheDocument()
+
+    act(() => setPlaybackSoundBlocked(false))
+
+    expect(screen.queryByText(/playing muted/i)).toBeNull()
   })
 })
 
