@@ -331,6 +331,8 @@ export const unblockChannel = (twitchId: string, signal?: AbortSignal) => act('/
 
 export const STREAM_STATES = ['new', 'working', 'suspect', 'dead', 'removed', 'unplayable', 'held'] as const
 export type StreamState = (typeof STREAM_STATES)[number]
+/** The states visitors can see: the server lists a stream on the visitor page (and lets it be the default) only in these. */
+export const LISTED_STATES: readonly StreamState[] = ['new', 'working', 'suspect']
 
 /** One stream as the owner sees it: every state, with the address (it is the owner's own list, shown as a host on screen). */
 export interface AdminStream {
