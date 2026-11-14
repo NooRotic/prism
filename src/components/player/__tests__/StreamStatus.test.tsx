@@ -131,6 +131,42 @@ describe('StreamErrorCard diagnosis', () => {
   })
 })
 
+describe('StreamErrorCard: what the player said', () => {
+  beforeEach(() => {
+    probe.mockResolvedValue({ kind: 'ok' })
+  })
+  afterEach(() => cleanup())
+
+  it('shows the player’s words, with no query value, login or fragment in any address it quotes', async () => {
+    render(
+      card({
+        playerError:
+          'Failed loading manifest: https://user:pw@h.test/live/a.mpd?sig=abc123&x=1, retrying (https://h.test/b.m3u8?token=zzz9#access_token=qq7)',
+      }),
+    )
+    await screen.findByTestId('probe-explanation')
+
+    const text = screen.getByText(/Player said/).textContent ?? ''
+    expect(text).toContain('https://***@h.test/live/a.mpd?sig=***&x=***')
+    expect(text).toContain('token=***')
+    for (const secret of ['abc123', 'pw@', 'zzz9', 'qq7']) expect(text).not.toContain(secret)
+  })
+
+  it('shows a message with no address in it as it is', async () => {
+    render(card({ playerError: 'Video.js could not use this source (code 4)' }))
+    await screen.findByTestId('probe-explanation')
+
+    expect(screen.getByText('Player said: Video.js could not use this source (code 4)')).toBeInTheDocument()
+  })
+
+  it('still offers the real address to open and copy', async () => {
+    render(card({ url: 'https://h.test/live/a.m3u8?token=real', playerError: null }))
+    await screen.findByTestId('probe-explanation')
+
+    expect(screen.getByRole('link', { name: /open address/i })).toHaveAttribute('href', 'https://h.test/live/a.m3u8?token=real')
+  })
+})
+
 describe('StreamErrorCard actions', () => {
   it('retries', async () => {
     const onRetry = vi.fn()
