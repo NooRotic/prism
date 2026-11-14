@@ -47,6 +47,10 @@ Design: [docs/superpowers/specs/2026-11-13-playlist-admin-design.md](../docs/sup
   default `php` is 4.4.9 and `php8.4` is the CGI build, so use **`/usr/bin/php8.4-cli`** for the install script, the
   cron job and `remove-channel.php`. Over SSH the working directory is the webspace root, so
   `/usr/bin/php8.4-cli prism-data/bin/install.php` creates the tables.
+- **The Authorization header.** The CGI PHP here does not receive the `Authorization` header by itself (checked live
+  2026-11-14: a throwaway probe saw `X-Prism-Authorization` but not `Authorization`). `public/.htaccess` therefore copies it into an
+  environment variable before the rewrite, and PHP sees it as `REDIRECT_HTTP_AUTHORIZATION` (verified live the same way);
+  `Request::fromGlobals()` also reads `HTTP_AUTHORIZATION` and the custom `X-Prism-Authorization` as fallbacks.
 - **Database.** Each database has its own login in the IONOS panel, and `db.name` in `config.php` must be the
   database's own name (`dbs` and digits), not its description. A login that is valid but not allowed into the named
   database fails with MySQL error 1044 (the server reports only "Database connection failed" by design).
