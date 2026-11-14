@@ -133,7 +133,7 @@ describe('planDecodeRecovery', () => {
 
 describe('installRenditionGuard', () => {
   function fakeVhs() {
-    const standard = vi.fn(function (this: unknown, ..._args: unknown[]) {
+    const standard = vi.fn(function (this: unknown) {
       return { picked: this }
     })
     const initial = vi.fn(function () {

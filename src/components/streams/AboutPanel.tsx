@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react'
 import { Info, Pin, PinOff } from 'lucide-react'
 import { useAutoFold } from '../../hooks/useAutoFold'
 import { regionName } from '../../lib/countries'
+import { usePlaybackLog } from '../../lib/playbackLog'
 import type { StreamEntry } from '../../lib/streamsApi'
 import ChannelPicture from './ChannelPicture'
 import CountryFlag from './CountryFlag'
+import PlaybackDebug from './PlaybackDebug'
 
 interface AboutPanelProps {
   stream: StreamEntry | null
@@ -33,7 +35,10 @@ function sourceHost(url: string): string | null {
  * and groups are text. The movement is skipped for a visitor who asked their system for less of it.
  */
 export default function AboutPanel({ stream, groups }: AboutPanelProps) {
-  const { open, pinned, bump, reopen, togglePin } = useAutoFold(stream?.id ?? '')
+  // While playback is failing or being retried the panel stays open (and opens if folded): it holds the debug output.
+  const playback = usePlaybackLog()
+  const failing = playback.status === 'retrying' || playback.status === 'failed'
+  const { open, pinned, bump, reopen, togglePin } = useAutoFold(stream?.id ?? '', 30_000, failing)
   const panelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -137,6 +142,8 @@ export default function AboutPanel({ stream, groups }: AboutPanelProps) {
                   <dd>{STATE_TEXT[stream.state]}</dd>
                 </div>
               </dl>
+
+              <PlaybackDebug />
             </>
           )}
         </div>

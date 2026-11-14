@@ -28,6 +28,7 @@
 - `src/pages/HlsPage.tsx` - the HLS / DASH page (`/hls-dash` and `/hls-dash/:streamId`): player, "About this stream" panel and a searchable windowed list; with the server down it shows the built-in demo streams. Parts in `src/components/streams/`, `src/hooks/useStreamSnapshot.ts`, `src/hooks/useAutoFold.ts`
 - `src/lib/streamsApi.ts` - client for `GET /api/streams` (the visitor stream list); never throws, remembers a good answer for the page session
 - `src/components/admin/PlaylistScreen.tsx` + `server/src/Admin/PlaylistAdmin.php` - the owner's Playlist screen (`/admin/playlist`) and its API (`/api/admin/streams*`): list, add, edit, pin, default, remove; every write audited; `StreamPreview.tsx` plays a stream in place under its row
+- `src/lib/playbackLog.ts` + `src/components/streams/PlaybackDebug.tsx` - the in-page playback log the engines write to and the PLAYBACK button / console output / debug report in the About panel; `src/lib/renditionGuard.ts` - Video.js decode-failure recovery (avoid a video format, reload); `src/lib/playbackEnvironment.ts` - the browser's codec table
 - `server/src/Playlist/` + `server/src/Store/StreamStore.php` - the playlist store (`streams` table), the insert-only M3U importer (`server/bin/import-playlist.php`), the visitor snapshot and the logo fetcher (`server/bin/fetch-logos.php`, through the guarded fetcher in `server/src/Net/`); see `server/README.md` ("The playlist") and the spec's "Piece 2 as built"
 
 ## Design Spec

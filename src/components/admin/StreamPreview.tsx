@@ -4,6 +4,7 @@ import { buildStreamPath } from '../../lib/routes'
 import { toStreamAddress } from '../../lib/streamSource'
 import { detectURLType, detectURLTypeAs, type StreamKind } from '../../lib/urlDetection'
 import StreamPlayerPanel from '../player/StreamPlayerPanel'
+import PlaybackDebug from '../streams/PlaybackDebug'
 
 const KIND_LABEL: Record<StreamKind, string> = { hls: 'HLS', dash: 'DASH', mp4: 'MP4' }
 const BUTTON = 'rounded border px-2 py-1 text-xs'
@@ -79,6 +80,7 @@ export default function StreamPreview({ stream, onClose }: StreamPreviewProps) {
           This address cannot be played here.
         </p>
       )}
+      {playable && <PlaybackDebug />}
     </section>
   )
 }
