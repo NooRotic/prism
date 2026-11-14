@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { beginPlayback, endPlayback, logPlayback, setPlaybackStatus } from '../../lib/playbackLog'
 import { getSourceColor, getURLTypeDisplayName, type StreamKind } from '../../lib/urlDetection'
 import { buildStreamPath } from '../../lib/routes'
 import type { StreamSource } from '../../lib/streamSource'
@@ -43,7 +44,16 @@ export default function StreamPlayerPanel({ source, heading = true, className, o
   // Once the player has given up, the error card already says what the stall notice would.
   const [failed, setFailed] = useState(false)
 
+  // One playback session per stream, for the status and the debug output. It begins in a layout effect, which runs before
+  // the effects of the engines below (they write to it), and ends when the panel goes away.
+  useLayoutEffect(() => {
+    beginPlayback({ url, kind })
+    return () => endPlayback()
+  }, [url, kind])
+
   const retry = useCallback(() => {
+    logPlayback('info', 'panel', 'Retry pressed')
+    setPlaybackStatus('retrying')
     setStalled(false)
     setFailed(false)
     setAttempt((n) => n + 1)
@@ -54,7 +64,11 @@ export default function StreamPlayerPanel({ source, heading = true, className, o
   )
   const onStall = useCallback(() => setStalled(true), [])
   const onPlaying = useCallback(() => setStalled(false), [])
-  const markFailed = useCallback(() => setFailed(true), [])
+  const markFailed = useCallback(() => {
+    logPlayback('error', 'panel', 'playback failed: no engine could play it')
+    setPlaybackStatus('failed')
+    setFailed(true)
+  }, [])
   const renderError = useCallback(
     (error: string | null) => (
       <>
