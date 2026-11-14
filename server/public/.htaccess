@@ -5,6 +5,12 @@ Options -Indexes
   Require all denied
 </FilesMatch>
 
+# The IONOS PHP is a CGI build that does not hand the Authorization header over by itself. Pass it on as an environment
+# variable (PHP sees it as HTTP_AUTHORIZATION or, after the rewrite below, REDIRECT_HTTP_AUTHORIZATION). The admin API needs it.
+RewriteEngine On
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # The target is the absolute URL path on purpose: the relative form 'index.php' gave the IONOS Apache a 500 on every routed URL.
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
