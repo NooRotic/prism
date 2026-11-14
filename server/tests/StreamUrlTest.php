@@ -36,6 +36,21 @@ final class StreamUrlTest extends TestCase
             'a login refused' => ['https://user:pass@example.com/a.m3u8', null],
             'a user name alone refused' => ['https://user@example.com/a.m3u8', null],
             'an empty login refused' => ['https://@example.com/a.m3u8', null],
+            // A host name a browser refuses must not be stored: the visitor page cannot parse the address, and (before the
+            // page learned to skip such a row) one of them emptied the whole list.
+            'a less-than sign in the host refused' => ['https://exa<mple.com/a.m3u8', null],
+            'a bracketed host that is not an ipv6 address refused' => ['https://[bad]/x.m3u8', null],
+            'a bracketed ipv4 address refused' => ['https://[1.2.3.4]/x.m3u8', null],
+            'a percent sign in the host refused' => ['https://exa%mple.com/a', null],
+            'a pipe in the host refused' => ['https://a|b.com/x', null],
+            'a caret in the host refused' => ['https://a^b.com/x', null],
+            'a backslash in the host refused' => ['https://a\\b.com/x', null],
+            'a non-ascii host refused (shown only as punycode, which this server cannot make)' => ['https://日本語.test/x', null],
+            'an underscore in a host is fine' => ['https://A_b.Example.com/x', 'https://a_b.example.com/x'],
+            'an ipv4 host is fine' => ['http://192.0.2.5:8080/x', 'http://192.0.2.5:8080/x'],
+            'a host spelled as one number is fine (a browser reads it as an address)' => ['https://2130706433/x', 'https://2130706433/x'],
+            'an ipv6 host is fine' => ['https://[2001:DB8::1]:8443/x', 'https://[2001:db8::1]:8443/x'],
+            'a trailing dot on a host is fine' => ['https://example.com./x', 'https://example.com./x'],
             'a space inside refused' => ['https://example.com/a b.m3u8', null],
             'a control character inside refused' => ["https://example.com/a\x00b.m3u8", null],
         ];

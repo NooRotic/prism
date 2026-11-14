@@ -46,6 +46,13 @@ final class ImportRulesTest extends TestCase
         $this->assertSame('token', $this->reject($this->entry('https://x.test/a?token=1', 'XXX')));
     }
 
+    public function testAHostABrowserCannotParseIsABadAddress(): void
+    {
+        foreach (['https://exa<mple.com/a.m3u8', 'https://[bad]/x.m3u8', 'https://exa%mple.com/a', 'https://a|b.com/x', 'https://a^b.com/x'] as $url) {
+            $this->assertSame('bad_address', $this->reject($this->entry($url)), $url);
+        }
+    }
+
     public function testAnAddressTooLongToStoreIsABadAddress(): void
     {
         $this->assertSame('bad_address', $this->reject($this->entry('https://x.test/' . str_repeat('a', 1000))));

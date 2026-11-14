@@ -29,6 +29,10 @@ final class StreamUrl
         if ($scheme !== 'http' && $scheme !== 'https') {
             return null;
         }
+        $host = strtolower($p['host']);
+        if (!self::isUsableHost($host)) {
+            return null;
+        }
         $port = $p['port'] ?? null;
         if ($port === ($scheme === 'https' ? 443 : 80)) {
             $port = null;
@@ -36,7 +40,23 @@ final class StreamUrl
         $path = isset($p['path']) && $p['path'] !== '' ? $p['path'] : '/';
         $query = isset($p['query']) && $p['query'] !== '' ? '?' . $p['query'] : '';
 
-        return $scheme . '://' . strtolower($p['host']) . ($port !== null ? ':' . $port : '') . $path . $query;
+        return $scheme . '://' . $host . ($port !== null ? ':' . $port : '') . $path . $query;
+    }
+
+    /**
+     * Whether a browser can make an address of this host: an IPv6 address in brackets, or letters, digits, hyphens,
+     * underscores and dots (a trailing dot is fine). PHP's parse_url accepts far more ("exa<mple.com", "[bad]"), and an
+     * address the visitor's browser cannot parse used to take the whole stream list down with it. A host in other
+     * scripts would need punycode, which this server cannot make, so it is refused too.
+     */
+    private static function isUsableHost(string $host): bool
+    {
+        if (str_starts_with($host, '[')) {
+            return str_ends_with($host, ']')
+                && filter_var(substr($host, 1, -1), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+        }
+
+        return preg_match('/^[a-z0-9_](?:[a-z0-9_.\-]*[a-z0-9_])?\.?$/D', $host) === 1;
     }
 
     /** The stream's key: 64 lower-case hex characters. */

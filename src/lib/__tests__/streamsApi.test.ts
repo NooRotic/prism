@@ -95,8 +95,9 @@ describe('parseSnapshot', () => {
     expect(parseSnapshot({ ...WIRE, streams: [{ ...WIRE.streams[0], c: 'GB' }] })?.streams[0].country).toBe('gb')
   })
 
-  const stream = WIRE.streams[0]
-  const bad: [string, unknown][] = [
+  // A wrong shape at the top (or in the groups list, which every stream indexes into) means this is not the list we
+  // know: the whole thing is refused.
+  const badRoot: [string, unknown][] = [
     ['null', null],
     ['an array', []],
     ['a string', 'hello'],
@@ -107,24 +108,53 @@ describe('parseSnapshot', () => {
     ['a group that is not text', { ...WIRE, groups: ['Other', 3] }],
     ['no generated time', { ...WIRE, generated: undefined }],
     ['a default that is not text', { ...WIRE, default: 5 }],
-    ['a stream that is not an object', { ...WIRE, streams: [null] }],
-    ['a name that is not text', { ...WIRE, streams: [{ ...stream, n: 12 }] }],
-    ['no id', { ...WIRE, streams: [{ ...stream, i: undefined }] }],
-    ['an id with a slash', { ...WIRE, streams: [{ ...stream, i: 'a/b' }] }],
-    ['an empty id', { ...WIRE, streams: [{ ...stream, i: '' }] }],
-    ['a group index out of range', { ...WIRE, streams: [{ ...stream, g: [3] }] }],
-    ['a negative group index', { ...WIRE, streams: [{ ...stream, g: [-1] }] }],
-    ['a fractional group index', { ...WIRE, streams: [{ ...stream, g: [0.5] }] }],
-    ['group indexes that are not a list', { ...WIRE, streams: [{ ...stream, g: 1 }] }],
-    ['a javascript address', { ...WIRE, streams: [{ ...stream, u: 'javascript:alert(1)' }] }],
-    ['an ftp address', { ...WIRE, streams: [{ ...stream, u: 'ftp://a.test/x' }] }],
-    ['a relative address', { ...WIRE, streams: [{ ...stream, u: '/live.m3u8' }] }],
-    ['no address', { ...WIRE, streams: [{ ...stream, u: undefined }] }],
-    ['an unknown kind', { ...WIRE, streams: [{ ...stream, k: 'rtmp' }] }],
-    ['an unlisted state', { ...WIRE, streams: [{ ...stream, s: 'dead' }] }],
   ]
-  it.each(bad)('rejects %s', (_label, json) => {
+  it.each(badRoot)('rejects the whole list for %s', (_label, json) => {
     expect(parseSnapshot(json)).toBeNull()
+  })
+
+  // One unusable stream costs that stream, never the list: the server accepts a few addresses a browser cannot parse,
+  // and one such row must not turn 3,500 streams into the five demos for every visitor.
+  const stream = WIRE.streams[0]
+  const badStream: [string, unknown][] = [
+    ['not an object', null],
+    ['a name that is not text', { ...stream, n: 12 }],
+    ['no id', { ...stream, i: undefined }],
+    ['an id with a slash', { ...stream, i: 'a/b' }],
+    ['an empty id', { ...stream, i: '' }],
+    ['a group index out of range', { ...stream, g: [3] }],
+    ['a negative group index', { ...stream, g: [-1] }],
+    ['a fractional group index', { ...stream, g: [0.5] }],
+    ['group indexes that are not a list', { ...stream, g: 1 }],
+    ['a javascript address', { ...stream, u: 'javascript:alert(1)' }],
+    ['an ftp address', { ...stream, u: 'ftp://a.test/x' }],
+    ['a relative address', { ...stream, u: '/live.m3u8' }],
+    ['no address', { ...stream, u: undefined }],
+    ['an address with a character a browser refuses in a host name', { ...stream, u: 'https://exa<mple.com/a.m3u8' }],
+    ['an address with a bracketed host that is not an IPv6 address', { ...stream, u: 'https://[bad]/x.m3u8' }],
+    ['an address with a bad punycode host', { ...stream, u: 'https://xn--a.com/x' }],
+    ['an unknown kind', { ...stream, k: 'rtmp' }],
+    ['an unlisted state', { ...stream, s: 'dead' }],
+  ]
+  it.each(badStream)('skips only the stream with %s and keeps the rest of the list', (_label, bad) => {
+    const parsed = parseSnapshot({ ...WIRE, streams: [bad, WIRE.streams[1], bad] })
+
+    expect(parsed).not.toBeNull()
+    expect(parsed?.streams).toEqual([EXPECTED.streams[1]])
+    expect(parsed?.groups).toEqual(EXPECTED.groups)
+    expect(parsed?.defaultId).toBe(EXPECTED.defaultId)
+  })
+
+  it('gives the other streams in their order when the bad one is in the middle', () => {
+    const parsed = parseSnapshot({ ...WIRE, streams: [WIRE.streams[0], { ...stream, i: 'a/b' }, WIRE.streams[1]] })
+
+    expect(parsed?.streams.map((s) => s.name)).toEqual(['Alpha', 'Beta'])
+  })
+
+  it('gives an empty list, still a list, when every stream is unusable', () => {
+    const parsed = parseSnapshot({ ...WIRE, streams: [{ ...stream, u: 'javascript:alert(1)' }] })
+
+    expect(parsed?.streams).toEqual([])
   })
 
   it('accepts a list with no streams and no groups', () => {

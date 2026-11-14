@@ -81,7 +81,10 @@ function parseStream(raw: unknown, groupCount: number): StreamEntry | null {
   }
 }
 
-/** Maps the server's compact JSON to a StreamSnapshot; null when it is not that shape (or not version 1). */
+/**
+ * Maps the server's compact JSON to a StreamSnapshot. Null when the list itself is not the shape we know (not version 1,
+ * no groups or streams lists); a single stream that is unusable is skipped and the rest of the list kept.
+ */
 export function parseSnapshot(json: unknown): StreamSnapshot | null {
   const root = rec(json)
   if (!root || root.v !== 1) return null
@@ -96,9 +99,10 @@ export function parseSnapshot(json: unknown): StreamSnapshot | null {
   }
   const streams: StreamEntry[] = []
   for (const raw of root.streams) {
+    // A stream this code cannot use (an address the browser cannot parse, a bad id) is left out; the rest of the list
+    // stays. One odd row must never turn thousands of streams into the demo list for every visitor.
     const stream = parseStream(raw, groups.length)
-    if (stream === null) return null
-    streams.push(stream)
+    if (stream !== null) streams.push(stream)
   }
 
   return { generated, defaultId: typeof root.default === 'string' ? root.default : null, groups, streams }
