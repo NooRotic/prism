@@ -70,6 +70,11 @@ export default function DashJSPlayer({
     videoEl.addEventListener('pause', handlePause)
     videoEl.addEventListener('ended', handleEnded)
     videoEl.addEventListener('playing', handlePlaying)
+    // The sound came on (the video's own controls, or the page's "Turn sound on"): stop saying it is playing muted.
+    const handleVolumeChange = () => {
+      if (mountedRef.current && !videoEl.muted) out.setSoundBlocked(false)
+    }
+    videoEl.addEventListener('volumechange', handleVolumeChange)
 
     let dashPlayer: MediaPlayerClass | null = null
 
@@ -129,6 +134,7 @@ export default function DashJSPlayer({
           startedMuted = true
           out.log('warn', 'dashjs', 'the browser blocked autoplay with sound; playing muted (the speaker button turns the sound on)')
           videoEl.muted = true
+          out.setSoundBlocked(true)
           player.play()
         }
 
@@ -254,6 +260,7 @@ export default function DashJSPlayer({
       videoEl.removeEventListener('pause', handlePause)
       videoEl.removeEventListener('ended', handleEnded)
       videoEl.removeEventListener('playing', handlePlaying)
+      videoEl.removeEventListener('volumechange', handleVolumeChange)
       try {
         dashPlayer?.destroy()
       } catch {

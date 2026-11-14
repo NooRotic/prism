@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { beginPlayback, endPlayback, logPlayback, setPlaybackStatus } from '../../lib/playbackLog'
+import { beginPlayback, endPlayback, logPlayback, setPlaybackSoundBlocked, setPlaybackStatus } from '../../lib/playbackLog'
 import { getSourceColor, getURLTypeDisplayName, type StreamKind } from '../../lib/urlDetection'
 import { buildStreamPath } from '../../lib/routes'
 import type { StreamSource } from '../../lib/streamSource'
 import PlayerHost from './PlayerHost'
+import SoundNotice from './SoundNotice'
 import { StreamErrorCard, StreamStallNotice } from './StreamStatus'
 import DebugPanel from '../layout/DebugPanel'
 
@@ -88,8 +89,19 @@ export default function StreamPlayerPanel({ source, heading = true, className, o
 
   const accentColor = getSourceColor(detection)
 
+  // The "Turn sound on" button of the notice: it runs from the visitor's click, so the browser lets the sound start.
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const turnSoundOn = useCallback(() => {
+    const video = wrapperRef.current?.querySelector('video')
+    if (video) {
+      video.muted = false
+      if (video.volume === 0) video.volume = 1
+    }
+    setPlaybackSoundBlocked(false)
+  }, [])
+
   return (
-    <div className={className ?? DEFAULT_WRAPPER}>
+    <div ref={wrapperRef} className={className ?? DEFAULT_WRAPPER}>
       {heading && (
         <div className="flex items-center gap-3">
           <h2
@@ -126,6 +138,8 @@ export default function StreamPlayerPanel({ source, heading = true, className, o
           onPlaying={onPlaying}
         />
       </div>
+
+      <SoundNotice onTurnOn={turnSoundOn} />
 
       {stalled && !failed && (
         <StreamStallNotice

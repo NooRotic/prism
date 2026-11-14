@@ -188,6 +188,7 @@ export default function VideoJSPlayer({
         if (!player.muted()) {
           log('warn', 'the browser blocked autoplay with sound; playing muted (the speaker button turns the sound on)')
           player.muted(true)
+          out.setSoundBlocked(true)
           player.play()?.catch(onPlayRejected)
           return
         }
@@ -203,6 +204,10 @@ export default function VideoJSPlayer({
       player.play()?.catch(onPlayRejected)
     }
 
+    // The sound came on (the speaker button, or the page's "Turn sound on"): the page stops saying it is playing muted.
+    player.on('volumechange', () => {
+      if (!player.muted()) out.setSoundBlocked(false)
+    })
     player.on('loadstart', () => log('info', 'loadstart'))
     player.on('loadedmetadata', () => log('info', `loadedmetadata (${videoEl.videoWidth}x${videoEl.videoHeight})`))
     player.on('canplay', () => log('info', 'canplay'))

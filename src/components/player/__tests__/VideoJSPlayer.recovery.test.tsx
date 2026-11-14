@@ -137,6 +137,30 @@ describe('VideoJSPlayer: sound', () => {
     expect(getPlaybackSnapshot().entries.some((entry) => entry.level === 'warn' && entry.message.includes('sound') && entry.message.includes('muted'))).toBe(true)
   })
 
+  it('says the sound was blocked when it had to start muted, and clears that once the sound is on', async () => {
+    fake.player.play.mockReturnValueOnce(notAllowed())
+    mount()
+
+    fake.emit('ready')
+    await flush()
+    expect(getPlaybackSnapshot().soundBlocked).toBe(true)
+
+    fake.emit('volumechange')
+    expect(getPlaybackSnapshot().soundBlocked).toBe(true)
+    fake.sound.muted = false
+    fake.emit('volumechange')
+    expect(getPlaybackSnapshot().soundBlocked).toBe(false)
+  })
+
+  it('does not say the sound was blocked when it started with sound', async () => {
+    mount()
+
+    fake.emit('ready')
+    await flush()
+
+    expect(getPlaybackSnapshot().soundBlocked).toBe(false)
+  })
+
   it('tells the page the player is blocked when even a muted start is refused', async () => {
     const onPlaybackBlocked = vi.fn()
     fake.player.play.mockReturnValueOnce(notAllowed()).mockReturnValueOnce(notAllowed())
