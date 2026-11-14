@@ -12,6 +12,7 @@ import MatrixRainBackground from './components/ui/MatrixRainBackground'
 import { OnboardingIntro } from './components/intro/OnboardingIntro'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
 import { useAuthProfile } from './hooks/useAuthProfile'
+import { usePageHit } from './hooks/usePageHit'
 import { STORAGE_KEYS } from './config/storageKeys'
 import { isPlayerPagePath } from './lib/routes'
 
@@ -109,9 +110,16 @@ function AppLayout() {
   )
 }
 
+/** Counts page opens for the owner's usage numbers. Outside the layout, so the chat pop-out window is counted too. */
+function HitReporter() {
+  usePageHit()
+  return null
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <HitReporter />
       <AppProvider>
         <AppRoutes layout={<AppLayout />} />
       </AppProvider>
