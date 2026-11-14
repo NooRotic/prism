@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, ExternalLink } from 'lucide-react'
+import { redactText } from '../../lib/playbackLog'
 import { probeStream, type ProbeResult } from '../../lib/streamProbe'
 import type { StreamKind } from '../../lib/urlDetection'
 
@@ -147,7 +148,8 @@ export function StreamErrorCard(props: StatusProps & { playerError: string | nul
       <Diagnosis url={props.url} kind={props.kind} />
       {props.playerError && (
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Player said: {props.playerError}
+          {/* Engines quote the address in their messages (dash.js does); it can carry a token, so none of it is shown. */}
+          Player said: {redactText(props.playerError)}
         </p>
       )}
       <Actions {...props} />

@@ -1,4 +1,5 @@
 import { ExternalLink, AlertTriangle } from 'lucide-react'
+import { redactText } from '../../lib/playbackLog'
 import type { URLDetectionResult } from '../../lib/urlDetection'
 
 interface FallbackCardProps {
@@ -78,7 +79,7 @@ export default function FallbackCard({ detection, error }: FallbackCardProps) {
             className="text-sm max-w-sm"
             style={{ color: 'var(--text-muted)' }}
           >
-            {error}
+            {redactText(error)}
           </p>
         )}
       </div>
