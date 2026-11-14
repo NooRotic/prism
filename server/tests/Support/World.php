@@ -30,9 +30,19 @@ final class World
     /** @var list<string> logins for which the TwitchTracker route blows up with an exception, to test a run that meets a bad channel */
     public array $ttThrowsFor = [];
 
+    /** @var array<string,array<string,mixed>> access token => the answer Twitch's validate endpoint gives for it */
+    public array $tokens = [];
+
+    /** The status Twitch's validate endpoint answers every request with; anything but 200 makes it look down. */
+    public int $validateStatus = 200;
+
+    /** When set, validate answers 200 with this raw body instead of the token's real answer (an unreadable answer). */
+    public ?string $validateRawBody = null;
+
     public function __construct()
     {
         $this->http = new FakeHttp();
+        $this->http->route('GET https://id.twitch.tv/oauth2/validate', fn (array $r): HttpResponse => $this->validate($r['headers']));
         $this->http->route('POST https://id.twitch.tv/oauth2/token', FakeHttp::json(['access_token' => 'TOKEN', 'expires_in' => 5_000_000]));
         $this->http->route('GET https://api.twitch.tv/helix/users', fn (array $r): HttpResponse => $this->users($r['url']));
         $this->http->route('GET https://api.twitch.tv/helix/channels', fn (array $r): HttpResponse => $this->channels($r['url']));
@@ -58,6 +68,35 @@ final class World
             'profile_image_url' => 'https://img.example/' . $login . '.png',
             'created_at' => '2016-12-14T20:32:28Z',
         ], $extra);
+    }
+
+    /**
+     * Makes Twitch vouch for an access token. A null user id is an app token (no user). Tokens never granted get 401.
+     *
+     * @param list<string> $scopes
+     */
+    public function grantToken(string $token, ?string $userId, string $login, string $clientId, array $scopes = [], int $expiresIn = 14400): void
+    {
+        $answer = ['client_id' => $clientId, 'scopes' => $scopes, 'expires_in' => $expiresIn];
+        if ($userId !== null) {
+            $answer += ['login' => $login, 'user_id' => $userId];
+        }
+        $this->tokens[$token] = $answer;
+    }
+
+    /** How many times Twitch was asked to validate this token. */
+    public function validationsOf(string $token): int
+    {
+        return count(array_filter(
+            $this->http->requests,
+            static fn (array $r): bool => str_starts_with($r['url'], 'https://id.twitch.tv/oauth2/validate')
+                && ($r['headers']['Authorization'] ?? '') === 'OAuth ' . $token,
+        ));
+    }
+
+    public function validationCalls(): int
+    {
+        return count($this->requestsTo('https://id.twitch.tv/oauth2/validate'));
     }
 
     /** @param array<string,mixed>|string $body */
@@ -106,6 +145,23 @@ final class World
             'tt' => ['user_agent' => self::UA],
             'log_path' => sys_get_temp_dir() . '/prism-world-' . bin2hex(random_bytes(3)) . '.log',
         ], $override));
+    }
+
+    /** @param array<string,string> $headers */
+    private function validate(array $headers): HttpResponse
+    {
+        if ($this->validateStatus !== 200) {
+            return new HttpResponse($this->validateStatus, '');
+        }
+        if ($this->validateRawBody !== null) {
+            return new HttpResponse(200, $this->validateRawBody);
+        }
+        $token = preg_replace('/^OAuth /', '', $headers['Authorization'] ?? '');
+        if (!isset($this->tokens[$token])) {
+            return FakeHttp::json(['status' => 401, 'message' => 'invalid access token'], 401);
+        }
+
+        return FakeHttp::json($this->tokens[$token]);
     }
 
     private function users(string $url): HttpResponse
