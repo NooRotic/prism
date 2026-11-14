@@ -164,6 +164,9 @@ describe('floatingShouldEnd', () => {
   it.each([
     ['a YouTube page', '/youtube/abc', null],
     ['an HLS or DASH page', '/hls-dash/s', null],
+    // /hls-dash itself opens on a default stream, so it plays its own video like the pages above.
+    ['the HLS / DASH page, which starts a default stream', '/hls-dash', null],
+    ['the HLS / DASH page with a trailing slash', '/hls-dash/', null],
     ['a Twitch page now playing a clip', '/twitch/x', clip],
     ['a Twitch page now playing a VOD', '/twitch/x', vod],
   ])('is true for %s', (_label, path, detection) => {

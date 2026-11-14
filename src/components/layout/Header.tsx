@@ -11,10 +11,10 @@ export function Header() {
   const debugMode = state.player.debugMode
   const location = useLocation()
 
-  // Only show SmartUrlInput in header when on the hub page
-  // (protocol pages have it in the sidebar)
+  // Only show SmartUrlInput in header when the page has none of its own: the hub has one, and the Twitch and YouTube
+  // listings have it in their sidebar. /hls-dash is not one of them any more (it is a player page with no sidebar).
   const isHub = location.pathname === '/'
-  const isProtocolListing = ['/twitch', '/youtube', '/hls-dash'].includes(location.pathname)
+  const isProtocolListing = ['/twitch', '/youtube'].includes(location.pathname)
   const showHeaderInput = !isHub && !isProtocolListing
 
   return (

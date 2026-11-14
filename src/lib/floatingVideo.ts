@@ -94,8 +94,11 @@ export function canPopOutOn(pathname: string, detection: URLDetectionResult | nu
   return floatingChannelFromPath(pathname) !== null && detection?.platform === 'twitch-stream'
 }
 
-/** Pages that play their own video end the floating window, so two things never play at once. */
-const OWN_VIDEO_ROUTES = ['/youtube/:videoId', '/hls-dash/:streamId']
+/**
+ * Pages that play their own video end the floating window, so two things never play at once. The HLS / DASH page
+ * counts with or without a stream in the address: it opens on a default stream.
+ */
+const OWN_VIDEO_ROUTES = ['/youtube/:videoId', '/hls-dash/:streamId?']
 
 export function floatingShouldEnd(pathname: string, detection: URLDetectionResult | null): boolean {
   if (OWN_VIDEO_ROUTES.some((pattern) => matchPath(pattern, pathname) !== null)) return true
