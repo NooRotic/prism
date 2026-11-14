@@ -1,6 +1,8 @@
+import { useRef } from 'react'
 import { LogIn, LogOut, Settings } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useApp } from '../../contexts/AppContext'
+import { useHeaderHeight } from '../../hooks/useHeaderHeight'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { SmartUrlInput } from '../search/SmartUrlInput'
 import HeaderNav from './HeaderNav'
@@ -11,6 +13,12 @@ export function Header() {
   const debugMode = state.player.debugMode
   const location = useLocation()
 
+  // On a phone the logo, the nav, the paste box and the buttons do not fit one row (the page used to scroll sideways): below
+  // 640 px the actions wrap onto a second row, so the header's height is whatever its content needs, published for the
+  // panels, rail and pages that sit under it.
+  const headerRef = useRef<HTMLElement | null>(null)
+  useHeaderHeight(headerRef)
+
   // Only show SmartUrlInput in header when the page has none of its own: the hub has one, and the Twitch and YouTube
   // listings have it in their sidebar. /hls-dash is not one of them any more (it is a player page with no sidebar).
   const isHub = location.pathname === '/'
@@ -19,14 +27,15 @@ export function Header() {
 
   return (
     <header
-      className="fill-hide flex items-center justify-between px-6 py-3 relative z-40 h-(--header-height)"
+      ref={headerRef}
+      className="fill-hide flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 sm:px-6 relative z-40 min-h-14"
       style={{
         borderBottom: '1px solid var(--border)',
         background: 'linear-gradient(180deg, var(--bg-sidebar), rgba(8, 8, 12, 0.8))',
         backdropFilter: 'blur(12px)',
       }}
     >
-      <div className="flex items-center">
+      <div data-header-brand className="flex flex-wrap items-center gap-y-1">
         <Link
           to="/"
           aria-label="Return to home"
@@ -42,8 +51,13 @@ export function Header() {
         {isAuthenticated && <HeaderNav />}
       </div>
 
-      <div className="flex items-center gap-3">
-        {showHeaderInput && <SmartUrlInput />}
+      <div data-header-actions className="flex w-full items-center gap-3 sm:w-auto">
+        {/* On a phone the paste box takes what the buttons leave (it cannot shrink on its own); from 640 px up it is its own size. */}
+        {showHeaderInput && (
+          <div className="min-w-0 flex-1 sm:flex-none">
+            <SmartUrlInput />
+          </div>
+        )}
 
         {/* Debug toggle lives here, not over the player: anything drawn on top
             of the Twitch embed makes its visibility check fail and disables

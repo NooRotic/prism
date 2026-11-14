@@ -43,7 +43,7 @@ export default function HeaderNav() {
   return (
     <nav
       aria-label="Main navigation"
-      className="flex items-center gap-1 ml-4"
+      className="flex items-center gap-1 ml-2 sm:ml-4"
       data-nav-trigger
     >
       {NAV_ITEMS.map((item) => {
@@ -55,7 +55,7 @@ export default function HeaderNav() {
             onClick={() => toggle(item.id)}
             aria-expanded={active}
             aria-controls={`nav-panel-${item.id}`}
-            className="px-3 py-1.5 rounded-md transition-all duration-150"
+            className="px-2 sm:px-3 py-1.5 rounded-md whitespace-nowrap transition-all duration-150"
             style={{
               color: active
                 ? 'var(--accent-green)'
@@ -80,7 +80,7 @@ export default function HeaderNav() {
           type="button"
           onClick={toggleBrowse}
           aria-expanded={browseOpen}
-          className="px-3 py-1.5 rounded-md transition-all duration-150"
+          className="px-2 sm:px-3 py-1.5 rounded-md whitespace-nowrap transition-all duration-150"
           style={{
             color: browseOpen
               ? 'var(--accent-twitch)'
