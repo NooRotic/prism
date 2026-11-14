@@ -1,4 +1,5 @@
 import { act, render } from '@testing-library/react'
+import { useEffect } from 'react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePageHit } from '../usePageHit'
@@ -12,11 +13,15 @@ vi.mock('../../config/historyServer', () => ({
   },
 }))
 
-let go: (to: string) => void = () => {}
+// The test's way to move the router: the harness hands over its `navigate` once it has mounted.
+const router: { go: (to: string) => void } = { go: () => {} }
 
 function Harness() {
   usePageHit()
-  go = useNavigate()
+  const navigate = useNavigate()
+  useEffect(() => {
+    router.go = (to) => void navigate(to)
+  }, [navigate])
   return null
 }
 
@@ -32,7 +37,7 @@ function mountAt(path: string) {
   )
 }
 
-const visit = (to: string) => act(() => go(to))
+const visit = (to: string) => act(() => router.go(to))
 
 describe('usePageHit', () => {
   beforeEach(() => {
