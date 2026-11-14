@@ -36,6 +36,7 @@ vi.mock('../../components/admin/UsageScreen', () => ({ default: () => <p>usage s
 vi.mock('../../components/admin/TtCallsScreen', () => ({ default: () => <p>tt screen</p> }))
 vi.mock('../../components/admin/SecurityScreen', () => ({ default: () => <p>security screen</p> }))
 vi.mock('../../components/admin/ChannelsScreen', () => ({ default: () => <p>channels screen</p> }))
+vi.mock('../../components/admin/PlaylistScreen', () => ({ default: () => <p>playlist screen</p> }))
 
 import { clearAdminToken, endAdminSession, startAdminSignIn } from '../../lib/adminAuth'
 
@@ -84,7 +85,7 @@ describe('AdminPage', () => {
   })
 
   describe('the session check', () => {
-    it('shows the menu and the screen for the owner, with Playlist and Health greyed out', async () => {
+    it('shows the menu and the screen for the owner, with only Health greyed out', async () => {
       api.getSession.mockResolvedValue(SESSION)
 
       renderAt('/admin')
@@ -97,14 +98,14 @@ describe('AdminPage', () => {
         ['TT calls', '/admin/tt'],
         ['Security', '/admin/security'],
         ['Channels', '/admin/channels'],
+        ['Playlist', '/admin/playlist'],
       ]) {
         expect(screen.getByRole('link', { name })).toHaveAttribute('href', href)
       }
-      expect(nav).toHaveTextContent('Playlist')
       expect(nav).toHaveTextContent('Health')
-      expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(2)
-      expect(screen.queryByRole('link', { name: /Playlist|Health/ })).not.toBeInTheDocument()
-      expect(screen.getAllByText('coming later')).toHaveLength(2)
+      expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(1)
+      expect(screen.queryByRole('link', { name: /Health/ })).not.toBeInTheDocument()
+      expect(screen.getAllByText('coming later')).toHaveLength(1)
     })
 
     it.each([
@@ -112,6 +113,7 @@ describe('AdminPage', () => {
       ['/admin/tt', 'tt screen'],
       ['/admin/security', 'security screen'],
       ['/admin/channels', 'channels screen'],
+      ['/admin/playlist', 'playlist screen'],
     ])('shows the right screen at %s', async (path, marker) => {
       api.getSession.mockResolvedValue(SESSION)
 
