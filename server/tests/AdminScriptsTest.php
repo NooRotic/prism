@@ -146,6 +146,18 @@ final class AdminScriptsTest extends DbTestCase
         $this->assertSame('1', (string) $this->pdo->query('SELECT COUNT(*) FROM channels')->fetchColumn());
     }
 
+    public function testTwitchIdScriptNeedsAValidLoginAndMakesNoRequestOtherwise(): void
+    {
+        $config = $this->configs->write();
+
+        foreach ([[], ['a b'], [''], [str_repeat('a', 26)]] as $args) {
+            [$code, , $err] = $this->script('twitch-id.php', $args, $config);
+
+            $this->assertSame(2, $code, json_encode($args));
+            $this->assertStringContainsString('usage', $err);
+        }
+    }
+
     public function testChannelStoreFindsEveryIdForALogin(): void
     {
         $channels = new ChannelStore($this->pdo, $this->clock);
@@ -162,7 +174,7 @@ final class AdminScriptsTest extends DbTestCase
         Database::dropAll($this->pdo);
         $server = $this->serve(self::ROOT . '/bin', null, $this->configs->write());
 
-        foreach (['/install.php', '/remove-channel.php', '/refresh.php'] as $path) {
+        foreach (['/install.php', '/remove-channel.php', '/refresh.php', '/twitch-id.php'] as $path) {
             $response = (new CurlHttp())->request('GET', $server->url($path));
 
             $this->assertSame(404, $response->status, $path);

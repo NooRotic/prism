@@ -33,6 +33,15 @@ return [
         // Twitch lookups per hour for logins never seen before (a flood of made-up names stops here).
         'lookups_per_hour' => 100,
     ],
+    // The owner-only admin side (the /admin page of PRISM). It stays off until both ids are filled in. Neither value is
+    // a secret: owner_twitch_id is your numeric Twitch user id (php8.4-cli bin/twitch-id.php <login> prints it) and
+    // frontend_client_id is the client id PRISM's own pages sign in with (VITE_TWITCH_CLIENT_ID). A wrong value
+    // switches the admin side off; it never breaks the public API.
+    'admin' => [
+        'enabled' => true,
+        'owner_twitch_id' => '',
+        'frontend_client_id' => '',
+    ],
     // Kill switches: set to false to switch behaviour off without a redeploy.
     'flags' => [
         'visits_enabled' => true,
