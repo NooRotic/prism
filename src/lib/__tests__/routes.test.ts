@@ -1,11 +1,11 @@
 import { isPlayerPagePath, buildStreamPath, CUSTOM_STREAM_ID } from '../routes'
 
 describe('isPlayerPagePath', () => {
-  it.each(['/twitch/streamer', '/youtube/abc', '/hls-dash/some-stream'])('is true for %s, which plays a video', (path) => {
+  it.each(['/twitch/streamer', '/youtube/abc', '/hls-dash/some-stream', '/hls-dash'])('is true for %s, which plays a video', (path) => {
     expect(isPlayerPagePath(path)).toBe(true)
   })
 
-  it.each(['/', '/twitch', '/youtube', '/hls-dash', '/nope', '/chat/streamer'])(
+  it.each(['/', '/twitch', '/youtube', '/nope', '/chat/streamer', '/hls-dashboard', '/hls-dash-x'])(
     'is false for %s',
     (path) => {
       expect(isPlayerPagePath(path)).toBe(false)

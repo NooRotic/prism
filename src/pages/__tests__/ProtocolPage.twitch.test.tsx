@@ -34,7 +34,7 @@ function setAuth({ signedIn, expired = false }: { signedIn: boolean; expired?: b
   } as unknown as ReturnType<typeof useApp>)
 }
 
-function renderPage(protocol: 'twitch' | 'youtube' | 'hls-dash') {
+function renderPage(protocol: 'twitch' | 'youtube') {
   return render(
     <MemoryRouter>
       <ProtocolPage protocol={protocol} />
@@ -80,12 +80,6 @@ describe('ProtocolPage on the Twitch protocol', () => {
     expect(screen.queryByTestId('twitch-dashboard')).not.toBeInTheDocument()
   })
 
-  it('leaves the HLS / DASH page as it was, with no connect card', () => {
-    setAuth({ signedIn: false })
-    renderPage('hls-dash')
-
-    expect(screen.getByTestId('demo-grid')).toBeInTheDocument()
-    expect(screen.queryByText('Connect Twitch to see who you follow that is live.')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('twitch-dashboard')).not.toBeInTheDocument()
-  })
+  // The HLS / DASH page is HlsPage now, not a ProtocolPage: its "no connect card, no Twitch dashboard" case moved to
+  // HlsPage.test.tsx ("is not the Twitch page").
 })

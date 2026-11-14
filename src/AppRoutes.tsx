@@ -4,7 +4,7 @@ import HubPage from './pages/HubPage'
 import ProtocolPage from './pages/ProtocolPage'
 import TwitchPlayerPage from './pages/TwitchPlayerPage'
 import YoutubePlayerPage from './pages/YoutubePlayerPage'
-import HlsDashPlayerPage from './pages/HlsDashPlayerPage'
+import HlsPage from './pages/HlsPage'
 import ChatPopoutPage from './pages/ChatPopoutPage'
 import NotFoundPage from './pages/NotFoundPage'
 
@@ -41,8 +41,9 @@ export default function AppRoutes({ layout }: AppRoutesProps) {
         <Route path="twitch/:channel" element={<TwitchPlayerPage />} />
         <Route path="youtube" element={<ProtocolPage protocol="youtube" />} />
         <Route path="youtube/:videoId" element={<YoutubePlayerPage />} />
-        <Route path="hls-dash" element={<ProtocolPage protocol="hls-dash" />} />
-        <Route path="hls-dash/:streamId" element={<HlsDashPlayerPage />} />
+        {/* One route for both /hls-dash and /hls-dash/:streamId, so choosing a stream from the list does not
+            remount the page (what was typed in the search box and the scrolled list stay as they were). */}
+        <Route path="hls-dash/:streamId?" element={<HlsPage />} />
         {/* Inside the layout on purpose: the header, the rail and a floating video window
             survive a mistyped address. */}
         <Route path="*" element={<NotFoundPage />} />
