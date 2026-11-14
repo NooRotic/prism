@@ -14,6 +14,16 @@ const api = vi.hoisted(() => ({
   removeStream: vi.fn(),
 }))
 vi.mock('../../../lib/adminApi', async (importActual) => ({ ...(await importActual<typeof import('../../../lib/adminApi')>()), ...api }))
+// The preview has its own tests; here it only shows that it is open for a stream, and can be closed.
+vi.mock('../StreamPreview', () => ({
+  default: ({ stream, onClose }: { stream: { publicId: string }; onClose: () => void }) => (
+    <div data-testid="preview" data-stream={stream.publicId}>
+      <button type="button" onClick={onClose}>
+        Close preview
+      </button>
+    </div>
+  ),
+}))
 
 const LIMITS = { ttDayBudget: 1500, ttRunBudget: 300, newPerDay: 200, tailDays: 30 }
 const onExpired = vi.fn()
@@ -504,5 +514,131 @@ describe('PlaylistScreen: editing, pinning, default and removing', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove stream' }))
 
     await vi.waitFor(() => expect(onExpired).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('PlaylistScreen: playing a stream in place', () => {
+  const previews = () => screen.queryAllByTestId('preview')
+  const play = (name: string) => screen.getByRole('button', { name: `Play ${name}` })
+
+  it('opens the preview in a row under the stream, moves it to another stream, and closes it', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await row('Alpha News')
+
+    await user.click(play('Alpha News'))
+    expect(previews()).toHaveLength(1)
+    expect(previews()[0]).toHaveAttribute('data-stream', '0123456789ab')
+    expect(previews()[0].closest('tr')?.previousElementSibling).toHaveTextContent('Alpha News')
+
+    await user.click(play('Beta Sports'))
+    expect(previews()).toHaveLength(1)
+    expect(previews()[0]).toHaveAttribute('data-stream', 'ba9876543210')
+    expect(previews()[0].closest('tr')?.previousElementSibling).toHaveTextContent('Beta Sports')
+
+    await user.click(screen.getByRole('button', { name: 'Close preview' }))
+    expect(previews()).toHaveLength(0)
+  })
+
+  it('closes the preview when Play is pressed again on the open stream, and says which stream is open', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await row('Alpha News')
+
+    expect(play('Alpha News')).toHaveAttribute('aria-expanded', 'false')
+    await user.click(play('Alpha News'))
+    expect(play('Alpha News')).toHaveAttribute('aria-expanded', 'true')
+    expect(play('Beta Sports')).toHaveAttribute('aria-expanded', 'false')
+    await user.click(play('Alpha News'))
+
+    expect(previews()).toHaveLength(0)
+    expect(play('Alpha News')).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('offers Play on every stream that is not removed, whatever its other state', async () => {
+    api.getStreams.mockResolvedValue(page([ALPHA, BETA, GAMMA, DELTA, EPSILON]))
+    renderScreen()
+    await row('Alpha News')
+
+    for (const name of ['Alpha News', 'Beta Sports', 'Gamma', 'Delta']) expect(play(name)).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Play Epsilon' })).toBeNull()
+  })
+
+  it('closes on a change of page, even when the same stream is on the next page', async () => {
+    const user = userEvent.setup()
+    api.getStreams.mockResolvedValue(page([ALPHA], { total: 120 }))
+    renderScreen()
+    await row('Alpha News')
+    await user.click(play('Alpha News'))
+    api.getStreams.mockResolvedValue(page([ALPHA], { total: 120, offset: 50 }))
+
+    await user.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(previews()).toHaveLength(0)
+
+    await screen.findByText(/Showing 51–51 of 120 streams/)
+    expect(previews()).toHaveLength(0)
+  })
+
+  it('closes on a change of filter, even when the stream still matches', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await row('Alpha News')
+    await user.click(play('Alpha News'))
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'State' }), { target: { value: 'new' } })
+
+    expect(previews()).toHaveLength(0)
+    await row('Alpha News')
+    expect(previews()).toHaveLength(0)
+  })
+
+  it('closes the preview of a stream that is being edited, and leaves another stream’s alone', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await row('Alpha News')
+    await user.click(play('Alpha News'))
+
+    await user.click(screen.getByRole('button', { name: 'Edit Beta Sports' }))
+    expect(previews()).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Edit Alpha News' }))
+    expect(previews()).toHaveLength(0)
+  })
+
+  it('closes the preview of a stream once it is removed, and keeps it when the removal is cancelled', async () => {
+    const user = userEvent.setup()
+    api.removeStream.mockResolvedValue(done())
+    renderScreen()
+    await row('Alpha News')
+    await user.click(play('Alpha News'))
+
+    await user.click(screen.getByRole('button', { name: 'Remove Alpha News' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }))
+    expect(previews()).toHaveLength(1)
+
+    // The list still holds the stream afterwards, now as a tombstone.
+    api.getStreams.mockResolvedValue(page([{ ...ALPHA, state: 'removed' }, BETA]))
+    await user.click(screen.getByRole('button', { name: 'Remove Alpha News' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove stream' }))
+
+    await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Play Alpha News' })).toBeNull())
+    expect(previews()).toHaveLength(0)
+  })
+
+  it('keeps the preview through a reload that still lists the stream, and closes it when a reload does not', async () => {
+    const user = userEvent.setup()
+    api.pinStream.mockResolvedValue(done())
+    renderScreen()
+    await row('Alpha News')
+    await user.click(play('Alpha News'))
+
+    await user.click(screen.getByRole('button', { name: 'Pin Beta Sports' }))
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Pin Beta Sports' })).toBeEnabled())
+    expect(previews()).toHaveLength(1)
+
+    api.getStreams.mockResolvedValue(page([BETA]))
+    await user.click(screen.getByRole('button', { name: 'Pin Beta Sports' }))
+
+    await vi.waitFor(() => expect(previews()).toHaveLength(0))
   })
 })

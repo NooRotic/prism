@@ -418,6 +418,11 @@ Stages A (server), B (HLS page) and C (the Playlist screen above) are built. Wha
   visitors can see), and remove (a confirmation, then a tombstone: the row stays so a re-import cannot bring it back, and its
   logo copy is deleted). Every write is one transaction with its audit row and rewrites the visitor snapshot after the commit.
   A group filter exists in the API but not yet on the screen.
+- **Play in place** (`src/components/admin/StreamPreview.tsx`; design `2026-11-14-playlist-stream-preview-design.md`): every
+  stream that is not removed has a Play button that opens the stream page's player in a row under it (one at a time, closed by
+  another page or filter, an edit, a removal, or a reload that drops the stream), with the kind and host, "Open in a new tab"
+  (`/hls-dash/<id>` for a stream visitors can see, the pasted-address form for the rest) and the player's own error card.
+  "Try as" changes the preview only. Nothing is saved from it; the checker (piece 3) decides states.
 
 ## Piece 3: the checker (decisions)
 
