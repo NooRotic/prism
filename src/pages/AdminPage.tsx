@@ -9,7 +9,7 @@ import SignInCard from '../components/admin/SignInCard'
 import TtCallsScreen from '../components/admin/TtCallsScreen'
 import UsageScreen from '../components/admin/UsageScreen'
 import { getSession, type AdminSession } from '../lib/adminApi'
-import { clearAdminToken, getAdminToken, startAdminSignIn } from '../lib/adminAuth'
+import { clearAdminToken, endAdminSession, getAdminToken, startAdminSignIn } from '../lib/adminAuth'
 
 type Gate =
   | { status: 'checking' }
@@ -52,7 +52,7 @@ export default function AdminPage() {
   }, [attempt])
 
   const signOut = useCallback(() => {
-    clearAdminToken()
+    endAdminSession() // revokes the token at Twitch, then forgets it
     setGate({ status: 'signed_out', expired: false })
   }, [])
   const onExpired = useCallback(() => {

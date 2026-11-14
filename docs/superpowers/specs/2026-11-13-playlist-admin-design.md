@@ -216,7 +216,7 @@ Everything else added here is a count with no identity: no IP, no hash of one, n
   owner, and a "Sign in as admin" button.
 - **A separate admin sign-in, not PRISM's viewer sign-in (the owner's choice).** The button starts a Twitch authorisation for
   PRISM's app with **no permissions** (identity only). Its token is kept under its own storage key in `sessionStorage`
-  (my call: it is gone when the tab closes), apart from the viewer token in `localStorage`. The request sets `force_verify`
+  (my call: the browser forgets it when the tab closes, but Twitch honours an unrevoked token for weeks, so **Sign out revokes it at Twitch**; found by the final review), apart from the viewer token in `localStorage`. The request sets `force_verify`
   so Twitch always shows its own authorise screen, even to someone who has already authorised PRISM. That screen is the
   deliberate act that counts as "trying" (my call; the builder confirms Twitch's behaviour). The owner clicks Authorize each
   time. PRISM's regular sign-in token, which carries nine permissions, is never sent to the server.
@@ -248,7 +248,7 @@ Everything else added here is a count with no identity: no IP, no hash of one, n
 - **No admin endpoint** returns config values (except a fixed short list of non-secret limits the screens display: the
   TwitchTracker day and run budgets, the new-channels cap and the tail days), returns secrets, runs code, reads
   files, or fetches an address on a caller's behalf and shows the result. This keeps the damage small if the owner's token is ever stolen.
-  The admin token sits in `sessionStorage` (gone when the tab closes) and the server refuses PRISM's long-lived viewer token
+  The admin token sits in `sessionStorage` (forgotten when the tab closes; revoked at Twitch on Sign out, otherwise valid until Twitch expires it, and the server may remember it as the owner's for up to 30 minutes more) and the server refuses PRISM's long-lived viewer token
   for admin, so an injected-script bug on a PRISM page could read a usable admin token only while the owner is signed in
   as admin; hence all playlist text is escaped and nothing is written into the page as HTML.
 
@@ -256,7 +256,7 @@ Everything else added here is a count with no identity: no IP, no hash of one, n
 
 | Request | Answer | What is recorded |
 |---|---|---|
-| No token, or a token Twitch calls invalid or expired | 401 | A count in today's "signed out" total, written under the same global per-minute cap as `hit`. No name, because none can be known. |
+| No token, or a token Twitch calls invalid or expired | 401 | A count in today's "signed out" total, written under its own global per-minute cap (600 a minute, a separate count from `hit`, so a flood of page-open pings cannot hide signed-out attempts). No name, because none can be known. |
 | A valid permission-less token issued to PRISM's app whose user is not the owner (someone who went through the admin sign-in) | 403 | A named row (below). |
 | Any other valid token that is not accepted: one carrying permissions (a viewer's regular PRISM token) or one issued to another Twitch app. PRISM's pages never send these, so this is a script | 403 | A named row, flagged "not via the admin sign-in". The owner's own token of this kind is refused too, but not logged. |
 
@@ -479,7 +479,7 @@ bundled worker.
   budget and the logo handling are sized to be safe without them.
 - The first full check pass reads on the order of 5,234 playlists plus first chunks; the budget spreads it across days.
 - A single IONOS datacenter cannot see geo-blocks or region differences; the host guard, the three-day rule and tombstones limit false removals.
-- A stolen owner token (through an injected-script bug) is the main admin risk; the short-lived permission-less admin token,
+- A stolen owner token (through an injected-script bug) is the main admin risk; the permission-less admin token (revoked on Sign out; otherwise it lives as long as Twitch lets it),
   the small admin surface and the audit list limit and reveal it.
 - Unverified until piece 1's first task: that the Authorization header reaches PHP on this CGI-style host, and that Twitch's
   `force_verify` shows the authorise screen for an already-authorised app as expected.

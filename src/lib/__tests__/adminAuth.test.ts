@@ -157,6 +157,61 @@ describe('admin sign-in', () => {
     })
   })
 
+  describe('endAdminSession (Sign out)', () => {
+    let fetchMock: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }))
+      vi.stubGlobal('fetch', fetchMock)
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('asks Twitch to revoke the token, so a copy of it stops working, and then forgets it', async () => {
+      const { endAdminSession, getAdminToken } = await loadAdminAuth()
+      sessionStorage.setItem(STORAGE_KEYS.SESSION_ADMIN_TOKEN, 'adm123')
+
+      endAdminSession()
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      const [url, init] = fetchMock.mock.calls[0]
+      expect(url).toBe('https://id.twitch.tv/oauth2/revoke')
+      expect(init.method).toBe('POST')
+      expect(init.mode).toBe('no-cors') // the answer is never read, so no cross-origin rules apply
+      expect(init.credentials).toBe('omit')
+      const form = new URLSearchParams(String(init.body))
+      expect(form.get('client_id')).toBe('test-client-id')
+      expect(form.get('token')).toBe('adm123')
+      expect(getAdminToken()).toBeNull()
+    })
+
+    it.each([
+      ['the request is rejected', () => fetchMock.mockRejectedValue(new TypeError('network down'))],
+      ['fetch throws at once', () => fetchMock.mockImplementation(() => { throw new TypeError('no fetch') })],
+    ])('still forgets the token when %s', async (_name, breakFetch) => {
+      const { endAdminSession, getAdminToken } = await loadAdminAuth()
+      sessionStorage.setItem(STORAGE_KEYS.SESSION_ADMIN_TOKEN, 'adm123')
+      breakFetch()
+
+      expect(() => endAdminSession()).not.toThrow()
+      await Promise.resolve()
+
+      expect(getAdminToken()).toBeNull()
+    })
+
+    it('has nothing to revoke without a token, and leaves the viewer token alone', async () => {
+      const { endAdminSession } = await loadAdminAuth()
+      localStorage.setItem(VIEWER_TOKEN_KEY, 'viewer')
+
+      endAdminSession()
+
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(localStorage.getItem(VIEWER_TOKEN_KEY)).toBe('viewer')
+    })
+  })
+
   describe('the stored token', () => {
     it('is read back and can be cleared, without touching the viewer token', async () => {
       const { getAdminToken, clearAdminToken } = await loadAdminAuth()
