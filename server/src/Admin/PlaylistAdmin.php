@@ -109,7 +109,15 @@ final class PlaylistAdmin
             return self::rejected('id_clash');
         }
 
-        return ['ok' => true, 'public_id' => $publicId, 'snapshot' => $this->rewriteSnapshot()];
+        // The state is part of the answer: an http:// address or an unusual port is stored but never shown to visitors,
+        // and the owner has to be told that, not only "added".
+        return [
+            'ok' => true,
+            'public_id' => $publicId,
+            'state' => $decision->state,
+            'state_reason' => $decision->reason,
+            'snapshot' => $this->rewriteSnapshot(),
+        ];
     }
 
     /**

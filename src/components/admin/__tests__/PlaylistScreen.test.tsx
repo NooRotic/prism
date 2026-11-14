@@ -47,7 +47,10 @@ const page = (streams: AdminStream[] = [ALPHA, BETA], extra: Record<string, unkn
   kind: 'ok',
   data: { streams, total: streams.length, counts: { new: 1, unplayable: 1 }, limit: 50, offset: 0, ...extra },
 })
-const done = (data: { publicId?: string | null; snapshot?: boolean } = {}) => ({ kind: 'ok', data: { publicId: null, snapshot: true, ...data } })
+const done = (data: { publicId?: string | null; snapshot?: boolean; state?: string | null; stateReason?: string | null } = {}) => ({
+  kind: 'ok',
+  data: { publicId: null, state: null, stateReason: null, snapshot: true, ...data },
+})
 
 function renderScreen() {
   return render(
@@ -177,6 +180,26 @@ describe('PlaylistScreen: filters and pages', () => {
     expect(api.getStreams).toHaveBeenLastCalledWith({ text: 'beta', state: 'held', country: 'gb' }, { limit: 50, offset: 0 }, expect.anything())
   })
 
+  it('asks for a country only once it has two letters, so typing one letter never makes the server answer an error', async () => {
+    renderScreen()
+    await table()
+    api.getStreams.mockClear()
+    const country = screen.getByRole('textbox', { name: 'Country' })
+
+    fireEvent.change(country, { target: { value: 'g' } })
+    expect(api.getStreams).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(await table()).toBeInTheDocument()
+
+    fireEvent.change(country, { target: { value: 'gb' } })
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: 'gb' }, { limit: 50, offset: 0 }, expect.anything())
+
+    fireEvent.change(country, { target: { value: 'g' } })
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: '' }, { limit: 50, offset: 0 }, expect.anything())
+    expect(api.getStreams).not.toHaveBeenCalledWith(expect.objectContaining({ country: 'g' }), expect.anything(), expect.anything())
+    expect((country as HTMLInputElement).value).toBe('g')
+  })
+
   it('offers every state to filter by', async () => {
     renderScreen()
     await table()
@@ -231,6 +254,36 @@ describe('PlaylistScreen: adding a stream', () => {
     expect((screen.getByRole('textbox', { name: 'Stream address' }) as HTMLInputElement).value).toBe('')
     expect((screen.getByRole('textbox', { name: 'Stream name' }) as HTMLInputElement).value).toBe('')
     expect(api.getStreams).toHaveBeenCalled()
+  })
+
+  it('says plainly when an added stream is hidden from visitors, and why', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await table()
+    const send = async (address: string) => {
+      await user.clear(screen.getByRole('textbox', { name: 'Stream address' }))
+      await user.type(screen.getByRole('textbox', { name: 'Stream address' }), address)
+      await user.clear(screen.getByRole('textbox', { name: 'Stream name' }))
+      await user.type(screen.getByRole('textbox', { name: 'Stream name' }), 'My Channel')
+      await user.click(screen.getByRole('button', { name: 'Add stream' }))
+    }
+
+    api.addStream.mockResolvedValueOnce(done({ publicId: 'ffffffffffff', state: 'unplayable', stateReason: 'http' }))
+    await send('http://example.tv/live.m3u8')
+    const http = await screen.findByRole('status')
+    expect(http).toHaveTextContent('Added “My Channel”')
+    expect(http).toHaveTextContent(/visitors will not see it/i)
+    expect(http).toHaveTextContent(/http:\/\//)
+
+    api.addStream.mockResolvedValueOnce(done({ publicId: 'ffffffffffff', state: 'held', stateReason: 'port' }))
+    await send('https://example.tv:8443/live.m3u8')
+    await vi.waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/unusual port/i))
+    expect(screen.getByRole('status')).toHaveTextContent(/visitors will not see it/i)
+
+    api.addStream.mockResolvedValueOnce(done({ publicId: 'ffffffffffff', state: 'new', stateReason: null }))
+    await send('https://example.tv/live.m3u8')
+    await vi.waitFor(() => expect(screen.getByRole('status')).not.toHaveTextContent(/will not see/i))
+    expect(screen.getByRole('status')).toHaveTextContent('Added “My Channel”.')
   })
 
   it('cannot be sent until there is an address and a name', async () => {
