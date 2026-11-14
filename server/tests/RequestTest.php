@@ -41,6 +41,22 @@ final class RequestTest extends TestCase
         $this->assertNull($this->withAuthorization(null)->bearerToken());
     }
 
+    public function testFromGlobalsReadsIfNoneMatchAndAcceptEncoding(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $_SERVER['REQUEST_URI'] = '/api/streams';
+        unset($_SERVER['HTTP_IF_NONE_MATCH'], $_SERVER['HTTP_ACCEPT_ENCODING']);
+        $bare = Request::fromGlobals();
+        $this->assertNull($bare->ifNoneMatch);
+        $this->assertNull($bare->acceptEncoding);
+
+        $_SERVER['HTTP_IF_NONE_MATCH'] = '"abc123"';
+        $_SERVER['HTTP_ACCEPT_ENCODING'] = 'gzip, deflate';
+        $r = Request::fromGlobals();
+        $this->assertSame('"abc123"', $r->ifNoneMatch);
+        $this->assertSame('gzip, deflate', $r->acceptEncoding);
+    }
+
     public function testFromGlobalsReadsTheThreeSourcesInOrder(): void
     {
         foreach (['HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION', 'HTTP_X_PRISM_AUTHORIZATION'] as $key) {
