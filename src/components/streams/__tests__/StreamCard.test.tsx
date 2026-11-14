@@ -33,6 +33,16 @@ describe('StreamCard', () => {
     expect(screen.getByText(/unchecked/i)).toBeInTheDocument()
   })
 
+  it('reads larger: the name at about 17 px and the line under it at 14 px, with a bigger picture', () => {
+    const { container } = render(<StreamCard stream={stream({ pinned: true })} selected={false} onSelect={() => {}} />)
+
+    expect(screen.getByText('Alpha News').className).toContain('text-[1.1rem]')
+    expect(screen.getByText(/unchecked/i).parentElement?.className).toContain('text-sm')
+    expect(screen.getByText(/pinned/i)).toBeInTheDocument()
+    const tile = container.querySelector<HTMLElement>('[data-letter-tile]')
+    expect([tile?.style.width, tile?.style.height]).toEqual(['64px', '64px'])
+  })
+
   it('has no badge for a working stream', () => {
     render(<StreamCard stream={stream({ state: 'working' })} selected={false} onSelect={() => {}} />)
 

@@ -45,6 +45,15 @@ describe('StreamGrid', () => {
     expect(screen.queryByText('Stream 4999')).toBeNull()
   })
 
+  it('gives each card room for the larger text by default: 96 px tall and at least 280 px wide', () => {
+    stubSize(900, 600)
+
+    render(<StreamGrid streams={makeStreams(40)} selectedId={null} onSelect={() => {}} renderCard={card} />)
+
+    expect(screen.getAllByRole('listitem')[0].style.height).toBe('96px')
+    expect(screen.getByRole('list').style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))')
+  })
+
   it('lays the cards out in as many columns as fit', () => {
     stubSize(900, 600)
 

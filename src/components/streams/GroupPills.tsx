@@ -9,32 +9,36 @@ interface GroupPillsProps {
   onSelect: (group: number | null) => void
 }
 
+const BASE =
+  'cursor-pointer rounded-full border px-4 py-1.5 text-[0.95rem] leading-tight transition-colors hover:brightness-125 focus-visible:outline-2 focus-visible:outline-[var(--accent-green)]'
+// A pill that is not chosen: the main text colour, a lighter fill than the page and a border that shows against it.
+const IDLE = 'border-[var(--text-muted)] bg-[var(--bg-card-hover)] text-[var(--text-primary)]'
+// The chosen pill: solid blue with bold black text.
+const CHOSEN = 'border-[var(--accent-hls)] bg-[var(--accent-hls)] font-semibold text-black'
+
+function Count({ value, active }: { value: number; active: boolean }) {
+  return (
+    <span className={`ml-1.5 font-mono text-[0.85em] ${active ? 'opacity-80' : 'text-[var(--text-secondary)]'}`}>{value}</span>
+  )
+}
+
 /** The group filter: an "All streams" pill and one pill for each group that has streams, with its count. */
 export default function GroupPills({ groups, counts, total, selected, onSelect }: GroupPillsProps) {
-  const pill = (active: boolean) => ({
-    background: active ? 'var(--accent-hls)' : 'var(--bg-card)',
-    borderColor: active ? 'var(--accent-hls)' : 'var(--border-accent)',
-    color: active ? '#000' : 'var(--text-secondary)',
-  })
-  const className =
-    'cursor-pointer rounded-full border px-3 py-1 text-xs transition-colors hover:brightness-125 focus-visible:outline-2 focus-visible:outline-[var(--accent-green)]'
-
   return (
-    <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by group">
-      <button type="button" className={className} style={pill(selected === null)} aria-pressed={selected === null} onClick={() => onSelect(null)}>
-        All streams <span className="ml-1 opacity-75">{total}</span>
+    <div className="flex flex-wrap gap-2.5" role="group" aria-label="Filter by group">
+      <button type="button" className={`${BASE} ${selected === null ? CHOSEN : IDLE}`} aria-pressed={selected === null} onClick={() => onSelect(null)}>
+        All streams <Count value={total} active={selected === null} />
       </button>
       {groups.map((name, index) =>
         counts[index] > 0 || selected === index ? (
           <button
             key={`${index}:${name}`}
             type="button"
-            className={className}
-            style={pill(selected === index)}
+            className={`${BASE} ${selected === index ? CHOSEN : IDLE}`}
             aria-pressed={selected === index}
             onClick={() => onSelect(index)}
           >
-            {name} <span className="ml-1 opacity-75">{counts[index]}</span>
+            {name} <Count value={counts[index]} active={selected === index} />
           </button>
         ) : null,
       )}

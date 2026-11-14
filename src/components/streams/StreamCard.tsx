@@ -20,27 +20,27 @@ export default function StreamCard({ stream, selected, onSelect }: StreamCardPro
       onClick={() => onSelect(stream.id)}
       aria-current={selected ? 'true' : undefined}
       title={stream.name}
-      className="flex h-full w-full cursor-pointer items-center gap-3 rounded-lg border px-2.5 text-left transition-colors hover:bg-[var(--bg-card-hover)] focus-visible:outline-2 focus-visible:outline-[var(--accent-green)]"
+      className="flex h-full w-full cursor-pointer items-center gap-3.5 rounded-lg border px-3 text-left transition-colors hover:bg-[var(--bg-card-hover)] focus-visible:outline-2 focus-visible:outline-[var(--accent-green)]"
       style={{
         background: selected ? 'var(--bg-card-hover)' : 'var(--bg-card)',
         borderColor: selected ? 'var(--accent-green)' : 'var(--border)',
       }}
     >
-      <ChannelPicture stream={stream} size={52} />
+      <ChannelPicture stream={stream} size={64} />
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 break-words text-[0.95rem] leading-snug font-medium" style={{ color: 'var(--text-primary)' }}>
+        <span className="line-clamp-2 break-words text-[1.1rem] leading-snug font-medium" style={{ color: 'var(--text-primary)' }}>
           {stream.name}
         </span>
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
-          <CountryFlag code={stream.country} size={16} />
+        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+          <CountryFlag code={stream.country} size={20} />
           {stream.pinned && (
             <span className="inline-flex items-center gap-1" style={{ color: 'var(--accent-gold)' }}>
-              <Pin size={12} aria-hidden="true" />
+              <Pin size={14} aria-hidden="true" />
               Pinned
             </span>
           )}
           {stream.state === 'new' && (
-            <span className="rounded px-1.5 py-px" style={{ background: 'var(--border-accent)' }}>
+            <span className="rounded px-2 py-px" style={{ background: 'var(--border-accent)' }}>
               Unchecked
             </span>
           )}
