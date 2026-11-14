@@ -43,6 +43,8 @@ export const STORAGE_KEYS = {
   LOCAL_VIDEO_POPOUT_SIZE: 'prism_video_popout_size',
   /** Which view of the dashboard's live follows the viewer last used: 'wall' or 'list'. */
   LOCAL_DASHBOARD_WALL_VIEW: 'prism_dashboard_wall_view',
+  /** The group filter chosen on the HLS / DASH page, by the group's NAME (its position changes with the list); absent means all streams. */
+  LOCAL_HLS_GROUP: 'prism_hls_group',
   /** Prefix for cached TwitchTracker summaries, one per lower-cased login (e.g. prism_tt_cache_streamer). */
   LOCAL_TWITCHTRACKER_CACHE_PREFIX: 'prism_tt_cache_',
   /** Id of this browser tab, so a chat pop-out knows which tab owns it. Survives a reload. */

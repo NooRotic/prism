@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import HlsPage from '../HlsPage'
+import { STORAGE_KEYS } from '../../config/storageKeys'
 import { useApp } from '../../contexts/AppContext'
 import { useStreamSnapshot, type StreamSnapshotState } from '../../hooks/useStreamSnapshot'
 import { buildStreamPath } from '../../lib/routes'
@@ -75,6 +76,8 @@ const cardNames = () =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // The page remembers the chosen group in local storage: no test starts with another's choice.
+  localStorage.clear()
 })
 
 describe('HlsPage: what plays', () => {
@@ -350,5 +353,90 @@ describe('HlsPage: the rest of the page', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('HlsPage: the remembered group', () => {
+  const KEY = STORAGE_KEYS.LOCAL_HLS_GROUP
+  const pill = (name: RegExp) => screen.getByRole('button', { name })
+
+  it('saves the group the visitor chooses, by its name', async () => {
+    const user = userEvent.setup()
+    renderAt('/hls-dash')
+
+    await user.click(pill(/^News.*2/))
+
+    expect(localStorage.getItem(KEY)).toBe('News')
+  })
+
+  it('shows the saved group again after a reload, with only its streams', () => {
+    localStorage.setItem(KEY, 'News')
+
+    renderAt('/hls-dash')
+
+    expect(pill(/^News.*2/).getAttribute('aria-pressed')).toBe('true')
+    expect(pill(/all streams/i).getAttribute('aria-pressed')).toBe('false')
+    expect(cardNames()).toEqual(['Alpha One', 'Beta Two'])
+  })
+
+  it('forgets the choice when the visitor goes back to all streams', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(KEY, 'Sports')
+    renderAt('/hls-dash')
+
+    await user.click(pill(/all streams/i))
+
+    expect(localStorage.getItem(KEY)).toBeNull()
+    expect(cardNames()).toHaveLength(4)
+  })
+
+  it('follows the name, not the position, when the groups change between visits', () => {
+    localStorage.setItem(KEY, 'Sports')
+
+    renderAt('/hls-dash', ready({ ...SNAPSHOT, groups: ['Other', 'Sports', 'News'], streams: [ALPHA, BUNNY, BETA, GAMMA] }))
+
+    expect(pill(/^Sports/).getAttribute('aria-pressed')).toBe('true')
+    expect(pill(/^News/).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('shows every stream when the saved group is not in the list that is showing, and keeps the choice for when it is', () => {
+    localStorage.setItem(KEY, 'News')
+
+    const demos = renderAt('/hls-dash', unavailable)
+    expect(pill(/all streams/i).getAttribute('aria-pressed')).toBe('true')
+    expect(localStorage.getItem(KEY)).toBe('News')
+    demos.unmount()
+
+    renderAt('/hls-dash', ready())
+    expect(pill(/^News.*2/).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('does not wipe the saved group while the list is still loading', () => {
+    localStorage.setItem(KEY, 'News')
+
+    renderAt('/hls-dash', loading)
+
+    expect(localStorage.getItem(KEY)).toBe('News')
+  })
+
+  it('still filters when local storage cannot be read or written', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage blocked')
+    })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage blocked')
+    })
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage blocked')
+    })
+    renderAt('/hls-dash')
+
+    await user.click(pill(/^News.*2/))
+    expect(cardNames()).toEqual(['Alpha One', 'Beta Two'])
+    await user.click(pill(/all streams/i))
+
+    expect(cardNames()).toHaveLength(4)
+    vi.restoreAllMocks()
   })
 })

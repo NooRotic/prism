@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
 import { demoToEntry, getHlsDashDemo } from '../config/demoContent'
+import { STORAGE_KEYS } from '../config/storageKeys'
 import { useStreamSnapshot } from '../hooks/useStreamSnapshot'
 import { buildStreamPath, CUSTOM_STREAM_ID } from '../lib/routes'
 import { filterStreams, groupCounts } from '../lib/streamFilter'
@@ -18,6 +19,25 @@ import StreamSearch from '../components/streams/StreamSearch'
 const DEFAULT_DEMO_ID = 'bbb-hls'
 const DEMO_GROUPS = ['Demo']
 const NO_PARAMS = new URLSearchParams()
+
+/** The group the visitor chose last time, by name, or null. Never throws: a blocked or full storage just forgets. */
+function readSavedGroup(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.LOCAL_HLS_GROUP) || null
+  } catch {
+    return null
+  }
+}
+
+/** Remembers the visitor's choice (null, "all streams", forgets it). Only the visitor's own choice is ever written. */
+function saveGroup(name: string | null): void {
+  try {
+    if (name === null) localStorage.removeItem(STORAGE_KEYS.LOCAL_HLS_GROUP)
+    else localStorage.setItem(STORAGE_KEYS.LOCAL_HLS_GROUP, name)
+  } catch {
+    // Private window or storage turned off: the choice simply does not survive a reload.
+  }
+}
 
 /** What the About panel shows for an address that is not in the list (a pasted one). */
 function pastedEntry(source: StreamSource): StreamEntry {
@@ -73,7 +93,9 @@ export default function HlsPage() {
   const { state, dispatch } = useApp()
   const { status, snapshot } = useStreamSnapshot()
   const [text, setText] = useState('')
-  const [group, setGroup] = useState<number | null>(null)
+  // The chosen group is kept by NAME (its position changes with the list) and remembered across reloads. It starts as what
+  // was saved; what the page shows follows from it and the list that is showing (see `group` below).
+  const [groupName, setGroupName] = useState<string | null>(readSavedGroup)
   const playerAnchor = useRef<HTMLDivElement | null>(null)
 
   const demoEntries = useMemo(() => getHlsDashDemo().map(demoToEntry), [])
@@ -82,6 +104,21 @@ export default function HlsPage() {
   const showingDemos = status !== 'loading' && real === null
   const entries = real?.streams ?? demoEntries
   const groupNames = real?.groups ?? DEMO_GROUPS
+  // The chosen group's position in the list that is showing. A saved group that list does not have (the demo list while the
+  // server is down, a group that was dropped) shows every stream, and stays saved: it applies again when the list has it.
+  const group = useMemo(() => {
+    if (groupName === null) return null
+    const index = groupNames.indexOf(groupName)
+    return index === -1 ? null : index
+  }, [groupName, groupNames])
+  const selectGroup = useCallback(
+    (index: number | null) => {
+      const name = index === null ? null : (groupNames[index] ?? null)
+      setGroupName(name)
+      saveGroup(name)
+    },
+    [groupNames],
+  )
 
   // What to play: a pasted address or a demo id first (they always worked), then a stream of the list, then the default.
   // An id that might be in a list that has not arrived yet waits, rather than being called unknown.
@@ -179,7 +216,7 @@ export default function HlsPage() {
         ) : (
           <>
             <StreamSearch value={text} onChange={setText} />
-            <GroupPills groups={groupNames} counts={counts} total={afterSearch.length} selected={group} onSelect={setGroup} />
+            <GroupPills groups={groupNames} counts={counts} total={afterSearch.length} selected={group} onSelect={selectGroup} />
             <StreamGrid streams={shown} selectedId={playingEntry?.id ?? null} onSelect={choose} renderCard={renderCard} />
           </>
         )}
