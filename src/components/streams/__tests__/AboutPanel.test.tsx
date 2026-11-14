@@ -181,6 +181,40 @@ describe('AboutPanel', () => {
     expect(screen.getByRole('heading', { name: 'Alpha News' })).toBeInTheDocument()
   })
 
+  it('has a Close button that folds the panel into its tab at once, and the tab opens it again', () => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} />)
+    expect(screen.getByRole('heading', { name: 'Alpha News' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close this panel' }))
+
+    expect(screen.queryByRole('heading', { name: 'Alpha News' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /about this stream/i }))
+    expect(screen.getByRole('heading', { name: 'Alpha News' })).toBeInTheDocument()
+  })
+
+  it('closing lets go of a pin, so the panel is not held open the next time', () => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Keep this panel open' }))
+    expect(screen.getByRole('button', { name: 'Let this panel fold away' })).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close this panel' }))
+    fireEvent.click(screen.getByRole('button', { name: /about this stream/i }))
+
+    expect(screen.getByRole('button', { name: 'Keep this panel open' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('gives the folded tab larger text, the main text colour, a visible border and a bigger icon', () => {
+    const { container } = render(<AboutPanel stream={stream()} groups={GROUPS} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Close this panel' }))
+
+    const tab = screen.getByRole('button', { name: /about this stream/i })
+    expect(tab.className).toContain('text-[var(--text-primary)]')
+    expect(tab.className).toContain('border-[var(--text-muted)]')
+    expect(screen.getByText('About this stream', { selector: 'span' }).className).toContain('text-base')
+    expect(screen.getByText('About this stream', { selector: 'span' }).className).not.toContain('text-xs')
+    expect(container.querySelector('svg')?.getAttribute('width')).toBe('22')
+  })
+
   it('a pin keeps it open', () => {
     render(<AboutPanel stream={stream()} groups={GROUPS} />)
     const pin = screen.getByRole('button', { name: /keep.*open/i })

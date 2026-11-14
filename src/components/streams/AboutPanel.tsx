@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Info, Pin, PinOff } from 'lucide-react'
+import { Info, Pin, PinOff, X } from 'lucide-react'
 import { useAutoFold } from '../../hooks/useAutoFold'
 import { regionName } from '../../lib/countries'
 import { usePlaybackLog } from '../../lib/playbackLog'
@@ -38,7 +38,7 @@ export default function AboutPanel({ stream, groups }: AboutPanelProps) {
   // While playback is failing or being retried the panel stays open (and opens if folded): it holds the debug output.
   const playback = usePlaybackLog()
   const failing = playback.status === 'retrying' || playback.status === 'failed'
-  const { open, pinned, bump, reopen, togglePin } = useAutoFold(stream?.id ?? '', 30_000, failing)
+  const { open, pinned, bump, reopen, close, togglePin } = useAutoFold(stream?.id ?? '', 30_000, failing)
   const panelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function AboutPanel({ stream, groups }: AboutPanelProps) {
       onMouseEnter={bump}
       onClick={bump}
       onFocusCapture={bump}
-      className={open ? 'w-full lg:w-[22rem]' : 'w-full lg:w-10'}
+      className={open ? 'w-full lg:w-[22rem]' : 'w-full lg:w-14'}
     >
       {open ? (
         <div
@@ -75,16 +75,28 @@ export default function AboutPanel({ stream, groups }: AboutPanelProps) {
             <span className="text-xs tracking-wide uppercase" style={{ color: 'var(--text-secondary)' }}>
               About this stream
             </span>
-            <button
-              type="button"
-              onClick={togglePin}
-              aria-pressed={pinned}
-              aria-label={pinned ? 'Let this panel fold away' : 'Keep this panel open'}
-              className="cursor-pointer rounded p-1 hover:bg-[var(--bg-card-hover)] focus-visible:outline-2 focus-visible:outline-[var(--accent-green)]"
-              style={{ color: pinned ? 'var(--accent-green)' : 'var(--text-secondary)' }}
-            >
-              {pinned ? <PinOff size={16} aria-hidden="true" /> : <Pin size={16} aria-hidden="true" />}
-            </button>
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={togglePin}
+                aria-pressed={pinned}
+                aria-label={pinned ? 'Let this panel fold away' : 'Keep this panel open'}
+                className="cursor-pointer rounded p-1 hover:bg-[var(--bg-card-hover)] focus-visible:outline-2 focus-visible:outline-[var(--accent-green)]"
+                style={{ color: pinned ? 'var(--accent-green)' : 'var(--text-secondary)' }}
+              >
+                {pinned ? <PinOff size={16} aria-hidden="true" /> : <Pin size={16} aria-hidden="true" />}
+              </button>
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Close this panel"
+                title="Close"
+                className="cursor-pointer rounded p-1 hover:bg-[var(--bg-card-hover)] focus-visible:outline-2 focus-visible:outline-[var(--accent-green)]"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </span>
           </div>
 
           {stream === null ? (
@@ -152,11 +164,10 @@ export default function AboutPanel({ stream, groups }: AboutPanelProps) {
           type="button"
           onClick={reopen}
           aria-label="About this stream"
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border px-2 py-2 hover:bg-[var(--bg-card-hover)] focus-visible:outline-2 focus-visible:outline-[var(--accent-green)] lg:h-40 lg:flex-col"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--text-muted)] bg-[var(--bg-card-hover)] px-2 py-2.5 text-[var(--text-primary)] hover:border-[var(--accent-green)] focus-visible:outline-2 focus-visible:outline-[var(--accent-green)] lg:h-48 lg:flex-col"
         >
-          <Info size={18} aria-hidden="true" />
-          <span className="text-xs lg:[writing-mode:vertical-rl]" aria-hidden="true">
+          <Info size={22} aria-hidden="true" />
+          <span className="text-base font-medium lg:[writing-mode:vertical-rl]" aria-hidden="true">
             About this stream
           </span>
         </button>

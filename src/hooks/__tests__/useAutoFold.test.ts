@@ -44,6 +44,30 @@ describe('useAutoFold while held', () => {
   })
 })
 
+describe('useAutoFold close', () => {
+  it('folds the panel at once and lets go of a pin', () => {
+    const { result } = renderHook(() => useAutoFold('a'))
+    act(() => result.current.togglePin())
+    expect(result.current.pinned).toBe(true)
+
+    act(() => result.current.close())
+
+    expect(result.current.open).toBe(false)
+    expect(result.current.pinned).toBe(false)
+  })
+
+  it('stays folded (the thirty seconds do not run for a panel that is already closed) until it is opened again', () => {
+    const { result } = renderHook(() => useAutoFold('a'))
+
+    act(() => result.current.close())
+    tick(60_000)
+    expect(result.current.open).toBe(false)
+
+    act(() => result.current.reopen())
+    expect(result.current.open).toBe(true)
+  })
+})
+
 describe('useAutoFold', () => {
   it('is open at first and folds after thirty seconds', () => {
     const { result } = renderHook(() => useAutoFold('a'))

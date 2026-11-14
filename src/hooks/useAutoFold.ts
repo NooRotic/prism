@@ -7,6 +7,8 @@ export interface AutoFold {
   bump: () => void
   /** Opens a folded panel. */
   reopen: () => void
+  /** Folds the panel at once and lets go of a pin: the reader chose to close it, so that wins over everything else. */
+  close: () => void
   togglePin: () => void
 }
 
@@ -57,7 +59,11 @@ export function useAutoFold(resetKey: string, ms = 30_000, hold = false): AutoFo
     setOpen(true)
     setRestarts((n) => n + 1)
   }, [])
+  const close = useCallback(() => {
+    setOpen(false)
+    setPinned(false)
+  }, [])
   const togglePin = useCallback(() => setPinned((p) => !p), [])
 
-  return { open, pinned, bump, reopen, togglePin }
+  return { open, pinned, bump, reopen, close, togglePin }
 }
