@@ -391,7 +391,7 @@ and groups, pin, set the default, and remove. Every write goes to the audit list
 
 ### Piece 2 as built (2026-11-14; plan `docs/superpowers/plans/2026-11-14-playlist-piece-2-store-import-and-hls-page.md`)
 
-Stages A (server) and B (HLS page) are built; the Playlist screen above (stage C) is not. What differs from, or adds to, the text above:
+Stages A (server), B (HLS page) and C (the Playlist screen above) are built. What differs from, or adds to, the text above:
 
 - **The snapshot carries each stream's address** (`u`), which the field list above omitted: the page cannot play a stream
   without it. The About panel shows only its host. The other keys are `i` (public id), `n`, `g` (indexes into `groups`, most-used
@@ -412,6 +412,12 @@ Stages A (server) and B (HLS page) are built; the Playlist screen above (stage C
   parameters, 1,169 `unplayable`, 483 `held`, 3,512 listed with the five demos; the snapshot is 673 KB (146 KB gzipped).
 - **The page** plays the snapshot's default (else Big Buck Bunny) while the list loads, filters in the browser, mounts only the
   visible cards, and shows the built-in demo streams with a notice when the server is down, not ready or sends nothing usable.
+- **The Playlist screen** (`/admin/playlist`, `src/components/admin/PlaylistScreen.tsx`; API in `server/src/Admin/PlaylistAdmin.php`)
+  lists every stream in every state (50 a page) with filters for text, state and country, shows an address only as its host,
+  and offers add (the import's rules; a refusal says which rule), edit (name and groups), pin, make default (only a stream
+  visitors can see), and remove (a confirmation, then a tombstone: the row stays so a re-import cannot bring it back, and its
+  logo copy is deleted). Every write is one transaction with its audit row and rewrites the visitor snapshot after the commit.
+  A group filter exists in the API but not yet on the screen.
 
 ## Piece 3: the checker (decisions)
 

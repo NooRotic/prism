@@ -81,7 +81,18 @@ between `new`, `working`, `suspect` and `dead`.
   `tt.user_agent` is for TwitchTracker only and is never sent to a logo host unless you put one in `playlist.user_agent` yourself.
 - **Re-import.** Upload the new list, run the import with `--dry-run`, compare, run it for real, then `fetch-logos.php`. The
   list is iptv-org data (the Unlicense: public domain); the HLS page credits it.
-- **Deploy order.** `deploy.mjs --go`, then `install.php` (expect `applied 003_streams`), then the import, then the logos.
+- **The owner's playlist actions (the Playlist screen, `/admin/playlist`).** Owner only, like the rest of `/api/admin/*`:
+  `GET /api/admin/streams?text=&state=&group=&country=&limit=&offset=` (every state, the owner's view; 50 a page by default,
+  200 at most, with the count of every state) and `POST /api/admin/streams/add|update|pin|default|remove` (JSON bodies, `public_id`
+  for an existing stream, at most 4 KiB). **Add** applies the import's rules (a refused address or name is 422 with its `reason`, a
+  known address, even a removed one, is 409 `already_known`) and stores it with source `manual`; **update** renames a stream and
+  replaces its groups; **default** needs a stream visitors can see (409 `not_listed` otherwise); **remove** leaves a tombstone (state
+  `removed`, no longer default or pinned) and deletes its logo copy, so a re-import cannot bring it back. Every write is one
+  transaction with its audit row (`stream.add`, `stream.update`, `stream.pin`, `stream.default`, `stream.remove`, shown on the
+  Security screen), and the visitor snapshot is rewritten after the commit; if only that rewrite fails the answer is `ok` with
+  `snapshot: false` and the list catches up on the next change.
+- **Deploy order.** `deploy.mjs --go`, then `install.php` (expect `applied 003_streams`), then the import, then the logos. The
+  admin API ships with the server code; the Playlist screen ships with the front end, so deploy the server first.
 
 ## IONOS host notes
 
