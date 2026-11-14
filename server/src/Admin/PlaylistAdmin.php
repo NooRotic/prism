@@ -226,7 +226,8 @@ final class PlaylistAdmin
     /** A name of 1 to 200 characters with no control characters; the owner is told about a bad one rather than having it quietly changed. */
     private static function cleanName(string $name): ?string
     {
-        $name = trim($name);
+        // Only spaces, tabs and line ends at the edges: PHP's default trim() would also swallow a NUL byte, which must be refused.
+        $name = trim($name, " \t\n\r");
         if ($name === '' || !mb_check_encoding($name, 'UTF-8') || mb_strlen($name) > self::NAME_MAX || preg_match(self::BAD_NAME_CHARS, $name) === 1) {
             return null;
         }
