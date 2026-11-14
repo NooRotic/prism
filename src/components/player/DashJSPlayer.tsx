@@ -115,12 +115,29 @@ export default function DashJSPlayer({
           cb.current.onError?.(msg)
         }
 
+        // Browsers let a page start sound by itself only once the visitor has used it. When dash.js's autoplay is refused it
+        // says so with this event: play again muted (always allowed; the controls turn the sound on), and only if that is
+        // refused too tell the page the player is blocked.
+        const player = dashPlayer
+        let startedMuted = false
+        const onPlaybackNotAllowed = () => {
+          if (!mountedRef.current) return
+          if (startedMuted) {
+            cb.current.onPlaybackBlocked?.()
+            return
+          }
+          startedMuted = true
+          out.log('warn', 'dashjs', 'the browser blocked autoplay with sound; playing muted (the speaker button turns the sound on)')
+          videoEl.muted = true
+          player.play()
+        }
+
         dashPlayer.on('streamInitialized', onStreamInitialized)
         dashPlayer.on('error', onErrorEvent)
+        dashPlayer.on('playbackNotAllowed', onPlaybackNotAllowed)
 
-        // Muted start for autoplay reliability under browser policies.
-        // Users can unmute via the native video element controls.
-        videoEl.muted = true
+        // Start with sound; the event above is the fallback.
+        videoEl.muted = false
         dashPlayer.initialize(videoEl, playableUrl, true)
 
         playerRef.current = dashPlayer

@@ -1,4 +1,5 @@
 import { cleanup, render } from '@testing-library/react'
+import videojs from 'video.js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import VideoJSPlayer from '../VideoJSPlayer'
 import type { URLDetectionResult } from '../../../lib/urlDetection'
@@ -12,6 +13,7 @@ vi.mock('../../../lib/playbackEnvironment', () => ({ describeDecoding: vi.fn(() 
 const fake = vi.hoisted(() => {
   const handlers: Record<string, Array<() => void>> = {}
   const vhsState = { current: undefined as string | undefined, all: [] as string[], ids: [] as string[] }
+  const soundState = { muted: false }
   const player = {
     on: (name: string, fn: () => void) => {
       ;(handlers[name] ??= []).push(fn)
@@ -24,7 +26,12 @@ const fake = vi.hoisted(() => {
     currentTime: () => 0,
     duration: () => 0,
     paused: () => false,
-    muted: () => true,
+    // Stateful, as Video.js's is: no argument reads, an argument sets.
+    muted: vi.fn((value?: boolean) => {
+      if (value === undefined) return soundState.muted
+      soundState.muted = value
+      return undefined
+    }),
     volume: () => 1,
     buffered: () => ({ length: 0 }),
     tech: vi.fn(() =>
@@ -54,7 +61,10 @@ const fake = vi.hoisted(() => {
       vhsState.current = undefined
       vhsState.all = []
       vhsState.ids = []
+      soundState.muted = false
+      player.muted.mockClear()
     },
+    sound: soundState,
   }
 })
 
@@ -76,6 +86,95 @@ const decodeError = (codecs: string | undefined, all: string[], message = APPEND
   fake.emit('error')
 }
 const messages = () => getPlaybackSnapshot().entries.map((entry) => entry.message)
+
+const notAllowed = () => Promise.reject(Object.assign(new Error('play() failed because the user did not interact'), { name: 'NotAllowedError' }))
+const flush = () => vi.advanceTimersByTimeAsync(0)
+
+describe('VideoJSPlayer: sound', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    fake.reset()
+    resetAvoidedFormats()
+    endPlayback()
+    beginPlayback({ url: URL_OF, kind: 'hls' })
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+    endPlayback()
+  })
+
+  it('asks Video.js for a player that is not muted, and leaves starting it to its own code', () => {
+    mount()
+
+    const options = (videojs as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1]
+    expect(options).toMatchObject({ muted: false, autoplay: false })
+  })
+
+  it('on ready, makes sure the player is not muted and plays', () => {
+    fake.sound.muted = true
+    mount()
+
+    fake.emit('ready')
+
+    expect(fake.player.muted).toHaveBeenCalledWith(false)
+    expect(fake.sound.muted).toBe(false)
+    expect(fake.player.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('when the browser refuses autoplay with sound, plays muted instead and says so, without calling the player blocked', async () => {
+    const onPlaybackBlocked = vi.fn()
+    fake.player.play.mockReturnValueOnce(notAllowed())
+    mount({ onPlaybackBlocked })
+
+    fake.emit('ready')
+    await flush()
+
+    expect(fake.sound.muted).toBe(true)
+    expect(fake.player.play).toHaveBeenCalledTimes(2)
+    expect(onPlaybackBlocked).not.toHaveBeenCalled()
+    expect(getPlaybackSnapshot().entries.some((entry) => entry.level === 'warn' && entry.message.includes('sound') && entry.message.includes('muted'))).toBe(true)
+  })
+
+  it('tells the page the player is blocked when even a muted start is refused', async () => {
+    const onPlaybackBlocked = vi.fn()
+    fake.player.play.mockReturnValueOnce(notAllowed()).mockReturnValueOnce(notAllowed())
+    mount({ onPlaybackBlocked })
+
+    fake.emit('ready')
+    await flush()
+
+    expect(fake.player.play).toHaveBeenCalledTimes(2)
+    expect(onPlaybackBlocked).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores an interrupted start and does not mute for it', async () => {
+    fake.player.play.mockReturnValueOnce(Promise.reject(Object.assign(new Error('interrupted'), { name: 'AbortError' })))
+    mount()
+
+    fake.emit('ready')
+    await flush()
+
+    expect(fake.sound.muted).toBe(false)
+    expect(fake.player.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('plays again after a decode-failure reload without turning the sound back on', () => {
+    mount({ onError: vi.fn() })
+    fake.sound.muted = true
+
+    fake.vhsState.current = 'hvc1.2.4,mp4a.40.2'
+    fake.vhsState.all = ['avc1.64001f,mp4a.40.2', 'hvc1.2.4,mp4a.40.2']
+    fake.player.error.mockReturnValue({ code: 3, message: APPEND_FAILURE })
+    fake.emit('error')
+
+    expect(fake.player.src).toHaveBeenCalledTimes(1)
+    expect(fake.player.play).toHaveBeenCalledTimes(1)
+    expect(fake.player.muted).not.toHaveBeenCalledWith(false)
+    expect(fake.sound.muted).toBe(true)
+  })
+})
 
 describe('VideoJSPlayer: logging and decode recovery', () => {
   beforeEach(() => {
