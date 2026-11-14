@@ -4,12 +4,18 @@ import {
   MAX_RECOVERIES,
   avoidFormat,
   avoidedFormats,
+  failingPlaylistId,
   installRenditionGuard,
+  isRenditionGuardInstalled,
+  isVideoAppendFailure,
   markAvoidedRenditions,
   planDecodeRecovery,
   resetAvoidedFormats,
   videoFamily,
 } from '../renditionGuard'
+
+// What Video.js says when appending a segment fails (segment-loader.js `handleAppendError_`).
+const APPEND_FAILURE = 'video append of 56283b failed for segment #0 in playlist 97-Job8208634a/hdr10plus/prog_index.m3u8'
 
 beforeEach(() => resetAvoidedFormats())
 
@@ -85,6 +91,25 @@ describe('markAvoidedRenditions', () => {
     expect(list[1].disabled).toBeUndefined()
   })
 
+  it('marks nothing when the only rendition left would be audio only, or would name no codec at all (sound over a black frame)', () => {
+    const audioOnly: Array<{ attributes?: { CODECS?: string }; disabled?: boolean }> = [rendition('hvc1.2.4,mp4a.40.2'), rendition('mp4a.40.2')]
+    const unknown: Array<{ attributes?: { CODECS?: string }; disabled?: boolean }> = [rendition('hvc1.2.4,mp4a.40.2'), rendition()]
+    avoidFormat('hevc')
+
+    expect(markAvoidedRenditions(audioOnly)).toBe(0)
+    expect(markAvoidedRenditions(unknown)).toBe(0)
+
+    expect([...audioOnly, ...unknown].every((item) => item.disabled === undefined)).toBe(true)
+  })
+
+  it('marks when a rendition with a known video format of another kind stays on, whatever else is in the list', () => {
+    const list: Array<{ attributes?: { CODECS?: string }; disabled?: boolean }> = [rendition('hvc1.2.4,mp4a.40.2'), rendition('mp4a.40.2'), rendition(), rendition('avc1.64001f,mp4a.40.2')]
+    avoidFormat('hevc')
+
+    expect(markAvoidedRenditions(list)).toBe(1)
+    expect(list.map((item) => item.disabled)).toEqual([true, undefined, undefined, undefined])
+  })
+
   it('does nothing when no format is avoided, and copes with no list', () => {
     const list = [rendition('hvc1.2.4,mp4a.40.2')]
 
@@ -93,8 +118,22 @@ describe('markAvoidedRenditions', () => {
   })
 })
 
+describe('isVideoAppendFailure and failingPlaylistId', () => {
+  it.each([
+    [APPEND_FAILURE, true, '97-Job8208634a/hdr10plus/prog_index.m3u8'],
+    ['video append of 12b failed for segment #7 in playlist 3-a/b.m3u8', true, '3-a/b.m3u8'],
+    ['audio append of 1234b failed for segment #3 in playlist 5-a', false, '5-a'],
+    ['Playback cannot continue. No available working or supported playlists.', false, null],
+    ['Video.js error code 3', false, null],
+    [undefined, false, null],
+  ])('%s -> video append failure %s, playlist %s', (message, failure, id) => {
+    expect(isVideoAppendFailure(message)).toBe(failure)
+    expect(failingPlaylistId(message)).toBe(id)
+  })
+})
+
 describe('planDecodeRecovery', () => {
-  const base = { code: 3, attempts: 0, failingCodecs: 'hvc1.2.4,mp4a.40.2', playlistCodecs: ['avc1.64001f,mp4a.40.2', 'hvc1.2.4,mp4a.40.2'] }
+  const base = { code: 3, message: APPEND_FAILURE, attempts: 0, failingCodecs: 'hvc1.2.4,mp4a.40.2', playlistCodecs: ['avc1.64001f,mp4a.40.2', 'hvc1.2.4,mp4a.40.2'] }
 
   it('asks for a retry that avoids the failing format when another format is on offer', () => {
     expect(planDecodeRecovery(base)).toEqual({ retry: true, family: 'hevc' })
@@ -109,6 +148,9 @@ describe('planDecodeRecovery', () => {
 
   it.each([
     ['another kind of error', { ...base, code: 4 }],
+    ['code 3 says there is no working playlist (not a video decode failure)', { ...base, message: 'Playback cannot continue. No available working or supported playlists.' }],
+    ['the failed append was audio', { ...base, message: 'audio append of 1234b failed for segment #3 in playlist 5-a' }],
+    ['there is no message to tell what failed', { ...base, message: undefined }],
     ['no error code', { ...base, code: undefined }],
     ['the recoveries are used up', { ...base, attempts: MAX_RECOVERIES }],
     ['the failing rendition names no codec', { ...base, failingCodecs: undefined }],
@@ -189,6 +231,15 @@ describe('installRenditionGuard', () => {
     expect(installRenditionGuard({})).toBe(false)
     expect(installRenditionGuard(undefined)).toBe(false)
     expect(installRenditionGuard({ Vhs: {} })).toBe(false)
+  })
+
+  it('remembers that it is installed, so the debug output can say so, and a failed call does not undo that', () => {
+    installRenditionGuard(fakeVhs().vjs)
+    expect(isRenditionGuardInstalled()).toBe(true)
+
+    installRenditionGuard({})
+
+    expect(isRenditionGuardInstalled()).toBe(true)
   })
 
   it('still picks when the handler has no playlists to look at', () => {

@@ -133,14 +133,62 @@ export function redactAddress(address: string): string {
   return `${url.protocol}//${auth}${url.host}${url.pathname}${query}`
 }
 
-const ADDRESS_IN_TEXT = /https?:\/\/[^\s"'<>()[\],]+/g
+// Free text (an engine's message, Video.js's own error text, a `data` object) can quote an address in any shape: absolute or
+// relative, in quotes or brackets, with an upper-case scheme or an IPv6 host. So nothing here looks for "an address": it
+// hides what can carry a secret wherever it stands. A query or a fragment starts at a `?` or `#` that follows a character
+// an address path or host can end in (so "Could not load? Try again" is left alone), and runs to the next space or quote.
+const AFTER_ADDRESS_PART = String.raw`(?<=[\w/.~%*\])-])`
+const LOGIN_IN_TEXT = /(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@"'<>]+@/gi
+const FRAGMENT_IN_TEXT = new RegExp(`${AFTER_ADDRESS_PART}#([^\\s"'<>]+)`, 'g')
+const QUERY_IN_TEXT = new RegExp(`${AFTER_ADDRESS_PART}\\?([^\\s"'<>#]+)`, 'g')
+const TRAILING_PUNCTUATION = /[.,;:!?)\]]+$/
 
-/** Text with every http(s) address in it passed through `redactAddress` (an engine's message can quote the full address). */
+/** `?token=abc&x=1` as `?token=***&x=***`; a part with no `=` (a bare token) becomes `***`. Punctuation that ends the query is kept. */
+function hideQuery(query: string): string {
+  const tail = TRAILING_PUNCTUATION.exec(query)?.[0] ?? ''
+  const body = tail ? query.slice(0, query.length - tail.length) : query
+  if (body === '') return `?${query}`
+  const hidden = body
+    .split('&')
+    .map((part) => {
+      const equals = part.indexOf('=')
+      return equals === -1 ? '***' : `${part.slice(0, equals)}=***`
+    })
+    .join('&')
+  return `?${hidden}${tail}`
+}
+
+/** Text with every query value, fragment and login hidden, so a log line or a report never carries a token. Safe to apply twice. */
 export function redactText(text: string): string {
-  return text.replace(ADDRESS_IN_TEXT, (match) => {
-    const address = match.replace(/[.;:!?]+$/, '')
-    return redactAddress(address) + match.slice(address.length)
-  })
+  return text.replace(LOGIN_IN_TEXT, '$1***@').replace(FRAGMENT_IN_TEXT, '#***').replace(QUERY_IN_TEXT, (_match, query: string) => hideQuery(query))
+}
+
+export interface PlaybackWriter {
+  log: (level: PlaybackLevel, source: string, message: string, data?: Record<string, unknown>) => void
+  setStatus: (status: PlaybackStatus) => void
+  setInspection: (data: Record<string, unknown>) => void
+}
+
+/**
+ * Writes for the session that is running now, and for no other. An engine takes one when it starts and writes through it
+ * all its life: a late event from an engine that is on its way out (a `playing` after the next stream began, an
+ * asynchronous result that arrives after it) then cannot put a line, an inspection or a green light into the next
+ * stream's session. Made while no session runs, it never writes.
+ */
+export function playbackWriter(): PlaybackWriter {
+  const bound = snapshot.session
+  const live = () => bound !== 0 && snapshot.session === bound
+  return {
+    log: (level, source, message, data) => {
+      if (live()) logPlayback(level, source, message, data)
+    },
+    setStatus: (status) => {
+      if (live()) setPlaybackStatus(status)
+    },
+    setInspection: (data) => {
+      if (live()) setPlaybackInspection(data)
+    },
+  }
 }
 
 const seconds = (ms: number): string => `+${(ms / 1000).toFixed(1)}s`
