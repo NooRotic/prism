@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
+  LISTED_STATES,
   STREAM_STATES,
   addStream,
   getStreams,
@@ -14,13 +15,13 @@ import {
 } from '../../lib/adminApi'
 import { regionName } from '../../lib/countries'
 import { useAdminSession } from './AdminSessionContext'
+import StreamPreview from './StreamPreview'
 import { useAdminResource } from './useAdminResource'
 
 const CARD = { background: 'var(--bg-card)', borderColor: 'var(--border-accent)' }
 const INPUT = { background: 'var(--bg-card)', borderColor: 'var(--border-accent)', color: 'var(--text-primary)' }
 const SEARCH_DEBOUNCE_MS = 300
 const PAGE_SIZE = 50
-const LISTED: readonly StreamState[] = ['new', 'working', 'suspect']
 
 /** Plain words for the rule that refused an address, a name or a group. Anything new the server says is shown as it is. */
 const REASONS: Record<string, string> = {
@@ -72,6 +73,8 @@ export default function PlaylistScreen() {
   const [behind, setBehind] = useState(false)
   const [editing, setEditing] = useState<Editing | null>(null)
   const [confirming, setConfirming] = useState<AdminStream | null>(null)
+  // The stream being played in place, and the list (page and filters) it was opened on.
+  const [previewing, setPreviewing] = useState<{ publicId: string; listKey: string } | null>(null)
   const [address, setAddress] = useState('')
   const [name, setName] = useState('')
   const [group, setGroup] = useState('')
@@ -95,6 +98,12 @@ export default function PlaylistScreen() {
   const [kept, setKept] = useState<AdminStreams | null>(null)
   if (streams.data !== null && streams.data !== kept) setKept(streams.data)
   const data = streams.status === 'error' ? null : (streams.data ?? kept)
+
+  // The preview belongs to the list it was opened on: another page or filter closes it, and so does a reload that no longer
+  // lists the stream or lists it as removed (a removed stream has no Play).
+  const listKey = JSON.stringify([query, state, countryFilter, offset])
+  const previewed = previewing === null ? null : (data?.streams.find((s) => s.publicId === previewing.publicId) ?? null)
+  if (previewing !== null && (previewing.listKey !== listKey || (data !== null && (previewed === null || previewed.state === 'removed')))) setPreviewing(null)
 
   /** Runs one write. Returns the result so the caller can show a message next to what it was about; `signed_out` ends the session. */
   async function run(act: (signal: AbortSignal) => Promise<StreamActionResult>): Promise<StreamActionResult | null> {
@@ -176,6 +185,8 @@ export default function PlaylistScreen() {
     const target = confirming
     const result = await run((signal) => removeStream(target.publicId, signal))
     setConfirming(null)
+    // Once it is removed (or already gone) there is nothing to play; a removal that failed leaves the preview as it was.
+    if (result !== null && (result.kind === 'ok' || result.kind === 'not_found')) setPreviewing((open) => (open?.publicId === target.publicId ? null : open))
     if (result !== null) setNotice(failure(result, 'That stream is already gone.'))
   }
 
@@ -300,66 +311,78 @@ export default function PlaylistScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.streams.map((s) =>
-                    editing?.publicId === s.publicId ? (
-                      <tr key={s.publicId}>
-                        <td colSpan={6} className="py-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <input type="text" aria-label={`Name of ${s.name}`} value={editing.name} maxLength={200} onChange={(event) => setEditing({ ...editing, name: event.target.value })} className="min-w-0 flex-[2] rounded border px-2 py-1 text-sm" style={INPUT} />
-                            <input type="text" aria-label={`Groups of ${s.name}`} value={editing.groups} maxLength={200} onChange={(event) => setEditing({ ...editing, groups: event.target.value })} className="min-w-0 flex-[2] rounded border px-2 py-1 text-sm" style={INPUT} />
-                            <button type="button" aria-label={`Save ${s.name}`} disabled={pending || editing.name.trim() === ''} onClick={() => void saveEdit()} className="rounded px-3 py-1 text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--accent-green)', color: '#000' }}>
-                              Save
-                            </button>
-                            <button type="button" aria-label={`Cancel editing ${s.name}`} disabled={pending} onClick={() => setEditing(null)} className="rounded border px-3 py-1 text-xs" style={{ borderColor: 'var(--border-accent)' }}>
-                              Cancel
-                            </button>
-                          </div>
-                          {editing.error !== null && (
-                            <p role="alert" className="m-0 mt-1 text-xs" style={{ color: 'var(--accent-red)' }}>
-                              {editing.error}
-                            </p>
-                          )}
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={s.publicId}>
-                        <td className="py-1 pr-3">
-                          <div>{s.name}</div>
-                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {host(s.url)}
-                          </div>
-                        </td>
-                        <td className="py-1 pr-3">{s.stateReason ? `${s.state} (${s.stateReason})` : s.state}</td>
-                        <td className="py-1 pr-3">{s.country ? regionName(s.country) : '–'}</td>
-                        <td className="py-1 pr-3">{s.groups.join(', ')}</td>
-                        <td className="py-1 pr-3">{s.source}</td>
-                        <td className="py-1 text-right whitespace-nowrap">
-                          {s.state !== 'removed' && (
-                            <span className="inline-flex flex-wrap justify-end gap-1">
-                              <button type="button" aria-label={s.pinned ? `Unpin ${s.name}` : `Pin ${s.name}`} aria-pressed={s.pinned} disabled={pending} onClick={() => void act((signal) => pinStream(s.publicId, !s.pinned, signal))} className="rounded border px-2 py-1 text-xs" style={{ borderColor: 'var(--border-accent)', color: s.pinned ? 'var(--accent-gold)' : undefined }}>
-                                {s.pinned ? 'Pinned' : 'Pin'}
+                  {data.streams.map((s) => (
+                    <Fragment key={s.publicId}>
+                      {editing?.publicId === s.publicId ? (
+                        <tr>
+                          <td colSpan={6} className="py-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input type="text" aria-label={`Name of ${s.name}`} value={editing.name} maxLength={200} onChange={(event) => setEditing({ ...editing, name: event.target.value })} className="min-w-0 flex-[2] rounded border px-2 py-1 text-sm" style={INPUT} />
+                              <input type="text" aria-label={`Groups of ${s.name}`} value={editing.groups} maxLength={200} onChange={(event) => setEditing({ ...editing, groups: event.target.value })} className="min-w-0 flex-[2] rounded border px-2 py-1 text-sm" style={INPUT} />
+                              <button type="button" aria-label={`Save ${s.name}`} disabled={pending || editing.name.trim() === ''} onClick={() => void saveEdit()} className="rounded px-3 py-1 text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--accent-green)', color: '#000' }}>
+                                Save
                               </button>
-                              {s.isDefault ? (
-                                <span className="px-2 py-1 text-xs" style={{ color: 'var(--accent-green)' }}>
-                                  Default
-                                </span>
-                              ) : (
-                                <button type="button" aria-label={`Make ${s.name} the default`} disabled={pending || !LISTED.includes(s.state)} onClick={() => void act((signal) => setDefaultStream(s.publicId, signal))} className="rounded border px-2 py-1 text-xs disabled:opacity-40" style={{ borderColor: 'var(--border-accent)' }}>
-                                  Make default
+                              <button type="button" aria-label={`Cancel editing ${s.name}`} disabled={pending} onClick={() => setEditing(null)} className="rounded border px-3 py-1 text-xs" style={{ borderColor: 'var(--border-accent)' }}>
+                                Cancel
+                              </button>
+                            </div>
+                            {editing.error !== null && (
+                              <p role="alert" className="m-0 mt-1 text-xs" style={{ color: 'var(--accent-red)' }}>
+                                {editing.error}
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr>
+                          <td className="py-1 pr-3">
+                            <div>{s.name}</div>
+                            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {host(s.url)}
+                            </div>
+                          </td>
+                          <td className="py-1 pr-3">{s.stateReason ? `${s.state} (${s.stateReason})` : s.state}</td>
+                          <td className="py-1 pr-3">{s.country ? regionName(s.country) : '–'}</td>
+                          <td className="py-1 pr-3">{s.groups.join(', ')}</td>
+                          <td className="py-1 pr-3">{s.source}</td>
+                          <td className="py-1 text-right whitespace-nowrap">
+                            {s.state !== 'removed' && (
+                              <span className="inline-flex flex-wrap justify-end gap-1">
+                                <button type="button" aria-label={`Play ${s.name}`} aria-expanded={previewed?.publicId === s.publicId} onClick={() => setPreviewing(previewed?.publicId === s.publicId ? null : { publicId: s.publicId, listKey })} className="rounded border px-2 py-1 text-xs" style={{ borderColor: 'var(--border-accent)' }}>
+                                  Play
                                 </button>
-                              )}
-                              <button type="button" aria-label={`Edit ${s.name}`} disabled={pending} onClick={() => setEditing({ publicId: s.publicId, name: s.name, groups: s.groups.join('; '), error: null })} className="rounded border px-2 py-1 text-xs" style={{ borderColor: 'var(--border-accent)' }}>
-                                Edit
-                              </button>
-                              <button type="button" aria-label={`Remove ${s.name}`} disabled={pending} onClick={() => setConfirming(s)} className="rounded border px-2 py-1 text-xs" style={{ borderColor: 'var(--accent-red)', color: 'var(--accent-red)' }}>
-                                Remove
-                              </button>
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ),
-                  )}
+                                <button type="button" aria-label={s.pinned ? `Unpin ${s.name}` : `Pin ${s.name}`} aria-pressed={s.pinned} disabled={pending} onClick={() => void act((signal) => pinStream(s.publicId, !s.pinned, signal))} className="rounded border px-2 py-1 text-xs" style={{ borderColor: 'var(--border-accent)', color: s.pinned ? 'var(--accent-gold)' : undefined }}>
+                                  {s.pinned ? 'Pinned' : 'Pin'}
+                                </button>
+                                {s.isDefault ? (
+                                  <span className="px-2 py-1 text-xs" style={{ color: 'var(--accent-green)' }}>
+                                    Default
+                                  </span>
+                                ) : (
+                                  <button type="button" aria-label={`Make ${s.name} the default`} disabled={pending || !LISTED_STATES.includes(s.state)} onClick={() => void act((signal) => setDefaultStream(s.publicId, signal))} className="rounded border px-2 py-1 text-xs disabled:opacity-40" style={{ borderColor: 'var(--border-accent)' }}>
+                                    Make default
+                                  </button>
+                                )}
+                                <button type="button" aria-label={`Edit ${s.name}`} disabled={pending} onClick={() => { setPreviewing((open) => (open?.publicId === s.publicId ? null : open)); setEditing({ publicId: s.publicId, name: s.name, groups: s.groups.join('; '), error: null }) }} className="rounded border px-2 py-1 text-xs" style={{ borderColor: 'var(--border-accent)' }}>
+                                  Edit
+                                </button>
+                                <button type="button" aria-label={`Remove ${s.name}`} disabled={pending} onClick={() => setConfirming(s)} className="rounded border px-2 py-1 text-xs" style={{ borderColor: 'var(--accent-red)', color: 'var(--accent-red)' }}>
+                                  Remove
+                                </button>
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                      {previewed?.publicId === s.publicId && (
+                        <tr>
+                          <td colSpan={6} className="pb-2">
+                            <StreamPreview stream={s} onClose={() => setPreviewing(null)} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
