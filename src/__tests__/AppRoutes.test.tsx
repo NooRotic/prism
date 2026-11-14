@@ -10,7 +10,7 @@ vi.mock('../pages/ProtocolPage', () => ({
 }))
 vi.mock('../pages/TwitchPlayerPage', () => ({ default: () => <div>twitch player page</div> }))
 vi.mock('../pages/YoutubePlayerPage', () => ({ default: () => <div>youtube player page</div> }))
-vi.mock('../pages/HlsDashPlayerPage', () => ({ default: () => <div>hls dash player page</div> }))
+vi.mock('../pages/HlsPage', () => ({ default: () => <div>hls page</div> }))
 vi.mock('../pages/ChatPopoutPage', () => ({ default: () => <div>chat pop-out page</div> }))
 vi.mock('../pages/AdminPage', () => ({ default: () => <div>admin page</div> }))
 
@@ -30,7 +30,7 @@ const renderAt = (path: string) =>
   )
 
 describe('AppRoutes: an address that matches nothing', () => {
-  it.each([['/nope'], ['/spike-pip.html'], ['/twitch/a/b'], ['/chat']])(
+  it.each([['/nope'], ['/spike-pip.html'], ['/twitch/a/b'], ['/chat'], ['/hls-dash/a/b']])(
     'shows the not-found page for %s, inside the layout so the header and the rail stay',
     (path) => {
       renderAt(path)
@@ -48,10 +48,12 @@ describe('AppRoutes: the pages that exist', () => {
     ['/', 'hub page'],
     ['/twitch', 'protocol page twitch'],
     ['/youtube', 'protocol page youtube'],
-    ['/hls-dash', 'protocol page hls-dash'],
+    ['/hls-dash', 'hls page'],
+    ['/hls-dash/', 'hls page'],
     ['/twitch/streamer', 'twitch player page'],
     ['/youtube/abc', 'youtube player page'],
-    ['/hls-dash/some-stream', 'hls dash player page'],
+    ['/hls-dash/some-stream', 'hls page'],
+    ['/hls-dash/custom', 'hls page'],
   ])('%s still shows its page, inside the layout', (path, text) => {
     renderAt(path)
 

@@ -2,7 +2,7 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import HlsDashPlayerPage from '../HlsDashPlayerPage'
+import HlsPage from '../HlsPage'
 import { useApp } from '../../contexts/AppContext'
 import { buildStreamPath } from '../../lib/routes'
 import type { PlayerProps } from '../../types/player'
@@ -79,7 +79,7 @@ function renderAt(entry: string, extra?: React.ReactNode) {
   return render(
     <MemoryRouter initialEntries={[entry]}>
       <Routes>
-        <Route path="hls-dash/:streamId" element={<HlsDashPlayerPage />} />
+        <Route path="hls-dash/:streamId?" element={<HlsPage />} />
       </Routes>
       <LocationSpy />
       {extra}
@@ -105,7 +105,10 @@ afterEach(() => {
   cleanup()
 })
 
-describe('HlsDashPlayerPage', () => {
+// The cases of the old player page (HlsDashPlayerPage), kept for the page that replaced it: playing, the error card, the
+// stall notice, retry, try-as, and moving between addresses. The server is switched off under the test runner, so the page
+// runs on its built-in demo list here. Two cases changed with the new layout (see their comments); none was dropped.
+describe('HlsPage: the player behaviour the old player page had', () => {
   it('plays a demo entry by its id and tells the app what is playing', () => {
     renderAt('/hls-dash/apple-basic')
 
@@ -116,11 +119,15 @@ describe('HlsDashPlayerPage', () => {
     )
   })
 
-  it('plays a pasted address under the HLS heading', () => {
+  // Changed with the new layout: the player panel's own title row ("HLS Stream Player" and the address) is switched off on
+  // this page, and the About panel names what plays instead, by its host.
+  it('plays a pasted address, and the About panel names it by its host', () => {
     renderAt(buildStreamPath('https://h/x.m3u8'))
 
     expect(lastProps().url).toBe('https://h/x.m3u8')
-    expect(screen.getByRole('heading', { name: /HLS Stream Player/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /HLS Stream Player/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Pasted address' })).toBeInTheDocument()
+    expect(screen.getByText('h')).toBeInTheDocument()
   })
 
   it('tries an address with no recognisable ending as HLS', () => {
@@ -129,11 +136,14 @@ describe('HlsDashPlayerPage', () => {
     expect(lastProps().detection.type).toBe('hls')
   })
 
-  it('says so when no demo has that id', () => {
+  // Changed with the new layout: the old "Browse the HLS / DASH demos" link pointed at the listing page, which is now this
+  // page, so the message sends the visitor to the list below instead (and the list is on screen).
+  it('says so when no stream has that id, with the list still on the page', () => {
     renderAt('/hls-dash/does-not-exist')
 
     expect(screen.getByText(/No stream called/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /demo/i })).toHaveAttribute('href', '/hls-dash')
+    expect(screen.getByText(/pick a stream from the list/i)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /stream list/i })).toBeInTheDocument()
     expect(screen.queryByTestId('player-host')).not.toBeInTheDocument()
   })
 
