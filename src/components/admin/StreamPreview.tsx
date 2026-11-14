@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { LISTED_STATES, type AdminStream } from '../../lib/adminApi'
 import { buildStreamPath } from '../../lib/routes'
 import { toStreamAddress } from '../../lib/streamSource'
@@ -37,6 +37,13 @@ interface StreamPreviewProps {
 export default function StreamPreview({ stream, onClose }: StreamPreviewProps) {
   const [kind, setKind] = useState<StreamKind>(stream.kind)
   const playable = canPlay(stream.url)
+  // Stable between renders: the player restarts the stream whenever the detection it is handed is a new object, so a source
+  // rebuilt on every render would retry a failed stream each time anything else on the screen changed. The stored kind is a
+  // classification of the address, not a check that it plays, so the other types stay on offer in the error card ("try as").
+  const source = useMemo(
+    () => ({ url: stream.url, detection: detectURLTypeAs(stream.url, kind), kind, guessedKind: true }),
+    [stream.url, kind],
+  )
   // A stream visitors can see opens on the page they get; any other has no page of its own, so it opens through the pasted-address form.
   const href = LISTED_STATES.includes(stream.state) ? `/hls-dash/${stream.publicId}` : buildStreamPath(stream.url, kind)
 
@@ -62,7 +69,7 @@ export default function StreamPreview({ stream, onClose }: StreamPreviewProps) {
       {playable ? (
         <StreamPlayerPanel
           key={`${stream.url}|${kind}`}
-          source={{ url: stream.url, detection: detectURLTypeAs(stream.url, kind), kind, guessedKind: false }}
+          source={source}
           heading={false}
           className="flex w-full flex-col gap-2"
           onTryAs={setKind}
