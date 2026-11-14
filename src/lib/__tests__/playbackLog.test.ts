@@ -108,6 +108,19 @@ describe('the playback log', () => {
     expect(snapshot.entries).toHaveLength(1)
   })
 
+  it('numbers the sessions, so a reader can tell that a new one began', () => {
+    beginPlayback({ url: 'https://one.test/a.m3u8', kind: 'hls' })
+    const first = getPlaybackSnapshot().session
+    setPlaybackStatus('retrying')
+    expect(getPlaybackSnapshot().session).toBe(first)
+
+    beginPlayback({ url: 'https://one.test/a.m3u8', kind: 'hls' })
+
+    expect(getPlaybackSnapshot().session).toBe(first + 1)
+    endPlayback()
+    expect(getPlaybackSnapshot().session).toBe(0)
+  })
+
   it('goes back to idle, with nothing left, when the session ends', () => {
     beginPlayback({ url: 'https://h.test/a.m3u8', kind: 'hls' })
     logPlayback('info', 'videojs', 'loadstart')
