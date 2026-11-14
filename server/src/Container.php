@@ -12,11 +12,13 @@ use Prism\History\Store\BioLinkStore;
 use Prism\History\Store\ChannelStore;
 use Prism\History\Store\JobState;
 use Prism\History\Store\SnapshotStore;
+use Prism\History\Store\UsageCounters;
 use Prism\History\Tracker\Sleeper;
 use Prism\History\Tracker\SystemSleeper;
 use Prism\History\Tracker\TrackerClient;
 use Prism\History\Tracker\TtGate;
 use Prism\History\Twitch\TwitchClient;
+use Prism\History\Usage\HitRecorder;
 
 /** Builds the object graph from a Config and a database connection. Tests pass a fake transport, clock and sleeper. */
 final class Container
@@ -40,9 +42,11 @@ final class Container
             $s['payload'],
             $s['clock'],
             $s['state'],
+            $s['counters'],
         );
+        $hits = new HitRecorder($s['counters'], new RateCap($s['state'], $s['clock']));
 
-        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger']);
+        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits);
     }
 
     /** The schema migrator over the migrations/ folder that ships next to src/. */
@@ -74,7 +78,7 @@ final class Container
         );
     }
 
-    /** @return array{clock:Clock,state:JobState,channels:ChannelStore,snapshots:SnapshotStore,links:BioLinkStore,twitch:TwitchClient,tracker:TrackerClient,gate:TtGate,payload:ChannelPayload,logger:Logger} */
+    /** @return array{clock:Clock,state:JobState,channels:ChannelStore,snapshots:SnapshotStore,links:BioLinkStore,counters:UsageCounters,twitch:TwitchClient,tracker:TrackerClient,gate:TtGate,payload:ChannelPayload,logger:Logger} */
     private static function services(Config $config, PDO $pdo, ?HttpClient $http, ?Clock $clock, ?Sleeper $sleeper): array
     {
         $clock ??= new SystemClock();
@@ -90,6 +94,7 @@ final class Container
             'channels' => $channels,
             'snapshots' => $snapshots,
             'links' => $links,
+            'counters' => new UsageCounters($pdo, $clock),
             'twitch' => new TwitchClient($http, $state, $clock, $config->twitchClientId(), $config->twitchClientSecret()),
             'tracker' => new TrackerClient($http, $config->ttUserAgent()),
             'gate' => new TtGate(

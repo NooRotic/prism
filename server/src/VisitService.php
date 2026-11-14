@@ -8,6 +8,7 @@ use Prism\History\Store\BioLinkStore;
 use Prism\History\Store\ChannelStore;
 use Prism\History\Store\JobState;
 use Prism\History\Store\SnapshotStore;
+use Prism\History\Store\UsageCounters;
 use Prism\History\Tracker\TrackerClient;
 use Prism\History\Tracker\TrackerResult;
 use Prism\History\Tracker\TtGate;
@@ -39,6 +40,7 @@ final class VisitService
         private ChannelPayload $payload,
         private Clock $clock,
         private JobState $state,
+        private UsageCounters $counters,
     ) {
     }
 
@@ -113,12 +115,23 @@ final class VisitService
                 return VisitResult::CAP;
             }
             $this->channels->insertTracked($user, $info);
+            $this->countNewChannel();
         } else {
             $this->channels->applyProfile($user->id, $user, $info);
         }
         $this->links->sync($user->id, BioLinks::extract($user->description));
 
         return null;
+    }
+
+    /** The owner's "new channels per day" figure. A counter that cannot be written must never break a visit. */
+    private function countNewChannel(): void
+    {
+        try {
+            $this->counters->increment('new_channels');
+        } catch (\Throwable) {
+            // the visit still answers; the day's figure is one short
+        }
     }
 
     private function channelInfo(string $id): ?TwitchChannelInfo
