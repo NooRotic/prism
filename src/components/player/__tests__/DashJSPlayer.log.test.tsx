@@ -12,6 +12,7 @@ const dash = vi.hoisted(() => {
       handlers[name] = fn
     },
     initialize: vi.fn(),
+    play: vi.fn(),
     destroy: vi.fn(),
   }
   return { player, handlers }
@@ -25,6 +26,7 @@ const messages = () => getPlaybackSnapshot().entries.map((entry) => entry.messag
 describe('DashJSPlayer and the playback log', () => {
   beforeEach(() => {
     dash.player.initialize.mockClear()
+    dash.player.play.mockClear()
     for (const key of Object.keys(dash.handlers)) delete dash.handlers[key]
     endPlayback()
     beginPlayback({ url: URL_OF, kind: 'dash' })
@@ -73,6 +75,34 @@ describe('DashJSPlayer and the playback log', () => {
 
     expect(getPlaybackSnapshot().status).toBe('starting')
     expect(messages()).toEqual(['Attempt 1: session started'])
+  })
+
+  it('starts with sound: not muted, and dash.js is asked to start playing', async () => {
+    const { container } = render(<DashJSPlayer url={URL_OF} detection={detection} />)
+    await waitFor(() => expect(dash.player.initialize).toHaveBeenCalled())
+
+    const video = container.querySelector('video')!
+    expect(video.muted).toBe(false)
+    expect(dash.player.initialize).toHaveBeenCalledWith(video, URL_OF, true)
+  })
+
+  it('when dash.js says playback is not allowed, mutes and plays again, once, and says so', async () => {
+    const onPlaybackBlocked = vi.fn()
+    const { container } = render(<DashJSPlayer url={URL_OF} detection={detection} onPlaybackBlocked={onPlaybackBlocked} />)
+    await waitFor(() => expect(dash.player.initialize).toHaveBeenCalled())
+    const video = container.querySelector('video')!
+
+    dash.handlers.playbackNotAllowed()
+
+    expect(video.muted).toBe(true)
+    expect(dash.player.play).toHaveBeenCalledTimes(1)
+    expect(onPlaybackBlocked).not.toHaveBeenCalled()
+    expect(getPlaybackSnapshot().entries.some((entry) => entry.level === 'warn' && entry.message.includes('sound') && entry.message.includes('muted'))).toBe(true)
+
+    dash.handlers.playbackNotAllowed()
+
+    expect(dash.player.play).toHaveBeenCalledTimes(1)
+    expect(onPlaybackBlocked).toHaveBeenCalledTimes(1)
   })
 
   it('moves the session to playing when the video starts playing', async () => {

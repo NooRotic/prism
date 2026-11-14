@@ -108,10 +108,11 @@ export default function VideoJSPlayer({
       clearTimeout(stallTimer)
     }
 
+    // Starts with sound, and starts it ourselves (see `startPlayback`): the `autoplay` attribute cannot fall back to muted.
     const player = videojs(videoEl, {
       controls: true,
-      autoplay: true,
-      muted: true,
+      autoplay: false,
+      muted: false,
       fill: true,
       preload: 'auto',
       sources: [{ src: playableUrl, type: sourceType }],
@@ -177,8 +178,29 @@ export default function VideoJSPlayer({
       return out
     }
 
-    const logPlayRejection = (err: Error) => {
-      if (err.name !== 'AbortError') log('warn', `play() rejected: ${err.name}`)
+    // Browsers let a page start sound by itself only once the visitor has used it (a click, or enough earlier listening). So
+    // a refused start with sound is tried again muted, which is always allowed: the video starts, and the speaker button
+    // in the controls turns the sound on. If even that is refused the page is told, as before.
+    const onPlayRejected = (err: Error) => {
+      // AbortError fires when play() is interrupted by another action (e.g. switching streams): intentional, ignore.
+      if (err.name === 'AbortError') return
+      if (err.name === 'NotAllowedError') {
+        if (!player.muted()) {
+          log('warn', 'the browser blocked autoplay with sound; playing muted (the speaker button turns the sound on)')
+          player.muted(true)
+          player.play()?.catch(onPlayRejected)
+          return
+        }
+        cb.current.onPlaybackBlocked?.()
+        return
+      }
+      logger.warn('[VideoJSPlayer] play() rejected:', err)
+    }
+
+    /** Plays, with sound first when `withSound` (a reload keeps whatever the sound state is now). */
+    const startPlayback = (withSound: boolean) => {
+      if (withSound) player.muted(false)
+      player.play()?.catch(onPlayRejected)
     }
 
     player.on('loadstart', () => log('info', 'loadstart'))
@@ -197,18 +219,7 @@ export default function VideoJSPlayer({
 
     player.on('ready', () => {
       cb.current.onReady?.()
-      player.play()?.catch((err: Error) => {
-        // AbortError fires when play() is interrupted by another action
-        // (e.g. switching streams) — that's intentional, ignore.
-        if (err.name === 'AbortError') return
-        // NotAllowedError = browser blocked autoplay; surface so the
-        // user knows they need to interact to start playback.
-        if (err.name === 'NotAllowedError') {
-          cb.current.onPlaybackBlocked?.()
-          return
-        }
-        logger.warn('[VideoJSPlayer] play() rejected:', err)
-      })
+      startPlayback(true)
     })
 
     player.on('play', () => cb.current.onPlay?.())
@@ -251,7 +262,7 @@ export default function VideoJSPlayer({
             // Video.js clears an error when given null; its type declarations leave null out.
             ;(player as unknown as { error(value: null): void }).error(null)
             player.src({ src: playableUrl, type: sourceType })
-            player.play()?.catch(logPlayRejection)
+            startPlayback(false)
             return
           } catch (reloadError) {
             log('error', `reload failed: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`)
