@@ -11,3 +11,7 @@ config.php
 *.log
 deploy.config.json
 .env
+
+# Playlist files made on the host by the commands in bin/: the visitor snapshot and import files, and the copied logos.
+/data/
+/public/logos/

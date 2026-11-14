@@ -77,6 +77,30 @@ final class ConfigTest extends TestCase
         $this->assertFalse($off->adminActive());
     }
 
+    public function testPlaylistDirsDefaultAndNeverThrow(): void
+    {
+        $defaults = Config::fromArray($this->base());
+        $this->assertStringEndsWith('/data', str_replace('\\', '/', $defaults->playlistDataDir()));
+        $this->assertStringEndsWith('/public/logos', str_replace('\\', '/', $defaults->playlistLogoDir()));
+
+        $set = $this->base();
+        $set['playlist'] = ['data_dir' => '/srv/prism/data', 'logo_dir' => '/srv/prism/logos'];
+        $configured = Config::fromArray($set);
+        $this->assertSame('/srv/prism/data', $configured->playlistDataDir());
+        $this->assertSame('/srv/prism/logos', $configured->playlistLogoDir());
+
+        foreach ([[], '', 7, null] as $bad) {
+            $a = $this->base();
+            $a['playlist'] = ['data_dir' => $bad, 'logo_dir' => $bad];
+            $c = Config::fromArray($a);
+            $this->assertSame($defaults->playlistDataDir(), $c->playlistDataDir(), json_encode($bad));
+            $this->assertSame($defaults->playlistLogoDir(), $c->playlistLogoDir(), json_encode($bad));
+        }
+        $notAnArray = $this->base();
+        $notAnArray['playlist'] = 'on';
+        $this->assertSame($defaults->playlistDataDir(), Config::fromArray($notAnArray)->playlistDataDir());
+    }
+
     public function testAnIntegerOwnerIdIsReadAsText(): void
     {
         $a = $this->base();
