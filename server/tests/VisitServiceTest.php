@@ -12,6 +12,7 @@ use Prism\History\Store\BioLinkStore;
 use Prism\History\Store\ChannelStore;
 use Prism\History\Store\JobState;
 use Prism\History\Store\SnapshotStore;
+use Prism\History\Store\UsageCounters;
 use Prism\History\Tests\Support\DbTestCase;
 use Prism\History\Tests\Support\FakeClock;
 use Prism\History\Tests\Support\FakeSleeper;
@@ -62,12 +63,38 @@ final class VisitServiceTest extends DbTestCase
             new ChannelPayload($this->channels, $this->snapshots, $this->links, $this->clock),
             $this->clock,
             $this->state,
+            new UsageCounters($this->pdo, $this->clock),
         );
     }
 
     private function rows(string $table): int
     {
         return (int) $this->pdo->query("SELECT COUNT(*) FROM {$table}")->fetchColumn();
+    }
+
+    public function testAFirstVisitCountsOneNewChannelAndARepeatCountsNone(): void
+    {
+        $this->world->addUser('1', 'alice');
+        $this->world->answerTt('alice', World::summary());
+        $counters = new UsageCounters($this->pdo, $this->clock);
+
+        $this->assertSame(VisitResult::OK, $this->service()->visit('alice')->outcome);
+        $this->assertSame(1, $counters->valueOn('2026-11-12', 'new_channels'));
+
+        $this->assertSame(VisitResult::OK, $this->service()->visit('alice')->outcome);
+        $this->assertSame(1, $counters->valueOn('2026-11-12', 'new_channels'));
+    }
+
+    public function testAVisitStillSucceedsWhenTheCounterTableIsMissing(): void
+    {
+        $this->world->addUser('1', 'alice');
+        $this->world->answerTt('alice', World::summary());
+        $this->pdo->exec('DROP TABLE usage_counters');
+
+        $result = $this->service()->visit('alice');
+
+        $this->assertSame(VisitResult::OK, $result->outcome);
+        $this->assertSame(1, $this->rows('channels'));
     }
 
     public function testInvalidLoginMakesNoRequests(): void

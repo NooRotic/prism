@@ -8,6 +8,7 @@ use Prism\History\ChannelPayload;
 use Prism\History\Config;
 use Prism\History\Logger;
 use Prism\History\Store\ChannelStore;
+use Prism\History\Usage\HitRecorder;
 use Prism\History\VisitResult;
 use Prism\History\VisitService;
 use Throwable;
@@ -31,6 +32,7 @@ final class Router
         private ChannelStore $channels,
         private ChannelPayload $payload,
         private Logger $logger,
+        private HitRecorder $hits,
     ) {
     }
 
@@ -67,6 +69,7 @@ final class Router
         return $this->withCors($request, match ($path) {
             '/api/visit' => $request->method === 'POST' ? $this->visit($request) : $this->notAllowed('POST, OPTIONS'),
             '/api/channel' => $request->method === 'GET' ? $this->channel($request) : $this->notAllowed('GET, OPTIONS'),
+            '/api/hit' => $request->method === 'POST' ? $this->hit($request) : $this->notAllowed('POST, OPTIONS'),
             default => ApiResponse::json(404, ['error' => 'not_found'], self::NO_STORE),
         });
     }
@@ -89,6 +92,24 @@ final class Router
             VisitResult::DISABLED => ApiResponse::json(503, ['error' => 'disabled'], self::NO_STORE),
             VisitResult::UNAVAILABLE => ApiResponse::json(503, ['error' => 'unavailable'], self::NO_STORE),
             default => ApiResponse::json(404, ['tracked' => false], self::NO_STORE), // blocked, not found, cap reached
+        };
+    }
+
+    /** One page open, counted under a section. The body is JSON sent as plain text (no preflight); nothing about the sender is kept. */
+    private function hit(Request $request): ApiResponse
+    {
+        if (strlen($request->body) > self::MAX_BODY_BYTES) {
+            return ApiResponse::json(413, ['error' => 'too_large'], self::NO_STORE);
+        }
+        $data = json_decode($request->body, true);
+        if (!is_array($data) || !isset($data['section']) || !is_string($data['section'])) {
+            return ApiResponse::json(400, ['error' => 'bad_request'], self::NO_STORE);
+        }
+
+        return match ($this->hits->record($data['section'])) {
+            HitRecorder::OK => new ApiResponse(204, self::NO_STORE, ''),
+            HitRecorder::BAD_SECTION => ApiResponse::json(400, ['error' => 'bad_section'], self::NO_STORE),
+            default => ApiResponse::json(429, ['error' => 'busy'], self::NO_STORE + ['Retry-After' => '60']),
         };
     }
 

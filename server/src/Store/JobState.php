@@ -55,6 +55,37 @@ final class JobState
         $this->pdo->prepare('DELETE FROM job_state WHERE k = ?')->execute([$key]);
     }
 
+    /**
+     * Every row whose key starts with the prefix, in key order. A plain prefix compare, not LIKE, so a `_` or `%`
+     * in the prefix means itself.
+     *
+     * @return array<string,string>
+     */
+    public function getByPrefix(string $prefix): array
+    {
+        $stmt = $this->pdo->prepare('SELECT k, v FROM job_state WHERE LEFT(k, :n) = :p ORDER BY k');
+        $stmt->bindValue('n', strlen($prefix), PDO::PARAM_INT);
+        $stmt->bindValue('p', $prefix);
+        $stmt->execute();
+
+        $rows = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $rows[(string) $row['k']] = (string) $row['v'];
+        }
+
+        return $rows;
+    }
+
+    /** Deletes the rows whose key starts with the prefix and sorts before `$cutoffKey`. */
+    public function pruneBefore(string $prefix, string $cutoffKey): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM job_state WHERE LEFT(k, :n) = :p AND k < :c');
+        $stmt->bindValue('n', strlen($prefix), PDO::PARAM_INT);
+        $stmt->bindValue('p', $prefix);
+        $stmt->bindValue('c', $cutoffKey);
+        $stmt->execute();
+    }
+
     private function now(): string
     {
         return Time::datetime($this->clock->nowMs());
