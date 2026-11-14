@@ -12,10 +12,11 @@ const SCREENS = [
   { to: '/admin/tt', label: 'TT calls', end: false },
   { to: '/admin/security', label: 'Security', end: false },
   { to: '/admin/channels', label: 'Channels', end: false },
+  { to: '/admin/playlist', label: 'Playlist', end: false },
 ]
 
-/** Later pieces: shown so the owner sees where the playlist and its health will live, but not links yet. */
-const COMING_LATER = ['Playlist', 'Health']
+/** A later piece: shown so the owner sees where the playlist's health will live, but not a link yet. */
+const COMING_LATER = ['Health']
 
 /** The admin layout: a menu down the left (a row above the screen on a narrow window) and the screen beside it. */
 export default function AdminShell({ onSignOut, children }: AdminShellProps) {
