@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace Prism\History;
 
 use PDO;
+use Prism\History\Admin\AdminController;
+use Prism\History\Admin\AdminGuard;
+use Prism\History\Admin\AdminReports;
+use Prism\History\Admin\TokenCache;
 use Prism\History\Api\Router;
 use Prism\History\Http\CurlHttp;
 use Prism\History\Http\HttpClient;
+use Prism\History\Store\AttemptStore;
+use Prism\History\Store\AuditStore;
 use Prism\History\Store\BioLinkStore;
 use Prism\History\Store\ChannelStore;
 use Prism\History\Store\JobState;
@@ -17,6 +23,7 @@ use Prism\History\Tracker\Sleeper;
 use Prism\History\Tracker\SystemSleeper;
 use Prism\History\Tracker\TrackerClient;
 use Prism\History\Tracker\TtGate;
+use Prism\History\Twitch\TokenValidator;
 use Prism\History\Twitch\TwitchClient;
 use Prism\History\Usage\HitRecorder;
 
@@ -44,9 +51,30 @@ final class Container
             $s['state'],
             $s['counters'],
         );
-        $hits = new HitRecorder($s['counters'], new RateCap($s['state'], $s['clock']));
+        $cap = new RateCap($s['state'], $s['clock']);
+        $hits = new HitRecorder($s['counters'], $cap);
+        $attempts = new AttemptStore($pdo, $s['clock']);
+        $guard = new AdminGuard(
+            $config,
+            new TokenValidator($s['http']),
+            new TokenCache($pdo, $s['clock']),
+            $attempts,
+            $s['counters'],
+            $cap,
+            $s['clock'],
+        );
+        $reports = new AdminReports(
+            $config,
+            $s['counters'],
+            $attempts,
+            new AuditStore($pdo, $s['clock']),
+            $s['state'],
+            $s['gate'],
+            $s['channels'],
+            $s['clock'],
+        );
 
-        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits);
+        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports));
     }
 
     /** The schema migrator over the migrations/ folder that ships next to src/. */
@@ -75,10 +103,11 @@ final class Container
             $s['logger'],
             $s['clock'],
             new RunLock($pdo),
+            $s['state'],
         );
     }
 
-    /** @return array{clock:Clock,state:JobState,channels:ChannelStore,snapshots:SnapshotStore,links:BioLinkStore,counters:UsageCounters,twitch:TwitchClient,tracker:TrackerClient,gate:TtGate,payload:ChannelPayload,logger:Logger} */
+    /** @return array{http:HttpClient,clock:Clock,state:JobState,channels:ChannelStore,snapshots:SnapshotStore,links:BioLinkStore,counters:UsageCounters,twitch:TwitchClient,tracker:TrackerClient,gate:TtGate,payload:ChannelPayload,logger:Logger} */
     private static function services(Config $config, PDO $pdo, ?HttpClient $http, ?Clock $clock, ?Sleeper $sleeper): array
     {
         $clock ??= new SystemClock();
@@ -89,6 +118,7 @@ final class Container
         $links = new BioLinkStore($pdo, $clock);
 
         return [
+            'http' => $http,
             'clock' => $clock,
             'state' => $state,
             'channels' => $channels,

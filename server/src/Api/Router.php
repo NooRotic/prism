@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Prism\History\Api;
 
+use Prism\History\Admin\AdminController;
 use Prism\History\ChannelPayload;
 use Prism\History\Config;
 use Prism\History\Logger;
@@ -33,6 +34,7 @@ final class Router
         private ChannelPayload $payload,
         private Logger $logger,
         private HitRecorder $hits,
+        private AdminController $admin,
     ) {
     }
 
@@ -65,6 +67,10 @@ final class Router
         }
 
         $path = rtrim($request->path, '/');
+
+        if (str_starts_with($path . '/', '/api/admin/')) {
+            return $this->withCors($request, $this->admin->handle($request)); // authorised there, owner only
+        }
 
         return $this->withCors($request, match ($path) {
             '/api/visit' => $request->method === 'POST' ? $this->visit($request) : $this->notAllowed('POST, OPTIONS'),
