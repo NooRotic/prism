@@ -76,7 +76,9 @@ between `new`, `working`, `suspect` and `dead`.
   resolves the name itself, refuses loopback, private, link-local, shared, unique-local and IPv4-mapped addresses (one bad
   answer blocks the name), connects to the address it vetted, re-vets every redirect (at most three), sends at most one
   request a second to a host, and never hands what it fetched to a caller of the HTTP API.
-- **Config.** Optional `'playlist' => ['data_dir' => …, 'logo_dir' => …]` (see `config.example.php`); the defaults fit the host.
+- **Config.** Optional `'playlist' => ['data_dir' => …, 'logo_dir' => …, 'user_agent' => …]` (see `config.example.php`); the defaults
+  fit the host. The logo copier introduces itself as `PRISM/1.0 (+https://prism.nooroticx.tv)`: the contact address in
+  `tt.user_agent` is for TwitchTracker only and is never sent to a logo host unless you put one in `playlist.user_agent` yourself.
 - **Re-import.** Upload the new list, run the import with `--dry-run`, compare, run it for real, then `fetch-logos.php`. The
   list is iptv-org data (the Unlicense: public domain); the HLS page credits it.
 - **Deploy order.** `deploy.mjs --go`, then `install.php` (expect `applied 003_streams`), then the import, then the logos.

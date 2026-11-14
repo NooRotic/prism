@@ -48,6 +48,9 @@ return [
     // 'playlist' => [
     //     'data_dir' => '/prism-data/data',
     //     'logo_dir' => '/prism-data/public/logos',
+    //     // What the logo copier tells the hosts it fetches pictures from. The default is 'PRISM/1.0 (+https://prism.nooroticx.tv)';
+    //     // it never uses the contact address in tt.user_agent (that one is for TwitchTracker only).
+    //     'user_agent' => 'PRISM/1.0 (+https://prism.nooroticx.tv)',
     // ],
     // Kill switches: set to false to switch behaviour off without a redeploy.
     'flags' => [
