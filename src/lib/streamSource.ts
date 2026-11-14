@@ -6,6 +6,7 @@ import {
   type StreamKind,
   type URLDetectionResult,
 } from './urlDetection'
+import type { StreamSnapshot } from './streamsApi'
 
 export interface StreamSource {
   url: string
@@ -38,6 +39,25 @@ export function toStreamAddress(text: string, allowBare: boolean): string | null
   if (!allowBare || !/^[^/?#]+\.[^/?#]+/.test(trimmed)) return null
   const prefixed = `https://${trimmed}`
   return isHttpAddress(prefixed) ? prefixed : null
+}
+
+/**
+ * What a public id from the history server's stream list asks the page to play, or null when the id is not in the
+ * list (or there is no list), or when the entry's address is not something this page can play. The kind comes from
+ * the entry, not from the address, so nothing here is a guess.
+ */
+export function resolveSnapshotStream(
+  streamId: string | undefined,
+  snapshot: StreamSnapshot | null,
+): StreamSource | null {
+  if (!streamId || snapshot === null) return null
+  const entry = snapshot.streams.find((stream) => stream.id === streamId)
+  if (!entry || !isHttpAddress(entry.url)) return null
+
+  const detected = detectURLType(entry.url)
+  if (detected.type === 'twitch' || detected.type === 'youtube') return null
+
+  return { url: entry.url, detection: detectURLTypeAs(entry.url, entry.kind), kind: entry.kind, guessedKind: false }
 }
 
 /**

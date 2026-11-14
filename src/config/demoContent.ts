@@ -1,3 +1,5 @@
+import type { StreamEntry } from '../lib/streamsApi'
+
 export type DemoProtocol = 'twitch' | 'youtube' | 'hls' | 'dash'
 
 export interface DemoEntry {
@@ -28,6 +30,25 @@ export const DEMO_CONTENT: DemoEntry[] = [
   { id: 'dash-bbb', label: 'Big Buck Bunny DASH', protocol: 'dash', url: 'https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd', featured: true, description: 'Akamai 30fps reference' },
   { id: 'dash-envivio', label: 'Envivio DASH', protocol: 'dash', url: 'https://dash.akamaized.net/envivio/EnvisioTVDVBTest/manifest.mpd', description: 'DVB test manifest' },
 ]
+
+/**
+ * A demo stream as an entry of the visitor stream list: what the HLS page shows when the history server cannot be
+ * reached. Pinned and working (the demos are known-good test streams), in a one-name "Demo" group (index 0), with no
+ * picture or country. Its id is the demo id, which `resolveStreamSource` already understands.
+ */
+export function demoToEntry(demo: DemoEntry): StreamEntry {
+  return {
+    id: demo.id,
+    name: demo.label,
+    groups: [0],
+    country: null,
+    logo: null,
+    kind: demo.protocol === 'dash' ? 'dash' : 'hls',
+    pinned: true,
+    state: 'working',
+    url: demo.url,
+  }
+}
 
 export function getDemoByProtocol(protocol: DemoProtocol): DemoEntry[] {
   return DEMO_CONTENT.filter((e) => e.protocol === protocol)
