@@ -14,6 +14,7 @@ final class Request
         public array $query,
         public ?string $origin,
         public string $body,
+        public ?string $authorization = null,
     ) {
     }
 
@@ -26,6 +27,36 @@ final class Request
             $_GET,
             isset($_SERVER['HTTP_ORIGIN']) ? (string) $_SERVER['HTTP_ORIGIN'] : null,
             (string) file_get_contents('php://input', false, null, 0, 1025),
+            self::authorizationFromGlobals(),
         );
+    }
+
+    /**
+     * The token after `Bearer `, or null. Null too for another scheme, an empty or whitespace-carrying token, and
+     * anything over 200 characters (a real Twitch token is 30), so a hostile header never reaches Twitch.
+     */
+    public function bearerToken(): ?string
+    {
+        if ($this->authorization === null || preg_match('/^Bearer ([^\s]{1,200})$/i', $this->authorization, $m) !== 1) {
+            return null;
+        }
+
+        return $m[1];
+    }
+
+    /**
+     * The Authorization header as the host hands it over. The IONOS PHP is a CGI build, where Apache may pass it
+     * as HTTP_AUTHORIZATION, as REDIRECT_HTTP_AUTHORIZATION (after the rewrite to the front controller) or, when
+     * nothing else gets through, as the custom X-Prism-Authorization header.
+     */
+    private static function authorizationFromGlobals(): ?string
+    {
+        foreach (['HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION', 'HTTP_X_PRISM_AUTHORIZATION'] as $key) {
+            if (isset($_SERVER[$key]) && is_string($_SERVER[$key])) {
+                return $_SERVER[$key];
+            }
+        }
+
+        return null;
     }
 }
