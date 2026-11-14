@@ -52,7 +52,7 @@ const SCOPES = [
  *
  * Must exactly match what's registered in Twitch Developer Console.
  */
-function getRedirectUri(): string {
+export function getRedirectUri(): string {
   if (REDIRECT_URI_OVERRIDE) return REDIRECT_URI_OVERRIDE
   const base = import.meta.env.BASE_URL || '/'
   return window.location.origin + base

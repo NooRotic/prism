@@ -47,4 +47,10 @@ export const STORAGE_KEYS = {
   LOCAL_TWITCHTRACKER_CACHE_PREFIX: 'prism_tt_cache_',
   /** Id of this browser tab, so a chat pop-out knows which tab owns it. Survives a reload. */
   SESSION_TAB_ID: 'prism_tab_id',
+  /** The owner's admin token (identity only, no permissions). Never the viewer token, and gone when the tab closes. */
+  SESSION_ADMIN_TOKEN: 'prism_admin_token',
+  /** OAuth state nonce for the admin sign-in round trip (always starts with `admin.`). */
+  SESSION_ADMIN_OAUTH_STATE: 'prism_admin_oauth_state',
+  /** The /admin page to return to once Twitch sends the owner back to the site root. */
+  SESSION_ADMIN_RETURN: 'prism_admin_return',
 } as const
