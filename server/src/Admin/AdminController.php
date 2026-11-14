@@ -6,6 +6,7 @@ namespace Prism\History\Admin;
 
 use Prism\History\Api\ApiResponse;
 use Prism\History\Api\Request;
+use Prism\History\Store\StreamStore;
 
 /**
  * Everything under /api/admin/. Each request is authorised first (the owner only), then routed. Answers are never
@@ -17,8 +18,17 @@ final class AdminController
 
     private const MAX_BODY_BYTES = 1024;
 
-    public function __construct(private AdminGuard $guard, private AdminReports $reports, private ChannelAdmin $channelAdmin)
-    {
+    /** The stream forms carry an address of up to 2,000 characters, a name and groups. */
+    private const STREAM_BODY_MAX_BYTES = 4096;
+
+    private const PUBLIC_ID = '/^[0-9a-f]{12}$/D';
+
+    public function __construct(
+        private AdminGuard $guard,
+        private AdminReports $reports,
+        private ChannelAdmin $channelAdmin,
+        private PlaylistAdmin $playlist,
+    ) {
     }
 
     public function handle(Request $request): ApiResponse
@@ -47,8 +57,119 @@ final class AdminController
             '/api/admin/channels' => $this->channels($request),
             '/api/admin/channels/remove' => $this->channelAction($request, fn (string $id): bool => $this->channelAdmin->removeAndBlock($id)),
             '/api/admin/channels/unblock' => $this->channelAction($request, fn (string $id): bool => $this->channelAdmin->unblock($id)),
+            '/api/admin/streams' => $this->streams($request),
+            '/api/admin/streams/add' => $this->streamAction($request, function (array $d): ?array {
+                $url = $d['url'] ?? null;
+                $name = $d['name'] ?? null;
+                $group = $d['group'] ?? null;
+
+                return is_string($url) && strlen($url) <= 2000 && is_string($name) && is_string($group)
+                    ? $this->playlist->add($url, $name, $group)
+                    : null;
+            }),
+            '/api/admin/streams/update' => $this->streamAction($request, function (array $d): ?array {
+                $id = self::publicId($d);
+                $name = $d['name'] ?? null;
+                $groups = $d['groups'] ?? null;
+                if ($id === null || !is_string($name) || !is_array($groups) || !array_is_list($groups) || count($groups) > 20) {
+                    return null;
+                }
+                foreach ($groups as $group) {
+                    if (!is_string($group)) {
+                        return null;
+                    }
+                }
+
+                return $this->playlist->update($id, $name, $groups);
+            }),
+            '/api/admin/streams/pin' => $this->streamAction($request, function (array $d): ?array {
+                $id = self::publicId($d);
+
+                return $id !== null && is_bool($d['pinned'] ?? null) ? $this->playlist->setPinned($id, $d['pinned']) : null;
+            }),
+            '/api/admin/streams/default' => $this->streamAction($request, function (array $d): ?array {
+                $id = self::publicId($d);
+
+                return $id === null ? null : $this->playlist->setDefault($id);
+            }),
+            '/api/admin/streams/remove' => $this->streamAction($request, function (array $d): ?array {
+                $id = self::publicId($d);
+
+                return $id === null ? null : $this->playlist->remove($id);
+            }),
             default => $this->error(404, 'not_found'),
         };
+    }
+
+    /** GET /api/admin/streams?text=&state=&group=&country=&limit=&offset= : every stream, every state, paged. */
+    private function streams(Request $request): ApiResponse
+    {
+        if ($request->method !== 'GET') {
+            return $this->notAllowed('GET, OPTIONS');
+        }
+        $filters = [];
+        foreach (['text' => 100, 'group' => 40] as $key => $max) {
+            $value = $request->query[$key] ?? '';
+            if (!is_string($value) || mb_strlen($value) > $max || preg_match('/[\x00-\x1f\x7f]/', $value) === 1) {
+                return $this->error(400, 'bad_query');
+            }
+            $filters[$key] = $value;
+        }
+        $state = $request->query['state'] ?? '';
+        $country = $request->query['country'] ?? '';
+        if (!is_string($state) || ($state !== '' && !in_array($state, StreamStore::STATES, true))
+            || !is_string($country) || preg_match('/^(?:[a-z]{2})?$/D', $country) !== 1) {
+            return $this->error(400, 'bad_query');
+        }
+        $filters += ['state' => $state, 'country' => $country];
+
+        $limit = $request->query['limit'] ?? '50';
+        $offset = $request->query['offset'] ?? '0';
+        if (!is_string($limit) || preg_match('/^\d{1,3}$/D', $limit) !== 1 || (int) $limit < 1 || (int) $limit > 200
+            || !is_string($offset) || preg_match('/^\d{1,7}$/D', $offset) !== 1) {
+            return $this->error(400, 'bad_query');
+        }
+
+        return ApiResponse::json(200, $this->playlist->list($filters, (int) $limit, (int) $offset), self::NO_STORE);
+    }
+
+    /**
+     * One POST with a JSON body. `$act` gets the decoded body and answers a PlaylistAdmin result, or null for a body that
+     * is not what the action needs (400).
+     *
+     * @param callable(array<string,mixed>):?array<string,mixed> $act
+     */
+    private function streamAction(Request $request, callable $act): ApiResponse
+    {
+        if ($request->method !== 'POST') {
+            return $this->notAllowed('POST, OPTIONS');
+        }
+        if (strlen($request->body) > self::STREAM_BODY_MAX_BYTES) {
+            return $this->error(413, 'too_large');
+        }
+        $data = json_decode($request->body, true);
+        $result = is_array($data) && !array_is_list($data) ? $act($data) : null;
+        if ($result === null) {
+            return $this->error(400, 'bad_request');
+        }
+        if ($result['ok'] === true) {
+            return ApiResponse::json(200, $result, self::NO_STORE);
+        }
+
+        return match ($result['error']) {
+            'not_found' => $this->error(404, 'not_found'),
+            'rejected' => ApiResponse::json(422, ['error' => 'rejected', 'reason' => $result['reason']], self::NO_STORE),
+            'already_known' => ApiResponse::json(409, ['error' => 'already_known', 'public_id' => $result['public_id']], self::NO_STORE),
+            default => $this->error(409, (string) $result['error']), // not_listed
+        };
+    }
+
+    /** @param array<string,mixed> $data */
+    private static function publicId(array $data): ?string
+    {
+        $id = $data['public_id'] ?? null;
+
+        return is_string($id) && preg_match(self::PUBLIC_ID, $id) === 1 ? $id : null;
     }
 
     private function channels(Request $request): ApiResponse

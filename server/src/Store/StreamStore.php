@@ -21,6 +21,9 @@ final class StreamStore
     /** The states a visitor may see. */
     public const LISTED = ['new', 'working', 'suspect'];
 
+    /** Every state a stream can be in (the column's ENUM). */
+    public const STATES = ['new', 'working', 'suspect', 'dead', 'removed', 'unplayable', 'held'];
+
     private const COLUMNS = [
         'id', 'public_id', 'url', 'name', 'groups_json', 'country', 'kind', 'state', 'state_reason', 'pinned', 'is_default',
         'source', 'logo_url', 'logo_file', 'logo_tries', 'added_at', 'last_checked_at', 'facts_json',
@@ -105,6 +108,71 @@ final class StreamStore
         $stmt->execute(self::LISTED);
 
         return array_map(self::typed(...), $stmt->fetchAll());
+    }
+
+    /**
+     * Every stream, in every state (the owner's view), filtered and paged. Filters: `text` (every word must be in the name;
+     * % and _ mean themselves), `state`, `group` (an exact group name) and `country`. Same order as the visitor list.
+     *
+     * @param array{text?:string,state?:string,group?:string,country?:string} $filters
+     * @return array{rows:list<array<string,mixed>>,total:int}
+     */
+    public function search(array $filters, int $limit, int $offset): array
+    {
+        $where = [];
+        $args = [];
+        foreach (preg_split('/\s+/', trim((string) ($filters['text'] ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+            $where[] = "name LIKE ? ESCAPE '|'";
+            $args[] = '%' . str_replace(['|', '%', '_'], ['||', '|%', '|_'], $word) . '%';
+        }
+        $state = (string) ($filters['state'] ?? '');
+        if ($state !== '') {
+            $where[] = in_array($state, self::STATES, true) ? 'state = ?' : '1 = 0';
+            if (in_array($state, self::STATES, true)) {
+                $args[] = $state;
+            }
+        }
+        $group = (string) ($filters['group'] ?? '');
+        if ($group !== '') {
+            $where[] = 'JSON_CONTAINS(groups_json, JSON_QUOTE(?))';
+            $args[] = $group;
+        }
+        $country = (string) ($filters['country'] ?? '');
+        if ($country !== '') {
+            $where[] = 'country = ?';
+            $args[] = $country;
+        }
+        $clause = $where === [] ? '' : ' WHERE ' . implode(' AND ', $where);
+
+        $count = $this->pdo->prepare('SELECT COUNT(*) FROM streams' . $clause);
+        $count->execute($args);
+        $limit = max(1, $limit);
+        $offset = max(0, $offset);
+        $page = $this->pdo->prepare(
+            'SELECT ' . self::READ . ' FROM streams' . $clause . " ORDER BY pinned DESC, name ASC, public_id ASC LIMIT {$limit} OFFSET {$offset}",
+        );
+        $page->execute($args);
+
+        return ['rows' => array_map(self::typed(...), $page->fetchAll()), 'total' => (int) $count->fetchColumn()];
+    }
+
+    /** Renames a stream and replaces its group list (JSON text that already fits the column). */
+    public function rename(string $id, string $name, string $groupsJson): void
+    {
+        $this->pdo->prepare('UPDATE streams SET name = ?, groups_json = ? WHERE id = ?')->execute([$name, $groupsJson, $id]);
+    }
+
+    public function setPinned(string $id, bool $pinned): void
+    {
+        $this->pdo->prepare('UPDATE streams SET pinned = ? WHERE id = ?')->execute([$pinned ? 1 : 0, $id]);
+    }
+
+    /** Turns a stream into a tombstone: state removed, no longer default or pinned, no logo copy. The row stays so a re-import cannot bring it back. */
+    public function tombstone(string $id): void
+    {
+        $this->pdo
+            ->prepare("UPDATE streams SET state = 'removed', state_reason = NULL, pinned = 0, is_default = 0, logo_file = NULL WHERE id = ?")
+            ->execute([$id]);
     }
 
     /** @return array<string,int> */

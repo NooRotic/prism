@@ -60,6 +60,12 @@ final class ImportRules
         );
     }
 
+    /** True when a group name is an adult-content term (whole words only): such a group is never accepted, however it arrives. */
+    public static function isAdultGroup(string $name): bool
+    {
+        return preg_match(self::ADULT, $name) === 1;
+    }
+
     private static function reject(string $reason): ImportDecision
     {
         return new ImportDecision('reject', null, $reason, null, 'hls', null, []);
@@ -119,10 +125,10 @@ final class ImportRules
     }
 
     /**
-     * @param list<string> $parts
+     * @param list<string> $parts the trimmed, non-empty parts of a group text
      * @return list<string> at most five names of at most forty characters; "Undefined" shows to visitors as "Other"
      */
-    private static function groupNames(array $parts): array
+    public static function groupNames(array $parts): array
     {
         $names = [];
         foreach ($parts as $part) {

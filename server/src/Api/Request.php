@@ -20,7 +20,13 @@ final class Request
     ) {
     }
 
-    /** Builds a request from PHP's globals. The body is read only up to one byte past the limit the router allows. */
+    /**
+     * The most body bytes ever read: one past the largest body any route accepts (the admin stream forms, 4 KiB), so a
+     * route can tell "too large" from "complete". Routes with a smaller limit check the length themselves.
+     */
+    public const BODY_READ_LIMIT = 4097;
+
+    /** Builds a request from PHP's globals. The body is read only up to one byte past the largest limit a route allows. */
     public static function fromGlobals(): self
     {
         return new self(
@@ -28,7 +34,7 @@ final class Request
             (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/'),
             $_GET,
             isset($_SERVER['HTTP_ORIGIN']) ? (string) $_SERVER['HTTP_ORIGIN'] : null,
-            (string) file_get_contents('php://input', false, null, 0, 1025),
+            (string) file_get_contents('php://input', false, null, 0, self::BODY_READ_LIMIT),
             self::authorizationFromGlobals(),
             isset($_SERVER['HTTP_IF_NONE_MATCH']) && is_string($_SERVER['HTTP_IF_NONE_MATCH']) ? $_SERVER['HTTP_IF_NONE_MATCH'] : null,
             isset($_SERVER['HTTP_ACCEPT_ENCODING']) && is_string($_SERVER['HTTP_ACCEPT_ENCODING']) ? $_SERVER['HTTP_ACCEPT_ENCODING'] : null,

@@ -168,7 +168,7 @@ final class Importer
     }
 
     /** @param list<string> $groups the JSON always fits the column: names are dropped from the end until it does */
-    private static function groupsJson(array $groups): string
+    public static function groupsJson(array $groups): string
     {
         while ($groups !== []) {
             $json = json_encode($groups, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
