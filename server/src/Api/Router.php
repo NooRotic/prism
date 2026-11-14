@@ -68,6 +68,19 @@ final class Router
 
         $path = rtrim($request->path, '/');
 
+        // TEMPORARY (reverted right after the live check): does the Authorization header reach PHP on this host?
+        if ($path === '/api/admin/_probe') {
+            $source = null;
+            foreach (['HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION', 'HTTP_X_PRISM_AUTHORIZATION'] as $key) {
+                if (isset($_SERVER[$key])) {
+                    $source = $key; // the name only, never the value
+                    break;
+                }
+            }
+
+            return $this->withCors($request, ApiResponse::json(200, ['seen' => $source !== null, 'source' => $source], self::NO_STORE));
+        }
+
         if (str_starts_with($path . '/', '/api/admin/')) {
             return $this->withCors($request, $this->admin->handle($request)); // authorised there, owner only
         }
