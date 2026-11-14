@@ -83,3 +83,26 @@ export function getAdminToken(): string | null {
 export function clearAdminToken(): void {
   sessionStorage.removeItem(STORAGE_KEYS.SESSION_ADMIN_TOKEN)
 }
+
+/**
+ * Sign out. Forgetting the token in this tab is not enough: Twitch honours an unrevoked token until it expires
+ * (weeks), so a copy of it made by an extension or an injected script would keep working. This asks Twitch to
+ * revoke it first. The request is a plain form POST that nothing reads (`no-cors`), it never blocks or fails the
+ * sign-out, and the token is forgotten whatever Twitch answers.
+ */
+export function endAdminSession(): void {
+  const token = getAdminToken()
+  if (token && CLIENT_ID) {
+    try {
+      void fetch('https://id.twitch.tv/oauth2/revoke', {
+        method: 'POST',
+        mode: 'no-cors',
+        credentials: 'omit',
+        body: new URLSearchParams({ client_id: CLIENT_ID, token }),
+      }).catch(() => {})
+    } catch {
+      // no fetch, or it threw before returning a promise: the token is still forgotten below
+    }
+  }
+  clearAdminToken()
+}

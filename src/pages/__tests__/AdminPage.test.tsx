@@ -13,6 +13,9 @@ vi.mock('../../lib/adminAuth', () => ({
   clearAdminToken: vi.fn(() => {
     auth.token = null
   }),
+  endAdminSession: vi.fn(() => {
+    auth.token = null
+  }),
   startAdminSignIn: vi.fn(),
 }))
 vi.mock('../../lib/adminApi', () => ({ getSession: api.getSession }))
@@ -34,7 +37,7 @@ vi.mock('../../components/admin/TtCallsScreen', () => ({ default: () => <p>tt sc
 vi.mock('../../components/admin/SecurityScreen', () => ({ default: () => <p>security screen</p> }))
 vi.mock('../../components/admin/ChannelsScreen', () => ({ default: () => <p>channels screen</p> }))
 
-import { clearAdminToken, startAdminSignIn } from '../../lib/adminAuth'
+import { clearAdminToken, endAdminSession, startAdminSignIn } from '../../lib/adminAuth'
 
 const SESSION = { kind: 'ok', data: { limits: { ttDayBudget: 1500, ttRunBudget: 300, newPerDay: 200, tailDays: 30 } } }
 
@@ -53,6 +56,7 @@ describe('AdminPage', () => {
     auth.token = 'tok'
     api.getSession.mockReset()
     vi.mocked(clearAdminToken).mockClear()
+    vi.mocked(endAdminSession).mockClear()
     vi.mocked(startAdminSignIn).mockClear()
   })
 
@@ -162,16 +166,33 @@ describe('AdminPage', () => {
   })
 
   describe('leaving', () => {
-    it('signs out: the token is cleared and the sign-in card comes back', async () => {
+    it('signs out: the token is revoked at Twitch and forgotten, and the sign-in card comes back', async () => {
       api.getSession.mockResolvedValue(SESSION)
       renderAt('/admin')
       await screen.findByText('overview screen (budget 1500)')
 
       await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
-      expect(clearAdminToken).toHaveBeenCalled()
+      expect(endAdminSession).toHaveBeenCalledTimes(1)
       expect(screen.getByRole('button', { name: 'Sign in as admin' })).toBeInTheDocument()
       expect(screen.queryByText(/Your admin session ended/)).not.toBeInTheDocument()
+    })
+
+    it('also revokes the token of a refused sign-in when that person signs out', async () => {
+      api.getSession.mockResolvedValue({ kind: 'refused', recorded: true })
+      renderAt('/admin')
+      await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }))
+
+      expect(endAdminSession).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: 'Sign in as admin' })).toBeInTheDocument()
+    })
+
+    it('does not revoke when the server says the session already ended', async () => {
+      api.getSession.mockResolvedValue({ kind: 'signed_out' })
+      renderAt('/admin')
+      await screen.findByText(/Your admin session ended/)
+
+      expect(endAdminSession).not.toHaveBeenCalled()
     })
 
     it('lets a screen end the session when one of its own requests is answered "signed out"', async () => {
