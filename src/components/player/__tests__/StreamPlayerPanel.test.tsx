@@ -1,22 +1,31 @@
+import { useEffect } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach } from 'vitest'
 import StreamPlayerPanel from '../StreamPlayerPanel'
+import { endPlayback, getPlaybackSnapshot, logPlayback } from '../../../lib/playbackLog'
 import { resolveStreamSource } from '../../../lib/streamSource'
 
 // When `failWith` is set, the stand-in player gives up at once, so the panel shows its error view.
-const mocks = vi.hoisted(() => ({ failWith: null as string | null }))
+// When `logOnRender` is set it also writes one line to the playback log from an effect, as a real engine would.
+const mocks = vi.hoisted(() => ({ failWith: null as string | null, logOnRender: false }))
 vi.mock('../PlayerHost', () => ({
-  default: ({ renderError }: { renderError?: (error: string | null) => React.ReactNode }) => (
-    <div data-testid="player-host">{mocks.failWith !== null && renderError ? renderError(mocks.failWith) : null}</div>
-  ),
+  default: function MockPlayerHost({ renderError }: { renderError?: (error: string | null) => React.ReactNode }) {
+    useEffect(() => {
+      if (mocks.logOnRender) logPlayback('info', 'test', 'player rendered')
+    }, [])
+    return <div data-testid="player-host">{mocks.failWith !== null && renderError ? renderError(mocks.failWith) : null}</div>
+  },
 }))
 vi.mock('../StreamStatus', () => ({
-  StreamErrorCard: ({ onTryAs }: { onTryAs: (kind: 'hls' | 'dash' | 'mp4') => void }) => (
+  StreamErrorCard: ({ onTryAs, onRetry }: { onTryAs: (kind: 'hls' | 'dash' | 'mp4') => void; onRetry: () => void }) => (
     <div data-testid="error-card">
       <button type="button" onClick={() => onTryAs('dash')}>
         try as dash
+      </button>
+      <button type="button" onClick={onRetry}>
+        retry
       </button>
     </div>
   ),
@@ -42,6 +51,7 @@ function renderPanel(props: Partial<React.ComponentProps<typeof StreamPlayerPane
 
 afterEach(() => {
   mocks.failWith = null
+  endPlayback()
 })
 
 describe('StreamPlayerPanel', () => {
@@ -66,6 +76,48 @@ describe('StreamPlayerPanel', () => {
     const { container } = renderPanel({ className: 'my-column' })
 
     expect(container.firstElementChild?.className).toBe('my-column')
+  })
+})
+
+describe('StreamPlayerPanel: the playback log', () => {
+  it('begins a session for its address and kind, and ends it when it goes away', () => {
+    const view = renderPanel()
+
+    expect(getPlaybackSnapshot()).toMatchObject({ status: 'starting', url: 'https://x.test/live/a.m3u8', kind: 'hls', attempts: 1 })
+
+    view.unmount()
+
+    expect(getPlaybackSnapshot().status).toBe('idle')
+  })
+
+  it('is ready before the player below it writes its first line', () => {
+    mocks.logOnRender = true
+
+    renderPanel()
+
+    expect(getPlaybackSnapshot().entries.map((entry) => entry.message)).toContain('player rendered')
+    mocks.logOnRender = false
+  })
+
+  it('says "failed" in the log and the status when the error view appears', () => {
+    mocks.failWith = 'boom'
+
+    renderPanel()
+
+    const snapshot = getPlaybackSnapshot()
+    expect(snapshot.status).toBe('failed')
+    expect(snapshot.entries.at(-1)).toMatchObject({ level: 'error', source: 'panel' })
+  })
+
+  it('writes down a Retry and counts it as a new attempt', async () => {
+    mocks.failWith = 'boom'
+    renderPanel()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'retry' }))
+
+    const snapshot = getPlaybackSnapshot()
+    expect(snapshot.attempts).toBe(2)
+    expect(snapshot.entries.map((entry) => entry.message)).toEqual(expect.arrayContaining(['Retry pressed', 'Attempt 2: retrying']))
   })
 })
 

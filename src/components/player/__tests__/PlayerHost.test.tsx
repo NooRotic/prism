@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PlayerHost from '../PlayerHost'
 import { AppProvider, useApp } from '../../../contexts/AppContext'
 import type { URLDetectionResult } from '../../../lib/urlDetection'
+import { beginPlayback, endPlayback, getPlaybackSnapshot } from '../../../lib/playbackLog'
 import type { PlayerProps } from '../../../types/player'
 
 // Capture props passed to each mocked player so tests can drive the callbacks.
@@ -278,5 +279,32 @@ describe('PlayerHost on an HLS stream', () => {
     const props = vjsProps[vjsProps.length - 1]
     expect(props.onStall).toBe(onStall)
     expect(props.onPlaying).toBe(onPlaying)
+  })
+
+  describe('and the playback log', () => {
+    afterEach(() => endPlayback())
+
+    it('writes down which engine gave up, why, and that none is left', async () => {
+      beginPlayback({ url: hlsDetection.originalUrl, kind: 'hls' })
+      renderHls({ renderError: () => <div data-testid="custom-error" /> })
+      await screen.findByTestId('mock-videojs')
+
+      act(() => { vjsProps[vjsProps.length - 1].onError!('Video.js error 3: decode') })
+
+      await screen.findByTestId('custom-error')
+      const lines = getPlaybackSnapshot().entries.filter((entry) => entry.source === 'host')
+      expect(lines.map((entry) => entry.message)).toEqual(['videojs gave up: Video.js error 3: decode', 'no engine left; showing the error'])
+      expect(lines[0].level).toBe('warn')
+    })
+
+    it('writes nothing when no session is running', async () => {
+      renderHls({ renderError: () => <div data-testid="custom-error" /> })
+      await screen.findByTestId('mock-videojs')
+
+      act(() => { vjsProps[vjsProps.length - 1].onError!('boom') })
+
+      await screen.findByTestId('custom-error')
+      expect(getPlaybackSnapshot().entries).toEqual([])
+    })
   })
 })
