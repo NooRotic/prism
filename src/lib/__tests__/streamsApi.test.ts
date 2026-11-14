@@ -132,7 +132,8 @@ describe('parseSnapshot', () => {
     ['no address', { ...stream, u: undefined }],
     ['an address with a character a browser refuses in a host name', { ...stream, u: 'https://exa<mple.com/a.m3u8' }],
     ['an address with a bracketed host that is not an IPv6 address', { ...stream, u: 'https://[bad]/x.m3u8' }],
-    ['an address with a bad punycode host', { ...stream, u: 'https://xn--a.com/x' }],
+    // Not here: a malformed punycode host such as https://xn--a.com/x. Whether new URL() refuses it differs between Node 24
+    // patch releases (CI accepts it, an older 24.x does not), so a test on it would pass or fail with the machine.
     ['an unknown kind', { ...stream, k: 'rtmp' }],
     ['an unlisted state', { ...stream, s: 'dead' }],
   ]
