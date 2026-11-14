@@ -251,7 +251,8 @@ describe('ChannelRail slides the page over on player pages instead of covering t
     expect(reserved(LEFT)).toBe('56px')
   })
 
-  it.each(['/youtube/abc', '/hls-dash/some-stream'])('does the same on %s', (path) => {
+  // /hls-dash itself is a player page now: it opens on a stream, so the embed must stay clear of the rail there too.
+  it.each(['/youtube/abc', '/hls-dash/some-stream', '/hls-dash'])('does the same on %s', (path) => {
     renderRailAt(path)
 
     fireEvent.focusIn(rail())
@@ -329,10 +330,11 @@ describe('the app shell keeps the player clear of the rail', () => {
     expect(within(gutter).getByTestId('player-page')).toBeInTheDocument()
   })
 
-  // The listing pages (/twitch, /youtube, /hls-dash) put a nav sidebar flush
+  // The listing pages (/twitch, /youtube) put a nav sidebar flush
   // against the left edge. Overlaying the rail there hides the first 56px of
   // every nav label (measured on /hls-dash, 2026-11-04: rail x 0-56, links x 0-219).
-  it.each(['/twitch', '/youtube', '/hls-dash'])(
+  // /hls-dash used to be one of them; it is a player page now (see above) and has no sidebar.
+  it.each(['/twitch', '/youtube'])(
     'pads the route content by the rail reservation on the %s listing page, whose sidebar sits at the edge',
     (path) => {
       window.history.pushState({}, '', path)
