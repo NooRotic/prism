@@ -108,6 +108,11 @@ let cached: SnapshotResult | null = null
 let inflight: Promise<SnapshotResult> | null = null
 let generation = 0
 
+/** The list this page session already has, or null: lets a page that mounts later draw it on its first frame. */
+export function peekStreamSnapshot(): SnapshotResult | null {
+  return cached
+}
+
 /** Forgets the remembered list and any request in flight. For tests. */
 export function resetSnapshotCache(): void {
   cached = null

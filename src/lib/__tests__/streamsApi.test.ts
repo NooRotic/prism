@@ -1,4 +1,11 @@
-import { loadStreamSnapshot, logoUrl, parseSnapshot, resetSnapshotCache, type StreamSnapshot } from '../streamsApi'
+import {
+  loadStreamSnapshot,
+  logoUrl,
+  parseSnapshot,
+  peekStreamSnapshot,
+  resetSnapshotCache,
+  type StreamSnapshot,
+} from '../streamsApi'
 
 const flags = vi.hoisted(() => ({ enabled: true, url: 'https://history.test' }))
 vi.mock('../../config/historyServer', () => ({
@@ -233,6 +240,28 @@ describe('loadStreamSnapshot', () => {
     expect(await loadStreamSnapshot(controller.signal)).toEqual({ kind: 'unavailable' })
     expect((await loadStreamSnapshot()).kind).toBe('ready')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('peekStreamSnapshot', () => {
+  it('has nothing until a good answer arrives, then the remembered list without a request', async () => {
+    const fetchMock = stubFetch(WIRE)
+    expect(peekStreamSnapshot()).toBeNull()
+
+    await loadStreamSnapshot()
+
+    expect(peekStreamSnapshot()).toEqual({ kind: 'ready', snapshot: EXPECTED })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    resetSnapshotCache()
+    expect(peekStreamSnapshot()).toBeNull()
+  })
+
+  it('stays empty after a failure', async () => {
+    stubFetch({ error: 'not_ready' }, 503)
+
+    await loadStreamSnapshot()
+
+    expect(peekStreamSnapshot()).toBeNull()
   })
 })
 
