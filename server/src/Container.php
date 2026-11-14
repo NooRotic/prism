@@ -146,7 +146,7 @@ final class Container
         $store = new StreamStore($pdo, $clock);
 
         return new LogoFetcher(
-            new SafeFetcher($resolver ?? new SystemResolver(), $transport ?? new CurlPinnedTransport(), $config->ttUserAgent()),
+            new SafeFetcher($resolver ?? new SystemResolver(), $transport ?? new CurlPinnedTransport(), $config->playlistUserAgent()),
             $store,
             new SnapshotWriter($store, $clock, $config->playlistDataDir()),
             $sleeper ?? new SystemSleeper(),
