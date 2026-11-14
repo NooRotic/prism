@@ -6,11 +6,26 @@ import type { VideoJsPlayerInternals } from '../../types/player-sdk'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
 import { logger } from '../../lib/logger'
+import { describeDecoding } from '../../lib/playbackEnvironment'
+import { logPlayback, redactAddress, setPlaybackInspection, setPlaybackStatus, type PlaybackLevel } from '../../lib/playbackLog'
+import { MAX_RECOVERIES, avoidFormat, avoidedFormats, installRenditionGuard, planDecodeRecovery } from '../../lib/renditionGuard'
 
 type Player = ReturnType<typeof videojs>
 
 /** How long a stream may go without loading its first data before the page is told. */
 const STALL_MS = 12_000
+
+// Video.js treats a decode failure of one rendition as fatal. With this, a format that failed to decode can be turned off
+// and the stream reloaded (see the error handler below). A no-op where there is no `Vhs` (tests that stand in for video.js).
+installRenditionGuard(videojs)
+
+/** The little of the tech's `vhs` the recovery and the inspection read. Everything on it is optional and read inside a try. */
+interface VhsView {
+  playlists?: {
+    media?: () => { attributes?: { CODECS?: string; BANDWIDTH?: number; RESOLUTION?: { width: number; height: number } } } | undefined
+    main?: { playlists?: Array<{ attributes?: { CODECS?: string }; disabled?: boolean }> }
+  }
+}
 
 /**
  * Video.js player wrapping HLS (via VHS) and native MP4.
@@ -70,6 +85,7 @@ export default function VideoJSPlayer({
     let started = false
     const stallTimer = setTimeout(() => {
       if (started) return
+      logPlayback('warn', 'videojs', 'no data after 12 seconds')
       // A stall is not a failure: the player keeps loading, so only tell the page when it listens.
       if (cb.current.onStall) cb.current.onStall()
       else cb.current.onError?.('Stream failed to load within 12 seconds')
@@ -95,9 +111,72 @@ export default function VideoJSPlayer({
 
     playerRef.current = player
 
+    const log = (level: PlaybackLevel, message: string, data?: Record<string, unknown>) => logPlayback(level, 'videojs', message, data)
+    log('info', `loading ${redactAddress(playableUrl)} as ${sourceType}`)
+
+    const readVhs = (): VhsView | undefined => {
+      try {
+        const tech = (player as unknown as { tech?: (options: object) => { vhs?: VhsView } | undefined }).tech?.({ IWillNotUseThisInPlugins: true })
+        return tech?.vhs
+      } catch {
+        return undefined
+      }
+    }
+
+    // How many times this stream has been reloaded after a decode failure (see the error handler).
+    let recoveries = 0
+
+    /** The state of the media element and of the rendition, for the debug output. Every read is guarded: it must never throw. */
+    const inspect = (code: number | undefined, message: string | undefined): Record<string, unknown> => {
+      const out: Record<string, unknown> = { errorCode: code ?? null, errorMessage: message ?? null, recoveries, avoidedFormats: avoidedFormats() }
+      try {
+        out.readyState = videoEl.readyState
+        out.networkState = videoEl.networkState
+        out.mediaError = videoEl.error ? `${videoEl.error.code}: ${videoEl.error.message}` : null
+        out.currentTime = Number(videoEl.currentTime.toFixed(2))
+        out.paused = videoEl.paused
+        out.decodedSize = `${videoEl.videoWidth}x${videoEl.videoHeight}`
+        const box = videoEl.getBoundingClientRect()
+        out.boxSize = `${Math.round(box.width)}x${Math.round(box.height)}`
+        const ranges: string[] = []
+        for (let i = 0; i < videoEl.buffered.length; i++) ranges.push(`${videoEl.buffered.start(i).toFixed(1)}-${videoEl.buffered.end(i).toFixed(1)}`)
+        out.buffered = ranges.length > 0 ? ranges.join(', ') : '(nothing)'
+      } catch {
+        /* ignore */
+      }
+      try {
+        const vhs = readVhs()
+        const media = vhs?.playlists?.media?.()
+        const size = media?.attributes?.RESOLUTION
+        if (size) out.rendition = `${size.width}x${size.height}`
+        if (media?.attributes?.BANDWIDTH) out.renditionBandwidth = media.attributes.BANDWIDTH
+        if (media?.attributes?.CODECS) out.renditionCodecs = media.attributes.CODECS
+        const all = vhs?.playlists?.main?.playlists
+        if (all) {
+          out.renditionsTotal = all.length
+          out.renditionsOff = all.filter((item) => item.disabled).length
+        }
+      } catch {
+        /* ignore */
+      }
+      return out
+    }
+
+    const logPlayRejection = (err: Error) => {
+      if (err.name !== 'AbortError') log('warn', `play() rejected: ${err.name}`)
+    }
+
+    player.on('loadstart', () => log('info', 'loadstart'))
+    player.on('loadedmetadata', () => log('info', `loadedmetadata (${videoEl.videoWidth}x${videoEl.videoHeight})`))
+    player.on('canplay', () => log('info', 'canplay'))
+    player.on('waiting', () => log('warn', 'waiting for data (buffering)'))
+    player.on('stalled', () => log('warn', 'the network stalled'))
+    player.on('loadeddata', () => log('info', 'loadeddata'))
     player.on('loadeddata', markStarted)
     player.on('playing', () => {
       markStarted()
+      log('ok', 'playing')
+      setPlaybackStatus('playing')
       cb.current.onPlaying?.()
     })
 
@@ -123,6 +202,46 @@ export default function VideoJSPlayer({
 
     player.on('error', () => {
       const err = player.error()
+      const vhs = readVhs()
+      let failingCodecs: string | undefined
+      let failingSize: { width: number; height: number } | undefined
+      let playlistCodecs: Array<string | undefined> = []
+      try {
+        const media = vhs?.playlists?.media?.()
+        failingCodecs = media?.attributes?.CODECS
+        failingSize = media?.attributes?.RESOLUTION
+        playlistCodecs = (vhs?.playlists?.main?.playlists ?? []).map((item) => item.attributes?.CODECS)
+      } catch {
+        /* ignore */
+      }
+      log('error', `Video.js error ${err?.code ?? 'unknown'}: ${err?.message ?? '(no message)'}`, { code: err?.code ?? null, codecs: failingCodecs ?? null })
+
+      if (err?.code === 3) {
+        // Video.js treats a decode failure of one rendition as fatal. Often another rendition of the same stream would
+        // play (an HDR HEVC one that this machine cannot decode, next to an H.264 one), so turn that video format off
+        // and reload, at most MAX_RECOVERIES times; after that the page hears about the failure as it always did.
+        if (failingCodecs) void describeDecoding(failingCodecs, failingSize).then((line) => log('info', line))
+        const plan = planDecodeRecovery({ code: err.code, attempts: recoveries, failingCodecs, playlistCodecs })
+        if (plan.retry) {
+          recoveries++
+          avoidFormat(plan.family)
+          log('warn', `${plan.family} failed to decode; avoiding it and reloading (recovery ${recoveries} of ${MAX_RECOVERIES})`)
+          setPlaybackStatus('retrying')
+          try {
+            // Video.js clears an error when given null; its type declarations leave null out.
+            ;(player as unknown as { error(value: null): void }).error(null)
+            player.src({ src: playableUrl, type: sourceType })
+            player.play()?.catch(logPlayRejection)
+            return
+          } catch (reloadError) {
+            log('error', `reload failed: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`)
+          }
+        } else {
+          log('info', `not retrying: ${plan.reason}`)
+        }
+      }
+
+      setPlaybackInspection(inspect(err?.code, err?.message))
       if (err?.code === 4) {
         cb.current.onPlaybackBlocked?.()
         cb.current.onError?.('Video.js could not use this source (code 4)')
@@ -136,10 +255,14 @@ export default function VideoJSPlayer({
     let retryCount = 0
     player.on('retryplaylist', () => {
       retryCount++
+      log('warn', `playlist fetch failed (retry ${retryCount})`)
       if (retryCount >= 3) {
         cb.current.onError?.('Stream unavailable — repeated fetch failures (possible CORS issue)')
       }
     })
+
+    // The rendition in use, so a change shows up in the log.
+    let lastRendition: string | null = null
 
     // QoE metrics at 1Hz — skip when tab is hidden to save CPU
     const metricsInterval = window.setInterval(() => {
@@ -188,6 +311,11 @@ export default function VideoJSPlayer({
             bytesTransferred = vhs.stats.mediaBytesTransferred
           }
         } catch { /* ignore */ }
+
+        if (resolution !== null && resolution !== lastRendition) {
+          lastRendition = resolution
+          log('info', `rendition ${resolution}${bitrate ? ` at ${Math.round(bitrate / 1000)} kbps` : ''}`)
+        }
 
         setPlayerMetrics(makeMetrics('videojs', {
           currentTime: player.currentTime() ?? null,
