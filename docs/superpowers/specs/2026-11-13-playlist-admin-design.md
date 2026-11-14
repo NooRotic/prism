@@ -423,6 +423,15 @@ Stages A (server), B (HLS page) and C (the Playlist screen above) are built. Wha
   another page or filter, an edit, a removal, or a reload that drops the stream), with the kind and host, "Open in a new tab"
   (`/hls-dash/<id>` for a stream visitors can see, the pasted-address form for the rest) and the player's own error card.
   "Try as" changes the preview only. Nothing is saved from it; the checker (piece 3) decides states.
+- **Playback debug output** (design `2026-11-14-playback-debug-and-rendition-fallback-design.md`): the engines write to a small
+  in-page log (`src/lib/playbackLog.ts`); the About panel and the Playlist preview show a **PLAYBACK** button (amber while the
+  first attempt loads, red while retrying or after a failure, green once playing), a **Console output** field with the last
+  two lines, and, while playback is failing (or when the button is pressed), the whole report with every attempt, the
+  rendition and media element state, the browser's codec table and a Copy report button. Query values in addresses show as `***`.
+- **Rendition fallback** (`src/lib/renditionGuard.ts`, used by `VideoJSPlayer.tsx`): Video.js picks a rendition by player size
+  and treats a decode failure as fatal, so a small player could land on an HDR HEVC rendition this machine cannot decode
+  (`Apple 4K HEVC`). On code 3 the player now avoids that video format and reloads, at most twice; the avoided formats last
+  until the page is reloaded.
 
 ## Piece 3: the checker (decisions)
 

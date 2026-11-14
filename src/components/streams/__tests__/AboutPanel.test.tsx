@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import AboutPanel from '../AboutPanel'
+import { beginPlayback, endPlayback, setPlaybackStatus } from '../../../lib/playbackLog'
 import type { StreamEntry } from '../../../lib/streamsApi'
 
 vi.mock('../../../config/historyServer', () => ({
@@ -34,6 +35,48 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
+})
+
+describe('AboutPanel and the playback status', () => {
+  const ADDRESS = 'https://edge-3.cdn.test/live/a.m3u8'
+  afterEach(() => endPlayback())
+
+  it('shows the PLAYBACK button and the console output under the details while a stream is running, and neither when none is', () => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} />)
+    expect(screen.queryByRole('button', { name: /PLAYBACK/ })).toBeNull()
+    expect(screen.queryByText('Console output')).toBeNull()
+
+    act(() => beginPlayback({ url: ADDRESS, kind: 'hls' }))
+
+    expect(screen.getByRole('button', { name: /PLAYBACK/ })).toBeInTheDocument()
+    expect(screen.getByText('Console output')).toBeInTheDocument()
+  })
+
+  it('does not fold while playback is retrying, and folds thirty seconds after it plays', () => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} />)
+    act(() => beginPlayback({ url: ADDRESS, kind: 'hls' }))
+    act(() => setPlaybackStatus('retrying'))
+
+    tick(120_000)
+    expect(screen.getByRole('heading', { name: 'Alpha News' })).toBeInTheDocument()
+
+    act(() => setPlaybackStatus('playing'))
+    tick(30_000)
+    expect(screen.queryByRole('heading', { name: 'Alpha News' })).toBeNull()
+  })
+
+  it('opens a folded panel, with the debug output showing, when playback starts failing', () => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} />)
+    act(() => beginPlayback({ url: ADDRESS, kind: 'hls' }))
+    act(() => setPlaybackStatus('playing'))
+    tick(30_000)
+    expect(screen.queryByRole('heading', { name: 'Alpha News' })).toBeNull()
+
+    act(() => setPlaybackStatus('failed'))
+
+    expect(screen.getByRole('heading', { name: 'Alpha News' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Playback debug output')).toBeInTheDocument()
+  })
 })
 
 describe('AboutPanel', () => {

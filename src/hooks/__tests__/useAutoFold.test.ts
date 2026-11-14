@@ -17,6 +17,33 @@ afterEach(() => {
 
 const tick = (ms: number) => act(() => void vi.advanceTimersByTime(ms))
 
+describe('useAutoFold while held', () => {
+  it('does not fold while held, and folds thirty seconds after the hold ends', () => {
+    const { result, rerender } = renderHook(({ hold }) => useAutoFold('a', 30_000, hold), { initialProps: { hold: true } })
+
+    tick(120_000)
+    expect(result.current.open).toBe(true)
+
+    rerender({ hold: false })
+    tick(29_999)
+    expect(result.current.open).toBe(true)
+    tick(1)
+    expect(result.current.open).toBe(false)
+  })
+
+  it('opens a folded panel when a hold starts', () => {
+    const { result, rerender } = renderHook(({ hold }) => useAutoFold('a', 30_000, hold), { initialProps: { hold: false } })
+    tick(30_000)
+    expect(result.current.open).toBe(false)
+
+    rerender({ hold: true })
+
+    expect(result.current.open).toBe(true)
+    tick(120_000)
+    expect(result.current.open).toBe(true)
+  })
+})
+
 describe('useAutoFold', () => {
   it('is open at first and folds after thirty seconds', () => {
     const { result } = renderHook(() => useAutoFold('a'))

@@ -64,8 +64,20 @@ describe('StreamPreview with the real player panel and error card', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Try as DASH' }))
 
     expect(screen.getByTestId('player-host')).toHaveAttribute('data-type', 'dash')
-    expect(screen.getByRole('region')).toHaveTextContent('Playing as DASH · secret-host.test:8443')
+    expect(screen.getByRole('region', { name: 'Preview of Alpha News' })).toHaveTextContent('Playing as DASH · secret-host.test:8443')
     expect(await screen.findByTestId('probe-explanation')).toBeInTheDocument()
+  })
+
+  it('shows the PLAYBACK status and the debug output under the player once playback has failed, with no query value', async () => {
+    render(preview(stream()))
+    expect(await screen.findByTestId('probe-explanation')).toBeInTheDocument()
+
+    expect(screen.getByRole('button', { name: /PLAYBACK/ })).toHaveAttribute('data-status', 'failed')
+    const text = screen.getByLabelText('Playback debug output').textContent!
+    expect(text).toContain('Status: failed')
+    expect(text).toContain('Address: https://secret-host.test:8443/live/path.m3u8?x=***')
+    expect(text).not.toContain('x=1')
+    expect(screen.getByLabelText('Console output')).toBeInTheDocument()
   })
 
   it('does not hand the player a new detection when the screen re-renders, so a failed stream is not retried on its own', async () => {
