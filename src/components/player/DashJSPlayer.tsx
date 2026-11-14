@@ -4,6 +4,7 @@ import type { PlayerProps } from '../../types/player'
 import type { DashPlayerWithTracks } from '../../types/player-sdk'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
+import { playbackWriter, redactAddress, redactText } from '../../lib/playbackLog'
 
 /**
  * DASH.js player wrapping MPEG-DASH manifests. dashjs is imported
@@ -42,6 +43,9 @@ export default function DashJSPlayer({
     if (!videoEl) return
 
     const playableUrl = detection.playableUrl || url
+    // Writes for the session that is running now and no other (a late event cannot reach the next stream's session).
+    const out = playbackWriter()
+    out.log('info', 'dashjs', `loading ${redactAddress(playableUrl)}`)
 
     // Attach native video events for play/pause/ended. dashjs's own
     // event API fires PLAYBACK_STARTED/PAUSED too, but the video
@@ -56,15 +60,23 @@ export default function DashJSPlayer({
       if (mountedRef.current) cb.current.onEnded?.()
     }
 
+    const handlePlaying = () => {
+      if (!mountedRef.current) return
+      out.log('ok', 'dashjs', 'playing')
+      out.setStatus('playing')
+    }
+
     videoEl.addEventListener('play', handlePlay)
     videoEl.addEventListener('pause', handlePause)
     videoEl.addEventListener('ended', handleEnded)
+    videoEl.addEventListener('playing', handlePlaying)
 
     let dashPlayer: MediaPlayerClass | null = null
 
     let readyFired = false
     const loadTimeout = setTimeout(() => {
       if (!readyFired && mountedRef.current) {
+        out.log('warn', 'dashjs', 'no stream after 10 seconds')
         cb.current.onError?.('DASH stream failed to load within 10 seconds')
       }
     }, 10_000)
@@ -79,6 +91,7 @@ export default function DashJSPlayer({
         const onStreamInitialized = () => {
           readyFired = true
           clearTimeout(loadTimeout)
+          out.log('ok', 'dashjs', 'stream initialised')
           if (mountedRef.current) cb.current.onReady?.()
         }
         const onErrorEvent = (e: unknown) => {
@@ -89,6 +102,8 @@ export default function DashJSPlayer({
           const msg =
             errData?.error?.message ||
             `DASH.js error code ${errData?.error?.code ?? 'unknown'}`
+          // dash.js quotes the full address in its messages; the log never keeps a query value.
+          out.log('error', 'dashjs', redactText(msg), { code: errData?.error?.code ?? null })
           // Autoplay / source compatibility issues: surface as
           // playback blocked so PlayerHost advances the chain.
           if (
@@ -100,12 +115,29 @@ export default function DashJSPlayer({
           cb.current.onError?.(msg)
         }
 
+        // Browsers let a page start sound by itself only once the visitor has used it. When dash.js's autoplay is refused it
+        // says so with this event: play again muted (always allowed; the controls turn the sound on), and only if that is
+        // refused too tell the page the player is blocked.
+        const player = dashPlayer
+        let startedMuted = false
+        const onPlaybackNotAllowed = () => {
+          if (!mountedRef.current) return
+          if (startedMuted) {
+            cb.current.onPlaybackBlocked?.()
+            return
+          }
+          startedMuted = true
+          out.log('warn', 'dashjs', 'the browser blocked autoplay with sound; playing muted (the speaker button turns the sound on)')
+          videoEl.muted = true
+          player.play()
+        }
+
         dashPlayer.on('streamInitialized', onStreamInitialized)
         dashPlayer.on('error', onErrorEvent)
+        dashPlayer.on('playbackNotAllowed', onPlaybackNotAllowed)
 
-        // Muted start for autoplay reliability under browser policies.
-        // Users can unmute via the native video element controls.
-        videoEl.muted = true
+        // Start with sound; the event above is the fallback.
+        videoEl.muted = false
         dashPlayer.initialize(videoEl, playableUrl, true)
 
         playerRef.current = dashPlayer
@@ -221,6 +253,7 @@ export default function DashJSPlayer({
       videoEl.removeEventListener('play', handlePlay)
       videoEl.removeEventListener('pause', handlePause)
       videoEl.removeEventListener('ended', handleEnded)
+      videoEl.removeEventListener('playing', handlePlaying)
       try {
         dashPlayer?.destroy()
       } catch {

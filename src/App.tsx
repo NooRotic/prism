@@ -66,7 +66,8 @@ function AppLayout() {
   // Per-page matrix rain tuning (Section 3 of design spec)
   const location = useLocation()
   const isPlayerPage = isPlayerPagePath(location.pathname)
-  const isProtocolPage = ['/twitch', '/youtube', '/hls-dash'].includes(location.pathname)
+  // /hls-dash is a player page now (it opens on a default stream), so it takes the player-page rain and gutter above.
+  const isProtocolPage = ['/twitch', '/youtube'].includes(location.pathname)
   const rainOpacity = isPlayerPage ? 0.03 : isProtocolPage ? 0.08 : 0.07
   const rainSpeed = isPlayerPage ? 0.5 : 1
 

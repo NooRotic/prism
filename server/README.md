@@ -41,6 +41,59 @@ Design: [docs/superpowers/specs/2026-11-13-playlist-admin-design.md](../docs/sup
 - **Deploy order.** `deploy.mjs --go`, then straight away `/usr/bin/php8.4-cli prism-data/bin/install.php` (expect
   `applied 002_admin`). A visit never fails in between: the new-channels counter swallows its own errors.
 
+## The playlist (piece 2)
+
+Design: the same spec, "Piece 2" and "The HLS page". The table comes from `migrations/003_streams.sql` (applied by
+`bin/install.php`: expect `applied 003_streams`). One row per stream, keyed by the SHA-256 of its normalised address
+(scheme and host lower-cased, default port and fragment dropped); the page address uses the first 12 characters
+(`public_id`). **States:** `new` (not checked yet), `working`, `suspect` are shown to visitors; `dead`, `removed`
+(a tombstone, so a re-import cannot bring it back), `unplayable` (an `http://` address: an https page cannot load it, reason
+`http`) and `held` (a port other than 80 or 443, reason `port`) are kept but never shown. Pieces 3 and 4 will move streams
+between `new`, `working`, `suspect` and `dead`.
+
+- **`GET /api/streams`** (public, origin allowlist, `ETag`, `Cache-Control: public, max-age=300`, gzip when accepted, 304 on a
+  matching `If-None-Match`, 503 `{"error":"not_ready"}` until the first import) answers the visitor snapshot:
+  `{"v":1,"generated":"…Z","default":"<public id>","groups":["Other",…],"streams":[{"i":"<public id>","n":"name","g":[0,2],
+  "c":"us","l":"<public id>.png","k":"hls","p":1,"s":"new","u":"https://host/path.m3u8"}]}`. Streams are pinned first, then by
+  name; `g` indexes `groups` (most-used first); `l` is served at `/logos/<file>`; readers ignore fields they do not know.
+  The file is written as `<data_dir>/streams.json` and `.gz` (default `/prism-data/data/`, outside `public/`) through a
+  temporary name and a rename, and is rewritten after every import and every logo run.
+- **Import** (the owner's media-demo list, about 5,200 entries; read-only source, copied up by SFTP, never edited):
+  `/usr/bin/php8.4-cli prism-data/bin/import-playlist.php prism-data/data/import/HLS_valid.m3u [--dry-run] [--batch=<name>]`
+  prints `key=value` counts (`entries inserted already_known duplicates rejected_* unplayable_http held_port demos`) and, for a
+  real run, `snapshot streams=<n>`. **It only inserts**: a known stream (even one that was renamed or removed) is never
+  touched, so re-running is safe and a new list adds only what is new. It seeds PRISM's five demo streams first (pinned,
+  `working`; Big Buck Bunny is the default) and the whole run is one transaction (a clash of the 12-character public id
+  stops it, loudly, with nothing written). **Never stored:** an address with a login, a query parameter named like a
+  token, an entry with player options (`#EXTVLCOPT`, `#EXTHTTP`, `#KODIPROP`, an `http-*` attribute: a browser cannot send
+  them), an address over 1,000 characters, a group matching adult terms. Names and groups are cleaned (valid UTF-8, no
+  control characters) and shown as text, never as HTML.
+- **Logos** are copied once by `/usr/bin/php8.4-cli prism-data/bin/fetch-logos.php [--limit=<1 to 1000>]` (default 100) into
+  `<logo_dir>` (default `/prism-data/public/logos/`, served by Apache as plain files). Repeat it until it prints
+  `fetched=0 failed=0`, or put it in cron (every 5 minutes, `--limit=250`; two runs never overlap). A picture is accepted
+  only when its first bytes say PNG, JPEG, GIF or WebP (never by name or `Content-Type`, never SVG) and it is at most 256 KiB;
+  a failure is counted and a stream is given up on after three. The fetcher allows only `http`/`https` on ports 80 and 443,
+  resolves the name itself, refuses loopback, private, link-local, shared, unique-local and IPv4-mapped addresses (one bad
+  answer blocks the name), connects to the address it vetted, re-vets every redirect (at most three), sends at most one
+  request a second to a host, and never hands what it fetched to a caller of the HTTP API.
+- **Config.** Optional `'playlist' => ['data_dir' => …, 'logo_dir' => …, 'user_agent' => …]` (see `config.example.php`); the defaults
+  fit the host. The logo copier introduces itself as `PRISM/1.0 (+https://prism.nooroticx.tv)`: the contact address in
+  `tt.user_agent` is for TwitchTracker only and is never sent to a logo host unless you put one in `playlist.user_agent` yourself.
+- **Re-import.** Upload the new list, run the import with `--dry-run`, compare, run it for real, then `fetch-logos.php`. The
+  list is iptv-org data (the Unlicense: public domain); the HLS page credits it.
+- **The owner's playlist actions (the Playlist screen, `/admin/playlist`).** Owner only, like the rest of `/api/admin/*`:
+  `GET /api/admin/streams?text=&state=&group=&country=&limit=&offset=` (every state, the owner's view; 50 a page by default,
+  200 at most, with the count of every state) and `POST /api/admin/streams/add|update|pin|default|remove` (JSON bodies, `public_id`
+  for an existing stream, at most 4 KiB). **Add** applies the import's rules (a refused address or name is 422 with its `reason`, a
+  known address, even a removed one, is 409 `already_known`) and stores it with source `manual`; **update** renames a stream and
+  replaces its groups; **default** needs a stream visitors can see (409 `not_listed` otherwise); **remove** leaves a tombstone (state
+  `removed`, no longer default or pinned) and deletes its logo copy, so a re-import cannot bring it back. Every write is one
+  transaction with its audit row (`stream.add`, `stream.update`, `stream.pin`, `stream.default`, `stream.remove`, shown on the
+  Security screen), and the visitor snapshot is rewritten after the commit; if only that rewrite fails the answer is `ok` with
+  `snapshot: false` and the list catches up on the next change.
+- **Deploy order.** `deploy.mjs --go`, then `install.php` (expect `applied 003_streams`), then the import, then the logos. The
+  admin API ships with the server code; the Playlist screen ships with the front end, so deploy the server first.
+
 ## IONOS host notes
 
 - **Which PHP.** The scripts in `bin/` are command line only (they exit unless `PHP_SAPI` is `cli`). On this host the

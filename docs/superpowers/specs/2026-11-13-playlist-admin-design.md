@@ -389,6 +389,50 @@ and sends it with the existing origin allowlist and an ETag. (my call)
 A table of streams with filters (state, group, country, text), add a stream (validated by the same rules as import), edit name
 and groups, pin, set the default, and remove. Every write goes to the audit list.
 
+### Piece 2 as built (2026-11-14; plan `docs/superpowers/plans/2026-11-14-playlist-piece-2-store-import-and-hls-page.md`)
+
+Stages A (server), B (HLS page) and C (the Playlist screen above) are built. What differs from, or adds to, the text above:
+
+- **The snapshot carries each stream's address** (`u`), which the field list above omitted: the page cannot play a stream
+  without it. The About panel shows only its host. The other keys are `i` (public id), `n`, `g` (indexes into `groups`, most-used
+  first), `c` (flag code), `l` (logo file), `k` (hls or dash), `p` (pinned), `s` (new, working, suspect); a captions flag is
+  not in yet (piece 3). `GET /api/streams` sends an `ETag`, gzip when accepted, `max-age=300`, and 503 `not_ready` before the first
+  import; the file lives in `<data_dir>` outside `public/`.
+- **A stream's page address is `/hls-dash/<public id>`**, the first 12 hex characters of the SHA-256 of its normalised address
+  (the full hash is the key). Demo ids (`apple-basic`, `bbb-hls`, …) and `/hls-dash/custom?url=` keep working.
+- **The import only inserts.** A stream that is already known, edited or removed is never touched, so a re-import cannot undo
+  the owner's work; a clash of the 12-character id stops it with nothing written. It also seeds the five demo streams (pinned,
+  `working`; Big Buck Bunny is the default). `http://` streams are stored `unplayable` and streams on ports other than 80 and 443
+  `held`: both are kept but not listed, so the first list is every https stream on a normal port, marked "unchecked".
+- **Never stored:** a login in the address, a token-like query parameter, player options (`#EXTVLCOPT`, `#EXTHTTP`, `#KODIPROP`,
+  `http-*` attributes), an address over 1,000 characters, an adult group.
+- **Logos** are copied by their own resumable command (`fetch-logos.php`), through a fetcher that refuses private, loopback and
+  link-local addresses at every redirect and accepts only PNG, JPEG, GIF or WebP by their first bytes.
+- **Real numbers** (the media-demo list, 5,234 entries): 5,159 stored, 3 duplicate addresses, 58 with player options, 14 with token
+  parameters, 1,169 `unplayable`, 483 `held`, 3,512 listed with the five demos; the snapshot is 673 KB (146 KB gzipped).
+- **The page** plays the snapshot's default (else Big Buck Bunny) while the list loads, filters in the browser, mounts only the
+  visible cards, and shows the built-in demo streams with a notice when the server is down, not ready or sends nothing usable.
+- **The Playlist screen** (`/admin/playlist`, `src/components/admin/PlaylistScreen.tsx`; API in `server/src/Admin/PlaylistAdmin.php`)
+  lists every stream in every state (50 a page) with filters for text, state and country, shows an address only as its host,
+  and offers add (the import's rules; a refusal says which rule), edit (name and groups), pin, make default (only a stream
+  visitors can see), and remove (a confirmation, then a tombstone: the row stays so a re-import cannot bring it back, and its
+  logo copy is deleted). Every write is one transaction with its audit row and rewrites the visitor snapshot after the commit.
+  A group filter exists in the API but not yet on the screen.
+- **Play in place** (`src/components/admin/StreamPreview.tsx`; design `2026-11-14-playlist-stream-preview-design.md`): every
+  stream that is not removed has a Play button that opens the stream page's player in a row under it (one at a time, closed by
+  another page or filter, an edit, a removal, or a reload that drops the stream), with the kind and host, "Open in a new tab"
+  (`/hls-dash/<id>` for a stream visitors can see, the pasted-address form for the rest) and the player's own error card.
+  "Try as" changes the preview only. Nothing is saved from it; the checker (piece 3) decides states.
+- **Playback debug output** (design `2026-11-14-playback-debug-and-rendition-fallback-design.md`): the engines write to a small
+  in-page log (`src/lib/playbackLog.ts`); the About panel and the Playlist preview show a **PLAYBACK** button (amber while the
+  first attempt loads, red while retrying or after a failure, green once playing), a **Console output** field with the last
+  two lines, and, while playback is failing (or when the button is pressed), the whole report with every attempt, the
+  rendition and media element state, the browser's codec table and a Copy report button. Query values in addresses show as `***`.
+- **Rendition fallback** (`src/lib/renditionGuard.ts`, used by `VideoJSPlayer.tsx`): Video.js picks a rendition by player size
+  and treats a decode failure as fatal, so a small player could land on an HDR HEVC rendition this machine cannot decode
+  (`Apple 4K HEVC`). On code 3 the player now avoids that video format and reloads, at most twice; the avoided formats last
+  until the page is reloaded.
+
 ## Piece 3: the checker (decisions)
 
 ### States (my call; numbers are starting points)

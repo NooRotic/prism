@@ -13,9 +13,9 @@ export function buildStreamPath(url: string, as?: StreamKind): string {
 }
 
 /**
- * A page that plays a video: `/twitch/:channel`, `/youtube/:id`, `/hls-dash/:id`.
- * The listing pages (`/twitch`, `/youtube`, `/hls-dash`) are not.
+ * A page that plays a video: `/twitch/:channel`, `/youtube/:id`, `/hls-dash/:id`, and `/hls-dash` itself, which opens on
+ * a default stream. The listing pages of the other protocols (`/twitch`, `/youtube`) are not.
  */
 export function isPlayerPagePath(pathname: string): boolean {
-  return /^\/(twitch|youtube|hls-dash)\//.test(pathname)
+  return /^\/(twitch|youtube|hls-dash)\//.test(pathname) || pathname === '/hls-dash'
 }

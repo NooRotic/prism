@@ -1,4 +1,4 @@
-import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { useState } from 'react'
 import { DemoGrid } from '../components/grid/DemoGrid'
@@ -9,11 +9,11 @@ import TwitchDashboard from '../components/dashboard/TwitchDashboard'
 import ConnectTwitchButton from '../components/ui/ConnectTwitchButton'
 import { useApp } from '../contexts/AppContext'
 import { useTwitchAuth } from '../hooks/useTwitchAuth'
-import { getDemoByProtocol, getHlsDashDemo, PROTOCOL_META, type ProtocolKey } from '../config/demoContent'
-import { buildStreamPath } from '../lib/routes'
+import { getDemoByProtocol, PROTOCOL_META, type ProtocolKey } from '../config/demoContent'
 
 interface ProtocolPageProps {
-  protocol: ProtocolKey
+  /** The HLS / DASH listing is its own page now (HlsPage), so only the other two protocols come here. */
+  protocol: Exclude<ProtocolKey, 'hls-dash'>
 }
 
 function ProtocolSidebar() {
@@ -161,14 +161,7 @@ export default function ProtocolPage({ protocol }: ProtocolPageProps) {
   const meta = PROTOCOL_META[protocol]
   const { state } = useApp()
   const { isAuthenticated, login } = useTwitchAuth()
-  const [searchParams] = useSearchParams()
-  const entries =
-    protocol === 'hls-dash' ? getHlsDashDemo() : getDemoByProtocol(protocol as 'twitch' | 'youtube')
-
-  // Links made while the paste box sent streams to this listing page (`/hls-dash?url=...`)
-  // still work: the player page is where a pasted address plays.
-  const pastedUrl = protocol === 'hls-dash' ? searchParams.get('url') : null
-  if (pastedUrl) return <Navigate to={buildStreamPath(pastedUrl)} replace />
+  const entries = getDemoByProtocol(protocol)
 
   return (
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-var(--header-height))]">
@@ -179,7 +172,7 @@ export default function ProtocolPage({ protocol }: ProtocolPageProps) {
           { label: 'YouTube', path: '/youtube', color: PROTOCOL_META.youtube.color },
           { label: 'HLS/DASH', path: '/hls-dash', color: PROTOCOL_META['hls-dash'].color },
         ] as const).map((item) => {
-          const isActive = `/${protocol}` === item.path || (protocol === 'hls-dash' && item.path === '/hls-dash')
+          const isActive = `/${protocol}` === item.path
           return (
             <Link
               key={item.path}

@@ -42,6 +42,16 @@ return [
         'owner_twitch_id' => '',
         'frontend_client_id' => '',
     ],
+    // Optional. Where the playlist keeps its files. The defaults (the data folder next to this file, and the public/logos
+    // folder of the server) are right for the IONOS layout; set them only if you moved things. Never inside public/ for
+    // data_dir, or Apache would serve the snapshot as a plain file without the origin check.
+    // 'playlist' => [
+    //     'data_dir' => '/prism-data/data',
+    //     'logo_dir' => '/prism-data/public/logos',
+    //     // What the logo copier tells the hosts it fetches pictures from. The default is 'PRISM/1.0 (+https://prism.nooroticx.tv)';
+    //     // it never uses the contact address in tt.user_agent (that one is for TwitchTracker only).
+    //     'user_agent' => 'PRISM/1.0 (+https://prism.nooroticx.tv)',
+    // ],
     // Kill switches: set to false to switch behaviour off without a redeploy.
     'flags' => [
         'visits_enabled' => true,

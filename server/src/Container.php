@@ -9,16 +9,27 @@ use Prism\History\Admin\AdminController;
 use Prism\History\Admin\AdminGuard;
 use Prism\History\Admin\AdminReports;
 use Prism\History\Admin\ChannelAdmin;
+use Prism\History\Admin\PlaylistAdmin;
 use Prism\History\Admin\TokenCache;
 use Prism\History\Api\Router;
+use Prism\History\Api\StreamsController;
 use Prism\History\Http\CurlHttp;
 use Prism\History\Http\HttpClient;
+use Prism\History\Net\CurlPinnedTransport;
+use Prism\History\Net\PinnedTransport;
+use Prism\History\Net\Resolver;
+use Prism\History\Net\SafeFetcher;
+use Prism\History\Net\SystemResolver;
+use Prism\History\Playlist\Importer;
+use Prism\History\Playlist\LogoFetcher;
+use Prism\History\Playlist\SnapshotWriter;
 use Prism\History\Store\AttemptStore;
 use Prism\History\Store\AuditStore;
 use Prism\History\Store\BioLinkStore;
 use Prism\History\Store\ChannelStore;
 use Prism\History\Store\JobState;
 use Prism\History\Store\SnapshotStore;
+use Prism\History\Store\StreamStore;
 use Prism\History\Store\UsageCounters;
 use Prism\History\Tracker\Sleeper;
 use Prism\History\Tracker\SystemSleeper;
@@ -65,6 +76,15 @@ final class Container
             $s['clock'],
         );
         $audit = new AuditStore($pdo, $s['clock']);
+        $streams = new StreamStore($pdo, $s['clock']);
+        $playlistAdmin = new PlaylistAdmin(
+            $pdo,
+            $streams,
+            $audit,
+            new SnapshotWriter($streams, $s['clock'], $config->playlistDataDir()),
+            $s['clock'],
+            $config->playlistLogoDir(),
+        );
         $reports = new AdminReports(
             $config,
             $s['counters'],
@@ -76,7 +96,7 @@ final class Container
             $s['clock'],
         );
 
-        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit)));
+        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit), $playlistAdmin), new StreamsController($config->playlistDataDir()));
     }
 
     /** The schema migrator over the migrations/ folder that ships next to src/. */
@@ -106,6 +126,42 @@ final class Container
             $s['clock'],
             new RunLock($pdo),
             $s['state'],
+        );
+    }
+
+    public static function importer(Config $config, PDO $pdo, ?Clock $clock = null): Importer
+    {
+        $clock ??= new SystemClock();
+
+        return new Importer(new StreamStore($pdo, $clock), $clock);
+    }
+
+    public static function snapshotWriter(Config $config, PDO $pdo, ?Clock $clock = null): SnapshotWriter
+    {
+        $clock ??= new SystemClock();
+
+        return new SnapshotWriter(new StreamStore($pdo, $clock), $clock, $config->playlistDataDir());
+    }
+
+    /** The logo copier. Tests pass a fake resolver, transport, sleeper and clock; the real ones are used when they are null. */
+    public static function logoFetcher(
+        Config $config,
+        PDO $pdo,
+        ?Resolver $resolver = null,
+        ?PinnedTransport $transport = null,
+        ?Sleeper $sleeper = null,
+        ?Clock $clock = null,
+    ): LogoFetcher {
+        $clock ??= new SystemClock();
+        $store = new StreamStore($pdo, $clock);
+
+        return new LogoFetcher(
+            new SafeFetcher($resolver ?? new SystemResolver(), $transport ?? new CurlPinnedTransport(), $config->playlistUserAgent()),
+            $store,
+            new SnapshotWriter($store, $clock, $config->playlistDataDir()),
+            $sleeper ?? new SystemSleeper(),
+            $clock,
+            $config->playlistLogoDir(),
         );
     }
 

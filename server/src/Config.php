@@ -185,6 +185,37 @@ final class Config
         return $this->adminEnabled() && $this->adminOwnerTwitchId() !== null && $this->adminFrontendClientId() !== null;
     }
 
+    /**
+     * Where the visitor snapshot and the playlist import files live: outside public/, so Apache never serves them
+     * as plain files. Never throws and is not read by check(): a wrong value means the default.
+     */
+    public function playlistDataDir(): string
+    {
+        return $this->stringOr('playlist.data_dir', dirname(__DIR__) . '/data');
+    }
+
+    /**
+     * What the logo copier says about itself to the hosts it fetches pictures from. Plain by default: the product and
+     * the public site, never the contact address in tt.user_agent (that one is for TwitchTracker, which asks for it).
+     * An owner who wants a contact in it sets `playlist.user_agent`. A value that is not a short single line of text
+     * means the default; this never throws.
+     */
+    public function playlistUserAgent(): string
+    {
+        $value = $this->value('playlist.user_agent');
+        if (is_string($value) && $value !== '' && strlen($value) <= 200 && preg_match('/^[\x20-\x7e]+$/D', $value) === 1) {
+            return $value;
+        }
+
+        return 'PRISM/1.0 (+https://prism.nooroticx.tv)';
+    }
+
+    /** Where the copied channel pictures are written: inside public/, so Apache serves them straight. */
+    public function playlistLogoDir(): string
+    {
+        return $this->stringOr('playlist.logo_dir', dirname(__DIR__) . '/public/logos');
+    }
+
     /** Reads every setting once, so a bad config fails when it is loaded, not on first use. */
     private function check(): void
     {
@@ -238,6 +269,13 @@ final class Config
         }
 
         return $value;
+    }
+
+    private function stringOr(string $path, string $default): string
+    {
+        $value = $this->value($path);
+
+        return is_string($value) && $value !== '' ? $value : $default;
     }
 
     private function intOr(string $path, int $default, int $min): int

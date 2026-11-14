@@ -77,6 +77,48 @@ final class ConfigTest extends TestCase
         $this->assertFalse($off->adminActive());
     }
 
+    public function testPlaylistDirsDefaultAndNeverThrow(): void
+    {
+        $defaults = Config::fromArray($this->base());
+        $this->assertStringEndsWith('/data', str_replace('\\', '/', $defaults->playlistDataDir()));
+        $this->assertStringEndsWith('/public/logos', str_replace('\\', '/', $defaults->playlistLogoDir()));
+
+        $set = $this->base();
+        $set['playlist'] = ['data_dir' => '/srv/prism/data', 'logo_dir' => '/srv/prism/logos'];
+        $configured = Config::fromArray($set);
+        $this->assertSame('/srv/prism/data', $configured->playlistDataDir());
+        $this->assertSame('/srv/prism/logos', $configured->playlistLogoDir());
+
+        foreach ([[], '', 7, null] as $bad) {
+            $a = $this->base();
+            $a['playlist'] = ['data_dir' => $bad, 'logo_dir' => $bad];
+            $c = Config::fromArray($a);
+            $this->assertSame($defaults->playlistDataDir(), $c->playlistDataDir(), json_encode($bad));
+            $this->assertSame($defaults->playlistLogoDir(), $c->playlistLogoDir(), json_encode($bad));
+        }
+        $notAnArray = $this->base();
+        $notAnArray['playlist'] = 'on';
+        $this->assertSame($defaults->playlistDataDir(), Config::fromArray($notAnArray)->playlistDataDir());
+    }
+
+    public function testPlaylistUserAgentIsPlainAndNeverTheTwitchTrackerContact(): void
+    {
+        $default = Config::fromArray($this->base())->playlistUserAgent();
+        $this->assertSame('PRISM/1.0 (+https://prism.nooroticx.tv)', $default);
+        $this->assertStringNotContainsString('contact', $default);
+        $this->assertStringNotContainsString('@', $default);
+
+        $set = $this->base();
+        $set['playlist'] = ['user_agent' => 'PRISM-logos/2 (+https://prism.nooroticx.tv/about; contact: someone@elsewhere.test)'];
+        $this->assertSame('PRISM-logos/2 (+https://prism.nooroticx.tv/about; contact: someone@elsewhere.test)', Config::fromArray($set)->playlistUserAgent(), 'an owner who chooses to put a contact in it can');
+
+        foreach ([[], '', 7, null, str_repeat('a', 201), "bad\r\nHeader: x", "tab\tin it"] as $bad) {
+            $a = $this->base();
+            $a['playlist'] = ['user_agent' => $bad];
+            $this->assertSame($default, Config::fromArray($a)->playlistUserAgent(), json_encode($bad));
+        }
+    }
+
     public function testAnIntegerOwnerIdIsReadAsText(): void
     {
         $a = $this->base();

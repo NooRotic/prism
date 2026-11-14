@@ -245,15 +245,24 @@ const parseOk = (json: unknown): { ok: true } => {
   return { ok: true }
 }
 
-interface RequestOptions {
+interface RequestOptions<E = never> {
   method?: 'GET' | 'POST'
   body?: unknown
   signal?: AbortSignal
-  /** Map a 404 to `not_found` (the two actions) instead of `unavailable` (a read of a server with no admin side). */
+  /** Map a 404 to `not_found` (the actions) instead of `unavailable` (a read of a server with no admin side). */
   notFound?: boolean
+  /**
+   * For the stream actions: turns a 409 or 422 answer (already parsed, or null when it was not JSON) into a result of its
+   * own, or null when it is not one this code knows (that becomes `unavailable`).
+   */
+  onRefusal?: (status: number, body: unknown) => E | null
 }
 
-async function request<T>(path: string, parse: (json: unknown) => T, options: RequestOptions = {}): Promise<AdminResult<T> | { kind: 'not_found' }> {
+async function request<T, E = never>(
+  path: string,
+  parse: (json: unknown) => T,
+  options: RequestOptions<E> = {},
+): Promise<AdminResult<T> | { kind: 'not_found' } | E> {
   if (!HISTORY_ENABLED) return { kind: 'unavailable' }
   const token = getAdminToken()
   if (!token) return { kind: 'signed_out' }
@@ -281,6 +290,10 @@ async function request<T>(path: string, parse: (json: unknown) => T, options: Re
     }
     if (response.status === 429) return { kind: 'busy' }
     if (response.status === 404) return options.notFound ? { kind: 'not_found' } : { kind: 'unavailable' }
+    if ((response.status === 409 || response.status === 422) && options.onRefusal) {
+      const body: unknown = await response.json().catch(() => null)
+      return options.onRefusal(response.status, body) ?? { kind: 'unavailable' }
+    }
     if (!response.ok) return { kind: 'unavailable' }
 
     return { kind: 'ok', data: parse(await response.json()) }
@@ -313,3 +326,143 @@ const act = (path: string, twitchId: string, signal?: AbortSignal): Promise<Admi
 export const removeChannel = (twitchId: string, signal?: AbortSignal) => act('/api/admin/channels/remove', twitchId, signal)
 /** Lifts a block. */
 export const unblockChannel = (twitchId: string, signal?: AbortSignal) => act('/api/admin/channels/unblock', twitchId, signal)
+
+// ---- The playlist (the Playlist screen)
+
+export const STREAM_STATES = ['new', 'working', 'suspect', 'dead', 'removed', 'unplayable', 'held'] as const
+export type StreamState = (typeof STREAM_STATES)[number]
+/** The states visitors can see: the server lists a stream on the visitor page (and lets it be the default) only in these. */
+export const LISTED_STATES: readonly StreamState[] = ['new', 'working', 'suspect']
+
+/** One stream as the owner sees it: every state, with the address (it is the owner's own list, shown as a host on screen). */
+export interface AdminStream {
+  publicId: string
+  name: string
+  url: string
+  groups: string[]
+  country: string | null
+  kind: 'hls' | 'dash'
+  state: StreamState
+  /** Why a stream is unlisted: `http` (unplayable) or `port` (held). */
+  stateReason: string | null
+  pinned: boolean
+  isDefault: boolean
+  source: string
+  hasLogo: boolean
+  addedAt: string
+}
+export interface AdminStreams {
+  streams: AdminStream[]
+  /** How many streams match the filters, not how many are on this page. */
+  total: number
+  /** How many streams are in each state (every stream, whatever the filters). Only states that have streams are present. */
+  counts: Partial<Record<StreamState, number>>
+  limit: number
+  offset: number
+}
+export interface StreamFilters {
+  text: string
+  state: StreamState | ''
+  /** A lower-case two-letter flag code, or ''. */
+  country: string
+}
+
+const parseStreams = (json: unknown): AdminStreams => {
+  const o = rec(json)
+  const counts: Partial<Record<StreamState, number>> = {}
+  for (const [state, n] of Object.entries(rec(o.counts))) counts[oneOf(state, STREAM_STATES)] = num(n)
+  return {
+    streams: list(o.streams).map((s) => {
+      const r = rec(s)
+      return {
+        publicId: str(r.public_id),
+        name: str(r.name),
+        url: str(r.url),
+        groups: list(r.groups).map(str),
+        country: strOrNull(r.country),
+        kind: oneOf(r.kind, ['hls', 'dash'] as const),
+        state: oneOf(r.state, STREAM_STATES),
+        stateReason: strOrNull(r.state_reason),
+        pinned: bool(r.pinned),
+        isDefault: bool(r.is_default),
+        source: str(r.source),
+        hasLogo: bool(r.has_logo),
+        addedAt: str(r.added_at),
+      }
+    }),
+    total: num(o.total),
+    counts,
+    limit: num(o.limit),
+    offset: num(o.offset),
+  }
+}
+
+/** One page of the playlist, filtered. Only the filters that are set are sent. */
+export const getStreams = (filters: StreamFilters, page: { limit: number; offset: number }, signal?: AbortSignal) => {
+  const query = new URLSearchParams()
+  if (filters.text) query.set('text', filters.text)
+  if (filters.state) query.set('state', filters.state)
+  if (filters.country) query.set('country', filters.country)
+  query.set('limit', String(page.limit))
+  query.set('offset', String(page.offset))
+  return read(`/api/admin/streams?${query.toString()}`, parseStreams, signal)
+}
+
+/**
+ * What a successful stream action reports. For an add, `state` (and `stateReason`) say how the stream was stored: an http://
+ * address or an unusual port is stored but hidden from visitors. `snapshot` is false when the change was saved but the
+ * visitor list could not be refreshed yet.
+ */
+export interface StreamActionDone {
+  publicId: string | null
+  state: StreamState | null
+  stateReason: string | null
+  snapshot: boolean
+}
+
+/** What a stream action came to. `rejected` carries the rule that refused it; `already_known` the stream that is already there. */
+export type StreamActionResult =
+  | AdminResult<StreamActionDone>
+  | { kind: 'not_found' }
+  | { kind: 'rejected'; reason: string }
+  | { kind: 'already_known'; publicId: string }
+  | { kind: 'not_listed' }
+
+const parseStreamAction = (json: unknown): StreamActionDone => {
+  const o = rec(json)
+  if (o.ok !== true) throw new ShapeError()
+  return {
+    publicId: o.public_id === undefined ? null : str(o.public_id),
+    state: o.state === undefined ? null : oneOf(o.state, STREAM_STATES),
+    stateReason: o.state_reason === undefined ? null : strOrNull(o.state_reason),
+    snapshot: bool(o.snapshot),
+  }
+}
+
+type Refusal = { kind: 'rejected'; reason: string } | { kind: 'already_known'; publicId: string } | { kind: 'not_listed' }
+
+function parseRefusal(status: number, body: unknown): Refusal | null {
+  if (!isRecord(body)) return null
+  if (status === 422 && body.error === 'rejected' && typeof body.reason === 'string') return { kind: 'rejected', reason: body.reason }
+  if (status === 409 && body.error === 'already_known' && typeof body.public_id === 'string') return { kind: 'already_known', publicId: body.public_id }
+  if (status === 409 && body.error === 'not_listed') return { kind: 'not_listed' }
+  return null
+}
+
+const streamAct = (path: string, body: unknown, signal?: AbortSignal): Promise<StreamActionResult> =>
+  request(path, parseStreamAction, { method: 'POST', body, signal, notFound: true, onRefusal: parseRefusal }) as Promise<StreamActionResult>
+
+/** Adds a stream by the same rules as the import. */
+export const addStream = (input: { url: string; name: string; group: string }, signal?: AbortSignal) =>
+  streamAct('/api/admin/streams/add', input, signal)
+/** Renames a stream and replaces its groups. */
+export const updateStream = (publicId: string, input: { name: string; groups: string[] }, signal?: AbortSignal) =>
+  streamAct('/api/admin/streams/update', { public_id: publicId, ...input }, signal)
+export const pinStream = (publicId: string, pinned: boolean, signal?: AbortSignal) =>
+  streamAct('/api/admin/streams/pin', { public_id: publicId, pinned }, signal)
+/** Makes a stream the one the HLS page opens on. */
+export const setDefaultStream = (publicId: string, signal?: AbortSignal) =>
+  streamAct('/api/admin/streams/default', { public_id: publicId }, signal)
+/** Removes a stream (it stays as a tombstone, so a re-import cannot bring it back). */
+export const removeStream = (publicId: string, signal?: AbortSignal) =>
+  streamAct('/api/admin/streams/remove', { public_id: publicId }, signal)

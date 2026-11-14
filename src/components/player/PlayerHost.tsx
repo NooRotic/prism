@@ -18,6 +18,7 @@ import {
 import type { PlayerProps } from '../../types/player'
 import { useApp } from '../../contexts/AppContext'
 import { logger } from '../../lib/logger'
+import { logPlayback } from '../../lib/playbackLog'
 import FallbackCard from './FallbackCard'
 
 // Error boundary catches DOM reconciliation crashes from video.js
@@ -150,6 +151,10 @@ export default function PlayerHost({
     (error: string) => {
       const currentStep = fallbackStepRef.current
       const nextStep = currentStep + 1
+      // For the playback debug output: which engine gave up, why, and what happens next.
+      logPlayback('warn', 'host', `${chain[currentStep] ?? 'engine'} gave up: ${error}`)
+      const upcoming = chain[nextStep] ?? 'fallback'
+      logPlayback('info', 'host', upcoming === 'fallback' ? 'no engine left; showing the error' : `trying ${upcoming}`)
       setLastTransitionAt(Date.now())
       if (nextStep < chain.length) {
         const nextEngine = chain[nextStep]
