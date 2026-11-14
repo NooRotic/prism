@@ -230,8 +230,10 @@ final class AdminPlaylistTest extends DbTestCase
 
         $http = $this->json($this->post('add', ['url' => 'http://a.test/x.m3u8', 'name' => 'Plain http', 'group' => '']));
         $this->assertSame(['unplayable', 'http'], [$this->row($http['public_id'])['state'], $this->row($http['public_id'])['state_reason']]);
+        $this->assertSame(['unplayable', 'http'], [$http['state'], $http['state_reason']], 'the answer says the stream is hidden from visitors, and why');
         $held = $this->json($this->post('add', ['url' => 'https://b.test:8443/x.m3u8', 'name' => 'Odd port', 'group' => '']));
         $this->assertSame(['held', 'port'], [$this->row($held['public_id'])['state'], $this->row($held['public_id'])['state_reason']]);
+        $this->assertSame(['held', 'port'], [$held['state'], $held['state_reason']]);
         $dash = $this->json($this->post('add', ['url' => 'https://c.test/live/manifest.mpd', 'name' => 'Dash one', 'group' => '']));
         $this->assertSame(['dash', '["Other"]'], [$this->row($dash['public_id'])['kind'], $this->row($dash['public_id'])['groups_json']]);
     }
@@ -244,6 +246,7 @@ final class AdminPlaylistTest extends DbTestCase
         $body = $this->json($response);
         $this->assertTrue($body['ok']);
         $this->assertTrue($body['snapshot']);
+        $this->assertSame(['new', null], [$body['state'], $body['state_reason']], 'a normal address is listed, as unchecked');
         $this->assertSame(StreamUrl::publicId(StreamUrl::id('https://example.com/Live/A.m3u8')), $body['public_id']);
 
         $row = $this->row($body['public_id']);

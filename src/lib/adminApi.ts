@@ -406,18 +406,35 @@ export const getStreams = (filters: StreamFilters, page: { limit: number; offset
   return read(`/api/admin/streams?${query.toString()}`, parseStreams, signal)
 }
 
+/**
+ * What a successful stream action reports. For an add, `state` (and `stateReason`) say how the stream was stored: an http://
+ * address or an unusual port is stored but hidden from visitors. `snapshot` is false when the change was saved but the
+ * visitor list could not be refreshed yet.
+ */
+export interface StreamActionDone {
+  publicId: string | null
+  state: StreamState | null
+  stateReason: string | null
+  snapshot: boolean
+}
+
 /** What a stream action came to. `rejected` carries the rule that refused it; `already_known` the stream that is already there. */
 export type StreamActionResult =
-  | AdminResult<{ publicId: string | null; snapshot: boolean }>
+  | AdminResult<StreamActionDone>
   | { kind: 'not_found' }
   | { kind: 'rejected'; reason: string }
   | { kind: 'already_known'; publicId: string }
   | { kind: 'not_listed' }
 
-const parseStreamAction = (json: unknown): { publicId: string | null; snapshot: boolean } => {
+const parseStreamAction = (json: unknown): StreamActionDone => {
   const o = rec(json)
   if (o.ok !== true) throw new ShapeError()
-  return { publicId: o.public_id === undefined ? null : str(o.public_id), snapshot: bool(o.snapshot) }
+  return {
+    publicId: o.public_id === undefined ? null : str(o.public_id),
+    state: o.state === undefined ? null : oneOf(o.state, STREAM_STATES),
+    stateReason: o.state_reason === undefined ? null : strOrNull(o.state_reason),
+    snapshot: bool(o.snapshot),
+  }
 }
 
 type Refusal = { kind: 'rejected'; reason: string } | { kind: 'already_known'; publicId: string } | { kind: 'not_listed' }

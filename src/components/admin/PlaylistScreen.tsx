@@ -87,7 +87,9 @@ export default function PlaylistScreen() {
   }, [text])
   useEffect(() => () => controller.current?.abort(), [])
 
-  const streams = useAdminResource((signal) => getStreams({ text: query, state, country }, { limit: PAGE_SIZE, offset }, signal), [query, state, country, offset])
+  // The server takes a country as exactly two letters (anything else is a 400): while one letter is typed, no filter yet.
+  const countryFilter = country.length === 2 ? country : ''
+  const streams = useAdminResource((signal) => getStreams({ text: query, state, country: countryFilter }, { limit: PAGE_SIZE, offset }, signal), [query, state, countryFilter, offset])
 
   // The list stays on screen while it reloads after an action (a table that vanished on every click would be hard to use).
   const [kept, setKept] = useState<AdminStreams | null>(null)
@@ -139,7 +141,14 @@ export default function PlaylistScreen() {
     const result = await run((signal) => addStream({ url: address.trim(), name: name.trim(), group: group.trim() }, signal))
     if (result === null) return
     if (result.kind === 'ok') {
-      setNotice(`Added “${name.trim()}”.`)
+      // An http:// address or an unusual port is stored but never shown to visitors: say so, not only "added".
+      const hidden =
+        result.data.state === 'unplayable'
+          ? ' Visitors will not see it: addresses that start with http:// cannot play on this page.'
+          : result.data.state === 'held'
+            ? ' Visitors will not see it: it uses an unusual port (not 80 or 443).'
+            : ''
+      setNotice(`Added “${name.trim()}”.${hidden}`)
       setAddError(null)
       setAddress('')
       setName('')

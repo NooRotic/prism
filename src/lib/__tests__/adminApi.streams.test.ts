@@ -172,12 +172,27 @@ describe('the five stream actions', () => {
     expect(JSON.parse(init.body)).toEqual(body)
   })
 
-  it('returns the new id for an add, and says whether the visitor list was refreshed', async () => {
-    fetchMock.mockReturnValueOnce(reply(200, { ok: true, public_id: ID, snapshot: true }))
-    expect(await addStream({ url: 'https://a.test/x', name: 'A', group: '' })).toEqual({ kind: 'ok', data: { publicId: ID, snapshot: true } })
+  it('returns the new id and the state it was stored in for an add, and says whether the visitor list was refreshed', async () => {
+    fetchMock.mockReturnValueOnce(reply(200, { ok: true, public_id: ID, state: 'new', state_reason: null, snapshot: true }))
+    expect(await addStream({ url: 'https://a.test/x', name: 'A', group: '' })).toEqual({
+      kind: 'ok',
+      data: { publicId: ID, state: 'new', stateReason: null, snapshot: true },
+    })
+
+    fetchMock.mockReturnValueOnce(reply(200, { ok: true, public_id: ID, state: 'unplayable', state_reason: 'http', snapshot: true }))
+    expect(await addStream({ url: 'http://a.test/x', name: 'A', group: '' })).toEqual({
+      kind: 'ok',
+      data: { publicId: ID, state: 'unplayable', stateReason: 'http', snapshot: true },
+    })
 
     fetchMock.mockReturnValueOnce(reply(200, { ok: true, snapshot: false }))
-    expect(await removeStream(ID)).toEqual({ kind: 'ok', data: { publicId: null, snapshot: false } })
+    expect(await removeStream(ID)).toEqual({ kind: 'ok', data: { publicId: null, state: null, stateReason: null, snapshot: false } })
+  })
+
+  it('treats a state nobody knows in an add answer as a wrong shape', async () => {
+    fetchMock.mockReturnValueOnce(reply(200, { ok: true, public_id: ID, state: 'mystery', state_reason: null, snapshot: true }))
+
+    expect(await addStream({ url: 'https://a.test/x', name: 'A', group: '' })).toEqual({ kind: 'unavailable' })
   })
 
   it.each(ACTIONS)('%s: a 404 is "not found", not a broken server', async (_name, call) => {
