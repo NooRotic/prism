@@ -17,6 +17,30 @@ controller with old classes. It only adds and replaces files: a file you remove 
 you delete it by hand. Unlike the owner's inferno recipe there is no scp fallback: without a password it stops with a
 message.
 
+## The admin side and the usage counters
+
+Design: [docs/superpowers/specs/2026-11-13-playlist-admin-design.md](../docs/superpowers/specs/2026-11-13-playlist-admin-design.md)
+(piece 1). The tables come from `migrations/002_admin.sql`, applied by `bin/install.php` like the first schema.
+
+- **Usage counters.** `POST /api/hit` with a plain-text JSON body `{"section":"twitch"}` (sections: `home`, `twitch`,
+  `youtube`, `hls-dash`, `chat-popout`, `other`) adds one to that UTC day's count: 204, or 400 / 413 / 429. A global cap of
+  600 a minute bounds a runaway script. No visitor data is kept; the counts are a floor and can be inflated, so they inform
+  the owner and decide nothing. Each new tracked channel is also counted per day (`new_channels`).
+- **The admin API** (`/api/admin/*`: `session`, `overview`, `usage`, `tt`, `security`, `channels`, `channels/remove`,
+  `channels/unblock`) answers only the owner. The request carries `Authorization: Bearer <Twitch token>`; the server asks
+  Twitch who it belongs to and accepts it only if the user is `admin.owner_twitch_id`, the token was issued to
+  `admin.frontend_client_id` (PRISM's own app) and it has **no scopes**. Everything else is refused: a valid Twitch user who is
+  not the owner is written to `admin_attempts` by name (the one thing the server remembers about a person; purged after
+  90 days, 1,000 rows at most), and the owner's own wrong kind of token is refused without a record.
+- **Config.** Add to `/prism-data/config.php` (neither value is a secret; `config.example.php` has the block):
+  `'admin' => ['owner_twitch_id' => '<numeric id>', 'frontend_client_id' => '<VITE_TWITCH_CLIENT_ID>']`. `bin/twitch-id.php
+  <login>` prints a login's numeric id. Until both are set, or with `'enabled' => false`, every `/api/admin/*` path answers
+  404; a wrong value switches the admin side off and never breaks the public API.
+- **Changes the owner makes** (Remove and block, Unblock) are written to `admin_audit` in the same transaction as the change.
+  `bin/remove-channel.php` stays as a fallback.
+- **Deploy order.** `deploy.mjs --go`, then straight away `/usr/bin/php8.4-cli prism-data/bin/install.php` (expect
+  `applied 002_admin`). A visit never fails in between: the new-channels counter swallows its own errors.
+
 ## IONOS host notes
 
 - **Which PHP.** The scripts in `bin/` are command line only (they exit unless `PHP_SAPI` is `cli`). On this host the
