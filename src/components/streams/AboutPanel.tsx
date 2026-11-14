@@ -41,6 +41,20 @@ export default function AboutPanel({ stream, groups }: AboutPanelProps) {
   const { open, pinned, bump, reopen, close, togglePin } = useAutoFold(stream?.id ?? '', 30_000, failing)
   const panelRef = useRef<HTMLDivElement | null>(null)
 
+  // Escape closes the open panel, like the X. It stands aside while the visitor types in a field, when a modifier key is
+  // held (those are the browser's and the page's own shortcuts), and when something else already took the key.
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+      const target = event.target instanceof HTMLElement ? event.target : null
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
+      close()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, close])
+
   useEffect(() => {
     const el = panelRef.current
     if (!open || !el || typeof el.animate !== 'function') return

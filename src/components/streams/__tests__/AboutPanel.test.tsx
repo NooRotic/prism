@@ -215,6 +215,70 @@ describe('AboutPanel', () => {
     expect(container.querySelector('svg')?.getAttribute('width')).toBe('22')
   })
 
+  it('closes when Escape is pressed, and Escape opens nothing once it is folded', () => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} />)
+    expect(screen.getByRole('heading', { name: 'Alpha News' })).toBeInTheDocument()
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('heading', { name: 'Alpha News' })).toBeNull()
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('heading', { name: 'Alpha News' })).toBeNull()
+  })
+
+  it('also lets go of a pin when Escape closes it', () => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Keep this panel open' }))
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: /about this stream/i }))
+
+    expect(screen.getByRole('button', { name: 'Keep this panel open' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it.each([
+    ['another key', { key: 'Enter' }],
+    ['Escape with Ctrl', { key: 'Escape', ctrlKey: true }],
+    ['Escape with Shift', { key: 'Escape', shiftKey: true }],
+    ['Escape with Alt', { key: 'Escape', altKey: true }],
+    ['Escape with Meta', { key: 'Escape', metaKey: true }],
+  ])('does not close for %s', (_label, init) => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} />)
+
+    fireEvent.keyDown(document.body, init)
+
+    expect(screen.getByRole('heading', { name: 'Alpha News' })).toBeInTheDocument()
+  })
+
+  it('leaves Escape alone while the visitor is typing in a field, or when something else already used it', () => {
+    render(
+      <>
+        <input aria-label="Search" />
+        <AboutPanel stream={stream()} groups={GROUPS} />
+      </>,
+    )
+
+    fireEvent.keyDown(screen.getByLabelText('Search'), { key: 'Escape' })
+    expect(screen.getByRole('heading', { name: 'Alpha News' })).toBeInTheDocument()
+
+    const used = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    used.preventDefault()
+    document.body.dispatchEvent(used)
+    expect(screen.getByRole('heading', { name: 'Alpha News' })).toBeInTheDocument()
+  })
+
+  it('stops listening for Escape when the panel goes away', () => {
+    const add = vi.spyOn(document, 'addEventListener')
+    const remove = vi.spyOn(document, 'removeEventListener')
+    const { unmount } = render(<AboutPanel stream={stream()} groups={GROUPS} />)
+    const keydowns = add.mock.calls.filter(([type]) => type === 'keydown').length
+    expect(keydowns).toBeGreaterThan(0)
+
+    unmount()
+
+    expect(remove.mock.calls.filter(([type]) => type === 'keydown').length).toBe(keydowns)
+  })
+
   it('a pin keeps it open', () => {
     render(<AboutPanel stream={stream()} groups={GROUPS} />)
     const pin = screen.getByRole('button', { name: /keep.*open/i })
