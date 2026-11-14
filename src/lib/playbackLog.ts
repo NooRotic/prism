@@ -13,6 +13,8 @@ export interface PlaybackEntry {
 }
 
 export interface PlaybackSnapshot {
+  /** Counts the sessions begun on this page (0 while idle), so a reader can tell that a new one started. */
+  session: number
   status: PlaybackStatus
   attempts: number
   url: string | null
@@ -26,9 +28,10 @@ export interface PlaybackSnapshot {
 }
 
 const MAX_ENTRIES = 300
-const IDLE: PlaybackSnapshot = { status: 'idle', attempts: 0, url: null, kind: null, startedAt: null, entries: [], inspection: null, avoided: [] }
+const IDLE: PlaybackSnapshot = { session: 0, status: 'idle', attempts: 0, url: null, kind: null, startedAt: null, entries: [], inspection: null, avoided: [] }
 
 let snapshot: PlaybackSnapshot = IDLE
+let sessions = 0
 const listeners = new Set<() => void>()
 
 function publish(next: PlaybackSnapshot): void {
@@ -44,6 +47,7 @@ function entry(at: number, level: PlaybackLevel, source: string, message: string
 export function beginPlayback(info: { url: string; kind: string }): void {
   const now = Date.now()
   publish({
+    session: ++sessions,
     status: 'starting',
     attempts: 1,
     url: info.url,
