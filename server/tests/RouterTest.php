@@ -83,6 +83,17 @@ final class RouterTest extends DbTestCase
         $this->assertStringContainsString('Content-Type', $response->headers['Access-Control-Allow-Headers']);
     }
 
+    public function testAdminPreflightAllowsAuthorizationButPublicPathsDoNot(): void
+    {
+        $admin = $this->call('OPTIONS', '/api/admin/session');
+        $public = $this->call('OPTIONS', '/api/visit');
+
+        $this->assertSame(204, $admin->status);
+        $this->assertStringContainsString('Authorization', $admin->headers['Access-Control-Allow-Headers']);
+        $this->assertStringContainsString('Content-Type', $admin->headers['Access-Control-Allow-Headers']);
+        $this->assertSame('Content-Type', $public->headers['Access-Control-Allow-Headers']);
+    }
+
     public function testADisallowedOriginIs403AndGetsNoCorsHeaders(): void
     {
         foreach ([['OPTIONS', '/api/visit'], ['GET', '/api/channel'], ['POST', '/api/visit']] as [$method, $path]) {

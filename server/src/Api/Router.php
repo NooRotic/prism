@@ -54,7 +54,10 @@ final class Router
         if ($request->method === 'OPTIONS') {
             return $this->withCors($request, new ApiResponse(204, self::NO_STORE + [
                 'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers' => 'Content-Type',
+                // Only the admin paths take a header beyond Content-Type, so a public page can never send Authorization.
+                'Access-Control-Allow-Headers' => str_starts_with(rtrim($request->path, '/') . '/', '/api/admin/')
+                    ? 'Authorization, Content-Type'
+                    : 'Content-Type',
                 'Access-Control-Max-Age' => '600',
             ], ''));
         }
