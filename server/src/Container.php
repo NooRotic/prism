@@ -9,6 +9,7 @@ use Prism\History\Admin\AdminController;
 use Prism\History\Admin\AdminGuard;
 use Prism\History\Admin\AdminReports;
 use Prism\History\Admin\ChannelAdmin;
+use Prism\History\Admin\PlaylistAdmin;
 use Prism\History\Admin\TokenCache;
 use Prism\History\Api\Router;
 use Prism\History\Api\StreamsController;
@@ -75,6 +76,15 @@ final class Container
             $s['clock'],
         );
         $audit = new AuditStore($pdo, $s['clock']);
+        $streams = new StreamStore($pdo, $s['clock']);
+        $playlistAdmin = new PlaylistAdmin(
+            $pdo,
+            $streams,
+            $audit,
+            new SnapshotWriter($streams, $s['clock'], $config->playlistDataDir()),
+            $s['clock'],
+            $config->playlistLogoDir(),
+        );
         $reports = new AdminReports(
             $config,
             $s['counters'],
@@ -86,7 +96,7 @@ final class Container
             $s['clock'],
         );
 
-        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit)), new StreamsController($config->playlistDataDir()));
+        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit), $playlistAdmin), new StreamsController($config->playlistDataDir()));
     }
 
     /** The schema migrator over the migrations/ folder that ships next to src/. */
