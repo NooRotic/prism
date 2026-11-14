@@ -15,7 +15,7 @@ use Prism\History\VisitService;
 use Throwable;
 
 /**
- * The whole HTTP API: POST /api/visit and GET /api/channel, plus the CORS preflight.
+ * The whole HTTP API: POST /api/visit, GET /api/channel, POST /api/hit, GET /api/streams and the admin routes, plus the CORS preflight.
  *
  * A request that carries an Origin which is not in the allow-list is refused. That only stops other websites'
  * browsers (anything can forge the header); the real protection is the Twitch check and the caps. A request
@@ -35,6 +35,7 @@ final class Router
         private Logger $logger,
         private HitRecorder $hits,
         private AdminController $admin,
+        private StreamsController $streams,
     ) {
     }
 
@@ -76,6 +77,7 @@ final class Router
             '/api/visit' => $request->method === 'POST' ? $this->visit($request) : $this->notAllowed('POST, OPTIONS'),
             '/api/channel' => $request->method === 'GET' ? $this->channel($request) : $this->notAllowed('GET, OPTIONS'),
             '/api/hit' => $request->method === 'POST' ? $this->hit($request) : $this->notAllowed('POST, OPTIONS'),
+            '/api/streams' => $this->streams->handle($request), // answers its own 405: GET and OPTIONS only
             default => ApiResponse::json(404, ['error' => 'not_found'], self::NO_STORE),
         });
     }
@@ -158,6 +160,14 @@ final class Router
             return $response;
         }
 
-        return $response->withHeaders(['Access-Control-Allow-Origin' => $request->origin, 'Vary' => 'Origin']);
+        // A route may already vary on something else (the streams list varies on Accept-Encoding): keep that, add Origin.
+        $vary = $response->headers['Vary'] ?? null;
+        if ($vary === null) {
+            $vary = 'Origin';
+        } elseif (!in_array('origin', array_map(static fn (string $v): string => strtolower(trim($v)), explode(',', $vary)), true)) {
+            $vary .= ', Origin';
+        }
+
+        return $response->withHeaders(['Access-Control-Allow-Origin' => $request->origin, 'Vary' => $vary]);
     }
 }

@@ -15,6 +15,8 @@ final class Request
         public ?string $origin,
         public string $body,
         public ?string $authorization = null,
+        public ?string $ifNoneMatch = null,
+        public ?string $acceptEncoding = null,
     ) {
     }
 
@@ -28,6 +30,8 @@ final class Request
             isset($_SERVER['HTTP_ORIGIN']) ? (string) $_SERVER['HTTP_ORIGIN'] : null,
             (string) file_get_contents('php://input', false, null, 0, 1025),
             self::authorizationFromGlobals(),
+            isset($_SERVER['HTTP_IF_NONE_MATCH']) && is_string($_SERVER['HTTP_IF_NONE_MATCH']) ? $_SERVER['HTTP_IF_NONE_MATCH'] : null,
+            isset($_SERVER['HTTP_ACCEPT_ENCODING']) && is_string($_SERVER['HTTP_ACCEPT_ENCODING']) ? $_SERVER['HTTP_ACCEPT_ENCODING'] : null,
         );
     }
 

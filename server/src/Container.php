@@ -11,6 +11,7 @@ use Prism\History\Admin\AdminReports;
 use Prism\History\Admin\ChannelAdmin;
 use Prism\History\Admin\TokenCache;
 use Prism\History\Api\Router;
+use Prism\History\Api\StreamsController;
 use Prism\History\Http\CurlHttp;
 use Prism\History\Http\HttpClient;
 use Prism\History\Store\AttemptStore;
@@ -76,7 +77,7 @@ final class Container
             $s['clock'],
         );
 
-        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit)));
+        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit)), new StreamsController($config->playlistDataDir()));
     }
 
     /** The schema migrator over the migrations/ folder that ships next to src/. */
