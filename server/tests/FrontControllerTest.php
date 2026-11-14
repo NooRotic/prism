@@ -136,6 +136,20 @@ final class FrontControllerTest extends DbTestCase
         $this->assertSame("ini_set('display_errors', '0');", $statements[0]);
     }
 
+    public function testHtaccessPassesTheAuthorizationHeaderOnBeforeTheRewrite(): void
+    {
+        $htaccess = (string) file_get_contents(self::PUBLIC_DIR . '/.htaccess');
+
+        // The IONOS PHP is a CGI build that does not hand the Authorization header over by itself (checked live
+        // 2026-11-14). The admin API needs it, so Apache passes it on as an environment variable first.
+        $this->assertStringContainsString('RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]', $htaccess);
+        $this->assertLessThan(
+            strpos($htaccess, 'RewriteRule ^ /index.php [L]'),
+            strpos($htaccess, 'E=HTTP_AUTHORIZATION'),
+            'the pass-through must come before the rule that ends the rewrite',
+        );
+    }
+
     public function testHtaccessDisablesIndexesAndRoutesEverythingToTheFrontController(): void
     {
         $htaccess = (string) file_get_contents(self::PUBLIC_DIR . '/.htaccess');
