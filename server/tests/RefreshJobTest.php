@@ -293,6 +293,27 @@ final class RefreshJobTest extends DbTestCase
         $this->assertSame(1, $this->snapshotCount());
     }
 
+    public function testARunRecordsItsCountsAndAnAlreadyRunningOneDoesNot(): void
+    {
+        $state = new \Prism\History\Store\JobState($this->pdo, $this->clock);
+        $this->assertNull($state->get('refresh_last_run'));
+        $other = Database::pdo();
+        $other->query("SELECT GET_LOCK('" . RunLock::NAME . "', 0)")->fetchColumn();
+
+        $this->job()->run();
+        $this->assertNull($state->get('refresh_last_run'), 'a run that did not get the lock is not a run');
+
+        $other->query("SELECT RELEASE_LOCK('" . RunLock::NAME . "')")->fetchColumn();
+        $this->job()->run();
+
+        $stored = json_decode((string) $state->get('refresh_last_run'), true);
+        $this->assertSame($this->clock->nowMs(), $stored['at_ms']);
+        $this->assertSame('done', $stored['stopped_by']);
+        $this->assertSame(0, $stored['tt_ok']);
+        $this->assertArrayHasKey('profiles', $stored);
+        $this->assertArrayHasKey('dormant', $stored);
+    }
+
     public function testAnOverlappingRunDoesNothing(): void
     {
         $this->track('1', 'alice');

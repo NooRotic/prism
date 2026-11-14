@@ -93,6 +93,14 @@ final class TtGate
         return $this->lastRefusal;
     }
 
+    /** When the 429 pause ends (milliseconds since the epoch), or null when none is in force. */
+    public function pausedUntilMs(): ?int
+    {
+        $until = (int) ($this->state->get(self::PAUSED_UNTIL) ?? '0');
+
+        return $this->clock->nowMs() < $until ? $until : null;
+    }
+
     /** True while a 429 pause is in force. */
     public function isPaused(): bool
     {

@@ -32,6 +32,18 @@ final class TtGateTest extends DbTestCase
         return $this->state->get('tt_calls:2026-11-12');
     }
 
+    public function testPausedUntilIsNullUntilA429(): void
+    {
+        $gate = $this->gate();
+        $this->assertNull($gate->pausedUntilMs());
+
+        $gate->pauseForRestOfDay(null);
+
+        $this->assertSame(strtotime('2026-11-13T00:00:00Z') * 1000, $gate->pausedUntilMs());
+        $this->clock->advanceMs(86_400_000);
+        $this->assertNull($gate->pausedUntilMs(), 'the pause is over');
+    }
+
     public function testFirstCallPassesImmediately(): void
     {
         $this->assertTrue($this->gate()->acquire(false));

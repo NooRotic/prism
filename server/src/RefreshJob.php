@@ -6,6 +6,7 @@ namespace Prism\History;
 
 use Prism\History\Store\BioLinkStore;
 use Prism\History\Store\ChannelStore;
+use Prism\History\Store\JobState;
 use Prism\History\Store\SnapshotStore;
 use Prism\History\Tracker\TrackerClient;
 use Prism\History\Tracker\TrackerResult;
@@ -43,6 +44,7 @@ final class RefreshJob
         private Logger $logger,
         private Clock $clock,
         private RunLock $lock,
+        private JobState $state,
     ) {
     }
 
@@ -218,6 +220,10 @@ final class RefreshJob
     private function finish(array $counts): array
     {
         $this->logger->info('refresh', $counts);
+        if ($counts['stopped_by'] !== 'already_running') {
+            // The admin screens read this: when the scheduled job last ran and how it went. Counts only.
+            $this->state->set('refresh_last_run', json_encode(['at_ms' => $this->clock->nowMs()] + $counts, JSON_THROW_ON_ERROR));
+        }
 
         return $counts;
     }
