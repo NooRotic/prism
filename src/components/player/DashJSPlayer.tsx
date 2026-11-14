@@ -4,7 +4,7 @@ import type { PlayerProps } from '../../types/player'
 import type { DashPlayerWithTracks } from '../../types/player-sdk'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
-import { logPlayback, redactAddress, redactText, setPlaybackStatus } from '../../lib/playbackLog'
+import { playbackWriter, redactAddress, redactText } from '../../lib/playbackLog'
 
 /**
  * DASH.js player wrapping MPEG-DASH manifests. dashjs is imported
@@ -43,7 +43,9 @@ export default function DashJSPlayer({
     if (!videoEl) return
 
     const playableUrl = detection.playableUrl || url
-    logPlayback('info', 'dashjs', `loading ${redactAddress(playableUrl)}`)
+    // Writes for the session that is running now and no other (a late event cannot reach the next stream's session).
+    const out = playbackWriter()
+    out.log('info', 'dashjs', `loading ${redactAddress(playableUrl)}`)
 
     // Attach native video events for play/pause/ended. dashjs's own
     // event API fires PLAYBACK_STARTED/PAUSED too, but the video
@@ -60,8 +62,8 @@ export default function DashJSPlayer({
 
     const handlePlaying = () => {
       if (!mountedRef.current) return
-      logPlayback('ok', 'dashjs', 'playing')
-      setPlaybackStatus('playing')
+      out.log('ok', 'dashjs', 'playing')
+      out.setStatus('playing')
     }
 
     videoEl.addEventListener('play', handlePlay)
@@ -74,7 +76,7 @@ export default function DashJSPlayer({
     let readyFired = false
     const loadTimeout = setTimeout(() => {
       if (!readyFired && mountedRef.current) {
-        logPlayback('warn', 'dashjs', 'no stream after 10 seconds')
+        out.log('warn', 'dashjs', 'no stream after 10 seconds')
         cb.current.onError?.('DASH stream failed to load within 10 seconds')
       }
     }, 10_000)
@@ -89,7 +91,7 @@ export default function DashJSPlayer({
         const onStreamInitialized = () => {
           readyFired = true
           clearTimeout(loadTimeout)
-          logPlayback('ok', 'dashjs', 'stream initialised')
+          out.log('ok', 'dashjs', 'stream initialised')
           if (mountedRef.current) cb.current.onReady?.()
         }
         const onErrorEvent = (e: unknown) => {
@@ -101,7 +103,7 @@ export default function DashJSPlayer({
             errData?.error?.message ||
             `DASH.js error code ${errData?.error?.code ?? 'unknown'}`
           // dash.js quotes the full address in its messages; the log never keeps a query value.
-          logPlayback('error', 'dashjs', redactText(msg), { code: errData?.error?.code ?? null })
+          out.log('error', 'dashjs', redactText(msg), { code: errData?.error?.code ?? null })
           // Autoplay / source compatibility issues: surface as
           // playback blocked so PlayerHost advances the chain.
           if (

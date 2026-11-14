@@ -6,6 +6,7 @@ import {
   formatPlaybackReport,
   getPlaybackSnapshot,
   logPlayback,
+  playbackWriter,
   redactAddress,
   redactText,
   setAvoidedFormats,
@@ -43,6 +44,64 @@ describe('redactText', () => {
 
   it('leaves text with no address alone', () => {
     expect(redactText('Video.js error 3')).toBe('Video.js error 3')
+  })
+
+  it.each([
+    ['a relative address with a query (as in a Video.js message)', 'video append of 12b failed for segment #0 in playlist 97-x/prog_index.m3u8?token=abc123 (retrying)', 'video append of 12b failed for segment #0 in playlist 97-x/prog_index.m3u8?token=*** (retrying)'],
+    ['a query that is only a token', 'GET https://h.test/a.m3u8?abcdef123 failed', 'GET https://h.test/a.m3u8?*** failed'],
+    ['a second parameter after a comma inside the query', 'https://h.test/a?x=1,token=abc2', 'https://h.test/a?x=***'],
+    ['an address in quotes and brackets', "failed ('https://h.test/a?sig=zz9') now", "failed ('https://h.test/a?sig=***') now"],
+    ['an IPv6 host', 'https://[2001:db8::1]:8443/a.m3u8?t=zz9', 'https://[2001:db8::1]:8443/a.m3u8?t=***'],
+    ['an upper-case scheme with a login', 'HTTPS://user:pw@Host.test/a?x=1', 'HTTPS://***@Host.test/a?x=***'],
+    ['a fragment that carries a token', 'https://h.test/cb#access_token=zz9', 'https://h.test/cb#***'],
+    ['a query and then a fragment', 'https://h.test/a?x=1#frag', 'https://h.test/a?x=***#***'],
+    ['a question inside a sentence', 'Could not load? Try again', 'Could not load? Try again'],
+    ['a question at the end', 'Did it work?', 'Did it work?'],
+    ['text that was already hidden', 'https://h.test/a?token=***', 'https://h.test/a?token=***'],
+  ])('hides the secret in %s', (_label, input, expected) => {
+    expect(redactText(input)).toBe(expected)
+  })
+})
+
+describe('playbackWriter', () => {
+  it('writes into the session it was made for', () => {
+    beginPlayback({ url: 'https://h.test/a.m3u8', kind: 'hls' })
+    const out = playbackWriter()
+
+    out.log('info', 'videojs', 'loadstart')
+    out.setStatus('playing')
+    out.setInspection({ readyState: 4 })
+
+    expect(getPlaybackSnapshot()).toMatchObject({ status: 'playing', inspection: { readyState: 4 } })
+    expect(getPlaybackSnapshot().entries.at(-1)?.message).toBe('loadstart')
+  })
+
+  it('stops writing once another session began, so an old engine cannot touch the next stream', () => {
+    beginPlayback({ url: 'https://one.test/a.m3u8', kind: 'hls' })
+    const old = playbackWriter()
+    beginPlayback({ url: 'https://two.test/b.m3u8', kind: 'hls' })
+
+    old.log('ok', 'videojs', 'playing')
+    old.setStatus('playing')
+    old.setInspection({ stale: true })
+
+    const snapshot = getPlaybackSnapshot()
+    expect(snapshot.status).toBe('starting')
+    expect(snapshot.inspection).toBeNull()
+    expect(snapshot.entries.map((entry) => entry.message)).toEqual(['Attempt 1: session started'])
+  })
+
+  it('stops writing when its session ended, and never writes if it was made while no session ran', () => {
+    const early = playbackWriter()
+    beginPlayback({ url: 'https://h.test/a.m3u8', kind: 'hls' })
+    const mine = playbackWriter()
+    endPlayback()
+    beginPlayback({ url: 'https://h.test/a.m3u8', kind: 'hls' })
+
+    mine.log('info', 'videojs', 'late')
+    early.log('info', 'videojs', 'early')
+
+    expect(getPlaybackSnapshot().entries.map((entry) => entry.message)).toEqual(['Attempt 1: session started'])
   })
 })
 

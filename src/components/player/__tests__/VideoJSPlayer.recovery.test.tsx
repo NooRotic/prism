@@ -11,7 +11,7 @@ vi.mock('../../../lib/playbackEnvironment', () => ({ describeDecoding: vi.fn(() 
 // current rendition and the list of renditions of the tech's `vhs`, `src` to reload with and `error(null)` to clear.
 const fake = vi.hoisted(() => {
   const handlers: Record<string, Array<() => void>> = {}
-  const vhsState = { current: undefined as string | undefined, all: [] as string[] }
+  const vhsState = { current: undefined as string | undefined, all: [] as string[], ids: [] as string[] }
   const player = {
     on: (name: string, fn: () => void) => {
       ;(handlers[name] ??= []).push(fn)
@@ -34,7 +34,7 @@ const fake = vi.hoisted(() => {
             vhs: {
               playlists: {
                 media: () => (vhsState.current === undefined ? undefined : { attributes: { CODECS: vhsState.current, BANDWIDTH: 573116, RESOLUTION: { width: 544, height: 306 } } }),
-                main: { playlists: vhsState.all.map((CODECS) => ({ attributes: { CODECS } })) },
+                main: { playlists: vhsState.all.map((CODECS, index) => ({ id: vhsState.ids[index], attributes: { CODECS } })) },
               },
             },
           },
@@ -53,6 +53,7 @@ const fake = vi.hoisted(() => {
       player.play.mockReturnValue(Promise.resolve())
       vhsState.current = undefined
       vhsState.all = []
+      vhsState.ids = []
     },
   }
 })
@@ -66,10 +67,12 @@ function mount(props: Partial<React.ComponentProps<typeof VideoJSPlayer>> = {}) 
   return render(<VideoJSPlayer url={URL_OF} detection={hls} {...props} />)
 }
 
-const decodeError = (codecs: string | undefined, all: string[]) => {
+const APPEND_FAILURE = 'video append of 56283b failed for segment #0 in playlist hdr10plus/prog_index.m3u8'
+const decodeError = (codecs: string | undefined, all: string[], message = APPEND_FAILURE, ids: string[] = []) => {
   fake.vhsState.current = codecs
   fake.vhsState.all = all
-  fake.player.error.mockReturnValue({ code: 3, message: 'video append of 56283b failed for segment #0 in playlist hdr10plus/prog_index.m3u8' })
+  fake.vhsState.ids = ids
+  fake.player.error.mockReturnValue({ code: 3, message })
   fake.emit('error')
 }
 const messages = () => getPlaybackSnapshot().entries.map((entry) => entry.message)
@@ -171,6 +174,49 @@ describe('VideoJSPlayer: logging and decode recovery', () => {
     expect(fake.player.src).not.toHaveBeenCalled()
     expect(onError).toHaveBeenCalledWith(expect.stringContaining('video append'))
     expect(avoidedFormats()).toEqual([])
+  })
+
+  it('does not treat a code 3 that is not a failed video append as a decode failure of the current format', () => {
+    const onError = vi.fn()
+    mount({ onError })
+
+    decodeError('hvc1.2.4,mp4a.40.2', ['avc1.64001f,mp4a.40.2', 'hvc1.2.4,mp4a.40.2'], 'Playback cannot continue. No available working or supported playlists.')
+
+    expect(fake.player.src).not.toHaveBeenCalled()
+    expect(avoidedFormats()).toEqual([])
+    expect(onError).toHaveBeenCalledWith('Playback cannot continue. No available working or supported playlists.')
+  })
+
+  it('finds the rendition that failed from the playlist the message names, not from the one Video.js shows as current', () => {
+    mount({ onError: vi.fn() })
+
+    decodeError(
+      'avc1.64001f,mp4a.40.2',
+      ['avc1.64001f,mp4a.40.2', 'hvc1.2.4,mp4a.40.2'],
+      'video append of 12b failed for segment #0 in playlist 1-hevc/prog_index.m3u8',
+      ['0-avc/prog_index.m3u8', '1-hevc/prog_index.m3u8'],
+    )
+
+    expect(fake.player.src).toHaveBeenCalledTimes(1)
+    expect(avoidedFormats()).toEqual(['hevc'])
+  })
+
+  it('says in the log when the rendition guard could not be installed, so a Video.js change does not go unnoticed', () => {
+    mount()
+
+    expect(getPlaybackSnapshot().entries.some((entry) => entry.level === 'warn' && entry.message.includes('rendition guard'))).toBe(true)
+  })
+
+  it('ignores a late event from this player once another session has begun', () => {
+    mount()
+    beginPlayback({ url: 'https://other.test/b.m3u8', kind: 'hls' })
+
+    fake.emit('playing')
+    fake.emit('loadstart')
+
+    const snapshot = getPlaybackSnapshot()
+    expect(snapshot.status).toBe('starting')
+    expect(snapshot.entries.map((entry) => entry.message)).toEqual(['Attempt 1: session started'])
   })
 
   it('tells the page at once when it cannot tell which format failed', () => {

@@ -63,6 +63,18 @@ describe('DashJSPlayer and the playback log', () => {
     expect(last?.message).toBe('Failed loading manifest: https://h.test/live/a.mpd?sig=***, retrying')
   })
 
+  it('ignores a late event from this player once another session has begun', async () => {
+    const { container } = render(<DashJSPlayer url={URL_OF} detection={detection} />)
+    await waitFor(() => expect(dash.player.initialize).toHaveBeenCalled())
+    beginPlayback({ url: 'https://other.test/b.mpd', kind: 'dash' })
+
+    container.querySelector('video')!.dispatchEvent(new Event('playing'))
+    dash.handlers.streamInitialized()
+
+    expect(getPlaybackSnapshot().status).toBe('starting')
+    expect(messages()).toEqual(['Attempt 1: session started'])
+  })
+
   it('moves the session to playing when the video starts playing', async () => {
     const { container } = render(<DashJSPlayer url={URL_OF} detection={detection} />)
     await waitFor(() => expect(dash.player.initialize).toHaveBeenCalled())

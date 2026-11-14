@@ -7,8 +7,17 @@ import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
 import { logger } from '../../lib/logger'
 import { describeDecoding } from '../../lib/playbackEnvironment'
-import { logPlayback, redactAddress, setPlaybackInspection, setPlaybackStatus, type PlaybackLevel } from '../../lib/playbackLog'
-import { MAX_RECOVERIES, avoidFormat, avoidedFormats, installRenditionGuard, planDecodeRecovery } from '../../lib/renditionGuard'
+import { playbackWriter, redactAddress, type PlaybackLevel } from '../../lib/playbackLog'
+import {
+  MAX_RECOVERIES,
+  avoidFormat,
+  avoidedFormats,
+  failingPlaylistId,
+  installRenditionGuard,
+  isRenditionGuardInstalled,
+  isVideoAppendFailure,
+  planDecodeRecovery,
+} from '../../lib/renditionGuard'
 
 type Player = ReturnType<typeof videojs>
 
@@ -23,7 +32,7 @@ installRenditionGuard(videojs)
 interface VhsView {
   playlists?: {
     media?: () => { attributes?: { CODECS?: string; BANDWIDTH?: number; RESOLUTION?: { width: number; height: number } } } | undefined
-    main?: { playlists?: Array<{ attributes?: { CODECS?: string }; disabled?: boolean }> }
+    main?: { playlists?: Array<{ id?: string; attributes?: { CODECS?: string; RESOLUTION?: { width: number; height: number } }; disabled?: boolean }> }
   }
 }
 
@@ -68,6 +77,10 @@ export default function VideoJSPlayer({
 
     const playableUrl = detection.playableUrl || url
 
+    // Everything this player writes to the playback log goes through this: it writes for the session that is running now
+    // and for no other, so a late event from this player cannot reach the next stream's session.
+    const out = playbackWriter()
+
     let sourceType = 'video/mp4'
     if (detection.type === 'hls' || playableUrl.includes('.m3u8')) {
       sourceType = 'application/x-mpegURL'
@@ -85,7 +98,7 @@ export default function VideoJSPlayer({
     let started = false
     const stallTimer = setTimeout(() => {
       if (started) return
-      logPlayback('warn', 'videojs', 'no data after 12 seconds')
+      out.log('warn', 'videojs', 'no data after 12 seconds')
       // A stall is not a failure: the player keeps loading, so only tell the page when it listens.
       if (cb.current.onStall) cb.current.onStall()
       else cb.current.onError?.('Stream failed to load within 12 seconds')
@@ -111,8 +124,10 @@ export default function VideoJSPlayer({
 
     playerRef.current = player
 
-    const log = (level: PlaybackLevel, message: string, data?: Record<string, unknown>) => logPlayback(level, 'videojs', message, data)
+    const log = (level: PlaybackLevel, message: string, data?: Record<string, unknown>) => out.log(level, 'videojs', message, data)
     log('info', `loading ${redactAddress(playableUrl)} as ${sourceType}`)
+    if (isRenditionGuardInstalled()) log('info', 'rendition guard active')
+    else log('warn', 'rendition guard NOT installed: a rendition that fails to decode cannot be skipped (did Video.js change?)')
 
     const readVhs = (): VhsView | undefined => {
       try {
@@ -176,7 +191,7 @@ export default function VideoJSPlayer({
     player.on('playing', () => {
       markStarted()
       log('ok', 'playing')
-      setPlaybackStatus('playing')
+      out.setStatus('playing')
       cb.current.onPlaying?.()
     })
 
@@ -207,26 +222,31 @@ export default function VideoJSPlayer({
       let failingSize: { width: number; height: number } | undefined
       let playlistCodecs: Array<string | undefined> = []
       try {
+        // An append failure names the playlist it failed on: prefer that over the one Video.js shows as current.
         const media = vhs?.playlists?.media?.()
-        failingCodecs = media?.attributes?.CODECS
-        failingSize = media?.attributes?.RESOLUTION
-        playlistCodecs = (vhs?.playlists?.main?.playlists ?? []).map((item) => item.attributes?.CODECS)
+        const all = vhs?.playlists?.main?.playlists ?? []
+        const named = failingPlaylistId(err?.message)
+        const failed = named === null ? undefined : all.find((item) => item.id === named)
+        failingCodecs = failed?.attributes?.CODECS ?? media?.attributes?.CODECS
+        failingSize = failed?.attributes?.RESOLUTION ?? media?.attributes?.RESOLUTION
+        playlistCodecs = all.map((item) => item.attributes?.CODECS)
       } catch {
         /* ignore */
       }
       log('error', `Video.js error ${err?.code ?? 'unknown'}: ${err?.message ?? '(no message)'}`, { code: err?.code ?? null, codecs: failingCodecs ?? null })
 
       if (err?.code === 3) {
-        // Video.js treats a decode failure of one rendition as fatal. Often another rendition of the same stream would
+        // Video.js treats a failed append of a video segment as fatal. Often another rendition of the same stream would
         // play (an HDR HEVC one that this machine cannot decode, next to an H.264 one), so turn that video format off
-        // and reload, at most MAX_RECOVERIES times; after that the page hears about the failure as it always did.
-        if (failingCodecs) void describeDecoding(failingCodecs, failingSize).then((line) => log('info', line))
-        const plan = planDecodeRecovery({ code: err.code, attempts: recoveries, failingCodecs, playlistCodecs })
+        // and reload, at most MAX_RECOVERIES times; after that the page hears about the failure as it always did. Code 3
+        // is also Video.js's word for other failures (no working playlist, audio appends): those are not retried here.
+        if (failingCodecs && isVideoAppendFailure(err.message)) void describeDecoding(failingCodecs, failingSize).then((line) => log('info', line))
+        const plan = planDecodeRecovery({ code: err.code, message: err.message, attempts: recoveries, failingCodecs, playlistCodecs })
         if (plan.retry) {
           recoveries++
           avoidFormat(plan.family)
           log('warn', `${plan.family} failed to decode; avoiding it and reloading (recovery ${recoveries} of ${MAX_RECOVERIES})`)
-          setPlaybackStatus('retrying')
+          out.setStatus('retrying')
           try {
             // Video.js clears an error when given null; its type declarations leave null out.
             ;(player as unknown as { error(value: null): void }).error(null)
@@ -241,7 +261,7 @@ export default function VideoJSPlayer({
         }
       }
 
-      setPlaybackInspection(inspect(err?.code, err?.message))
+      out.setInspection(inspect(err?.code, err?.message))
       if (err?.code === 4) {
         cb.current.onPlaybackBlocked?.()
         cb.current.onError?.('Video.js could not use this source (code 4)')
