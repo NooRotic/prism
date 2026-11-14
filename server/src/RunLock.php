@@ -15,7 +15,10 @@ final class RunLock
 {
     public const NAME = 'prism_history_refresh';
 
-    public function __construct(private PDO $pdo)
+    /** The logo copier's own lock, so a slow run of it never blocks the history refresh (and the other way round). */
+    public const LOGOS = 'prism_playlist_logos';
+
+    public function __construct(private PDO $pdo, private string $name = self::NAME)
     {
     }
 
@@ -23,7 +26,7 @@ final class RunLock
     public function acquire(): bool
     {
         $stmt = $this->pdo->prepare('SELECT GET_LOCK(?, 0)');
-        $stmt->execute([self::NAME]);
+        $stmt->execute([$this->name]);
 
         return (int) $stmt->fetchColumn() === 1;
     }
@@ -31,7 +34,7 @@ final class RunLock
     public function release(): void
     {
         $stmt = $this->pdo->prepare('SELECT RELEASE_LOCK(?)');
-        $stmt->execute([self::NAME]);
+        $stmt->execute([$this->name]);
         $stmt->fetchColumn();
     }
 }
