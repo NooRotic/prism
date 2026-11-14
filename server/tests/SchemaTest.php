@@ -117,6 +117,50 @@ final class SchemaTest extends DbTestCase
         $this->assertSame('1', (string) $this->pdo->query('SELECT COUNT(*) FROM snapshots')->fetchColumn());
     }
 
+    public function testAdminTablesExist(): void
+    {
+        $tables = $this->pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+
+        foreach (['usage_counters', 'admin_attempts', 'admin_audit', 'admin_token_cache'] as $table) {
+            $this->assertContains($table, $tables);
+        }
+    }
+
+    public function testUsageCounterKeyIsDayAndName(): void
+    {
+        $insert = $this->pdo->prepare('INSERT INTO usage_counters (day_utc, k, n) VALUES (?, ?, 1)');
+        $insert->execute(['2026-11-12', 'hit:home']);
+        $insert->execute(['2026-11-13', 'hit:home']);
+        $insert->execute(['2026-11-12', 'hit:twitch']);
+
+        $this->expectException(PDOException::class);
+        $insert->execute(['2026-11-12', 'hit:home']);
+    }
+
+    public function testAttemptsAreOneRowPerTwitchUser(): void
+    {
+        $insert = $this->pdo->prepare(
+            'INSERT INTO admin_attempts (twitch_id, login, first_attempt_at, last_attempt_at) VALUES (?, ?, ?, ?)',
+        );
+        $insert->execute(['7', 'someone', '2026-11-12 03:00:00', '2026-11-12 03:00:00']);
+        $row = $this->pdo->query('SELECT attempts, via_script FROM admin_attempts')->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame([1, 0], [(int) $row['attempts'], (int) $row['via_script']]);
+
+        $this->expectException(PDOException::class);
+        $insert->execute(['7', 'someone', '2026-11-12 04:00:00', '2026-11-12 04:00:00']);
+    }
+
+    public function testSecondMigrationCanBeRunAgain(): void
+    {
+        $this->pdo->exec("INSERT INTO usage_counters (day_utc, k, n) VALUES ('2026-11-12', 'hit:home', 4)");
+        $this->pdo->exec("DELETE FROM schema_migrations WHERE version = '002_admin'");
+
+        $applied = (new \Prism\History\Migrator($this->pdo, __DIR__ . '/../migrations'))->run();
+
+        $this->assertSame(['002_admin'], $applied);
+        $this->assertSame('4', (string) $this->pdo->query('SELECT n FROM usage_counters')->fetchColumn());
+    }
+
     public function testSnapshotNumbersKeepTheirSignAndSize(): void
     {
         $this->channel('1', 'alice');
