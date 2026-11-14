@@ -19,7 +19,7 @@ interface StreamGridProps {
  * A scrolling box of cards that mounts only the rows in view, so thousands of streams cost a few dozen elements.
  * `onSelect` is part of the grid's props so a caller wires one handler for the list; the cards call it.
  */
-export default function StreamGrid({ streams, selectedId, renderCard, rowHeight = 88, minCardWidth = 240 }: StreamGridProps) {
+export default function StreamGrid({ streams, selectedId, renderCard, rowHeight = 108, minCardWidth = 280 }: StreamGridProps) {
   const { containerRef, columns, totalHeight, firstIndex, endIndex, offsetY, resetScroll } = useWindowedGrid({
     itemCount: streams.length,
     rowHeight,
