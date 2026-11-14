@@ -15,7 +15,9 @@ final class AdminController
 {
     private const NO_STORE = ['Cache-Control' => 'no-store'];
 
-    public function __construct(private AdminGuard $guard, private AdminReports $reports)
+    private const MAX_BODY_BYTES = 1024;
+
+    public function __construct(private AdminGuard $guard, private AdminReports $reports, private ChannelAdmin $channelAdmin)
     {
     }
 
@@ -42,8 +44,45 @@ final class AdminController
             '/api/admin/usage' => $this->windowed($request, 14, fn (int $days): array => $this->reports->usage($days)),
             '/api/admin/tt' => $this->windowed($request, 30, fn (int $days): array => $this->reports->tt($days)),
             '/api/admin/security' => $this->read($request, fn (): array => $this->reports->security()),
+            '/api/admin/channels' => $this->channels($request),
+            '/api/admin/channels/remove' => $this->channelAction($request, fn (string $id): bool => $this->channelAdmin->removeAndBlock($id)),
+            '/api/admin/channels/unblock' => $this->channelAction($request, fn (string $id): bool => $this->channelAdmin->unblock($id)),
             default => $this->error(404, 'not_found'),
         };
+    }
+
+    private function channels(Request $request): ApiResponse
+    {
+        $query = $request->query['q'] ?? '';
+        if (!is_string($query) || preg_match('/^[A-Za-z0-9_]{0,25}$/', $query) !== 1) {
+            return $this->method($request, 'GET') ?? $this->error(400, 'bad_query');
+        }
+
+        return $this->read($request, fn (): array => $this->reports->channels($query));
+    }
+
+    /** @param callable(string):bool $act */
+    private function channelAction(Request $request, callable $act): ApiResponse
+    {
+        if ($request->method !== 'POST') {
+            return $this->notAllowed('POST, OPTIONS');
+        }
+        if (strlen($request->body) > self::MAX_BODY_BYTES) {
+            return $this->error(413, 'too_large');
+        }
+        $data = json_decode($request->body, true);
+        $id = is_array($data) ? ($data['twitch_id'] ?? null) : null;
+        if (!is_string($id) || preg_match('/^\d{1,20}$/', $id) !== 1) {
+            return $this->error(400, 'bad_request');
+        }
+
+        return $act($id) ? ApiResponse::json(200, ['ok' => true], self::NO_STORE) : $this->error(404, 'not_found');
+    }
+
+    /** A 405 when the request is not the expected method, else null. */
+    private function method(Request $request, string $expected): ?ApiResponse
+    {
+        return $request->method === $expected ? null : $this->notAllowed($expected . ', OPTIONS');
     }
 
     /** @param callable():array<string,mixed> $body */

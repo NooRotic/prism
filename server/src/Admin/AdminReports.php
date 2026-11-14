@@ -130,6 +130,12 @@ final class AdminReports
         ];
     }
 
+    /** @return array{channels:list<array<string,mixed>>,blocked:list<array<string,string>>} */
+    public function channels(string $query): array
+    {
+        return ['channels' => $this->channels->search($query, 100), 'blocked' => $this->channels->blocked(200)];
+    }
+
     /** @return list<string> */
     private function hitKeys(): array
     {
