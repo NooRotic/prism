@@ -516,6 +516,12 @@ recheck now, restore, remove and pin; host-guard events; today's download budget
   to a host back to back); failures are written at the end of their batch (after the retry and the host guard), passes at once;
   Apply's two-thirds refusal counts failures against all checked results; a voided result does not count as checked; the Health
   screen links to the Playlist screen rather than to a filtered address (the Playlist screen keeps its filter in component state).
+  After the whole-branch review: **the run guard takes one vote per host** over the last 50 hosts, only from streams expected to
+  play (never `suspect` or `dead`) and only "no answer at all" counts (the design's share-of-checks guard could stall a worker for
+  good when one big host was down or when suspect streams headed the queue); an auto-removal is refused for a row the owner pinned
+  or made the default since it was read; the launcher (`WorkerLauncher`) waits for every started worker before it releases the
+  launch lock and the lock holder asks for an eight-hour `wait_timeout`; a segment that stalls after bytes began to arrive still
+  counts as played; the public page says "about once a day" and that a redirect can add a request.
 - **Not in 3a:** visitor reports and the Health actions (recheck now, restore, remove), segment checks for DASH, checking
   more than the first variant of a master playlist.
 

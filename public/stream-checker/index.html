@@ -53,13 +53,13 @@
     <p><a href="https://prism.nooroticx.tv">PRISM</a> is a free web page for watching public live and on-demand video streams (HLS and DASH). Its list is built from public playlists, so a stream of yours may be in it. The stream checker is a small program on PRISM's server that checks the listed streams still play, so people who open PRISM are not shown dead ones.</p>
 
     <h2>What it does</h2>
-    <p>For each stream, once a day, it makes a few plain <code>GET</code> requests, the same ones a viewer's browser makes to start playback:</p>
+    <p>For each stream, about once a day (more often for a few days after a stream fails, so a short outage does not hide it), it makes a few plain <code>GET</code> requests, the same ones a viewer's browser makes to start playback:</p>
     <ul>
       <li>the stream's playlist (<code>.m3u8</code>, or the manifest for DASH);</li>
       <li>the first rendition's playlist, when the first one is a list of renditions;</li>
       <li>the first few kilobytes of one video segment.</li>
     </ul>
-    <p>Each request carries an <code>Origin</code> header naming <code>https://prism.nooroticx.tv</code>, so the checker sees whether your server lets PRISM's page play the stream (the CORS answer). It sends at most one request a second to the host named in a stream's address (a playlist that points at a shared video host can add requests to that host too). It reads no more than 256 KB of a playlist and 64 KB of a segment, follows at most three redirects, never signs in, and never fetches addresses on private or internal networks.</p>
+    <p>Each request carries an <code>Origin</code> header naming <code>https://prism.nooroticx.tv</code>, so the checker sees whether your server lets PRISM's page play the stream (the CORS answer). It sends at most one request a second to the host named in a stream's address (a redirect can add a request, and a playlist that points at a shared video host can add requests to that host too). It reads no more than 256 KB of a playlist and 64 KB of a segment, follows at most three redirects, never signs in, and never fetches addresses on private or internal networks.</p>
     <p>Its user agent is <code>PRISM-StreamChecker/1.0 (+https://prism.nooroticx.tv/stream-checker/)</code>.</p>
 
     <h2>What it keeps</h2>

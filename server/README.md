@@ -104,7 +104,7 @@ fail, and brings them back if they recover. Migration `004_checker.sql` adds its
 
 - **A check** (`src/Checker/StreamChecker.php`): GET only, always with `Origin: https://prism.nooroticx.tv`. HLS: the playlist, its
   first variant, then the first bytes of a segment (the second one when the list is live and has three or more, because a live
-  list's first segment is about to expire; `Range: bytes=0-65535`, a cut at 64 KiB is a pass). DASH: the manifest only. CORS must
+  list's first segment is about to expire; `Range: bytes=0-65535`; a cut at 64 KiB, or a stall after the bytes began to arrive, is a pass). DASH: the manifest only. CORS must
   hold on every response of the chain, hop by hop as a browser sees it (`Origin: null` after a cross-origin redirect). Hosts of
   Twitch and YouTube are never fetched (`skipped`). Everything goes through the guarded fetcher with the checker's policy: https
   only, ports 80, 443 and 1024 up except the ports Chromium refuses, a public address vetted on every hop. Results are one of a
@@ -119,9 +119,13 @@ fail, and brings them back if they recover. Migration `004_checker.sql` adds its
   owner removed is never checked or revived.** A pinned or default stream is hidden like any other when it fails, but it keeps its
   pin and default flag and is never auto-removed (the page falls back to its demo default meanwhile).
 - **Guards.** The host guard: when more than half of a host's streams (at least four) fail in a run, the failures of streams that
-  passed before are set aside (`host_guard`); streams that never passed are not protected. The run guard: when two thirds of a
-  worker's last 50 checks fail, the checker's own network is the likely cause, so the worker stops and voids those checks
-  (`voided`, treated as not checked). A failing check is tried once more at the end of its batch before it counts.
+  passed before are set aside (`host_guard`); streams that never passed are not protected. The run guard asks whether the
+  checker's own network is down: it takes ONE vote per host over the last 50 hosts a worker asked (a big host that is down is one
+  piece of evidence, not fifty), only from streams expected to play (`new`, `held(awaiting_check)`, `working`, never `suspect` or
+  `dead`), and only "no answer at all" (`unreachable`) counts against; when two thirds of those hosts did not answer, the worker
+  stops (`stopped=run_guard`) and voids the streams that voted (`voided`, treated as not checked, so they are done again by the
+  next launch). A failing check is tried once more at the end of its batch before it counts. An auto-removal is also refused for
+  a row the owner pinned or made the default since the worker read it.
 - **Shadow run, then Apply.** Until the owner presses Apply on the Health screen the checker only *records* results: no state
   changes and the visitor snapshot is not rewritten. Apply (`POST /api/admin/checker/apply`) runs the recorded first-pass results
   through the same state machine a live run uses, in one transaction with the audit row `checker.apply`, then rewrites the
@@ -148,7 +152,9 @@ fail, and brings them back if they recover. Migration `004_checker.sql` adds its
   list rows also carry `last_checked_at` and `check_result`.
 - **Rollout order (each live step needs the owner's go).** 1. Deploy the server code and run `install.php` (expect
   `applied 004_checker`; nothing changes for visitors). 2. `rejudge-held.php` dry run, then `--apply`. 3. Probe how many PHP
-  processes and cron entries the host allows: start with `checker.workers` 2. 4. The shadow first pass in one sitting:
+  processes and cron entries the host allows: start with `checker.workers` 2, read the database's `wait_timeout`
+  (`SHOW VARIABLES LIKE 'wait_timeout'`; the launcher asks for eight hours on its lock connection, a host may refuse), and run
+  `check-streams.php --limit=20` once to see both workers start and finish. 4. The shadow first pass in one sitting:
   `check-streams.php --first-pass` (not from cron: until Apply only the first pass is run, by hand). 5. Review the Health screen
   (progress, outcome, host clusters) and press Apply. 6. Enable the steady cron entry, for example every 15 minutes:
   `*/15 * * * * /usr/bin/php8.4-cli /prism-data/bin/check-streams.php` (each stream is due once a day, so the load spreads
