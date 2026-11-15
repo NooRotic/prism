@@ -98,6 +98,46 @@ final class CurlPinnedTransportTest extends TestCase
         $this->assertSame(200_000, strlen($r->body));
     }
 
+    public function testRequestHeadersArriveAtTheServer(): void
+    {
+        $r = (new CurlPinnedTransport())->get($this->url('/echo'), '127.0.0.1', self::$port, 10_000, 5, 'PRISM-test/1', ['Origin' => 'https://prism.test', 'Range' => 'bytes=0-65535']);
+
+        $decoded = json_decode($r->body, true);
+        $this->assertSame('https://prism.test', $decoded['origin']);
+        $this->assertSame('bytes=0-65535', $decoded['range']);
+    }
+
+    public function testAHeaderWithALineBreakOrABadNameIsNotSent(): void
+    {
+        $r = (new CurlPinnedTransport())->get($this->url('/echo'), '127.0.0.1', self::$port, 10_000, 5, '', [
+            'Origin' => "https://prism.test\r\nInjected: yes",
+            'Bad Name' => 'x',
+            'Range' => 'bytes=0-1',
+        ]);
+
+        $decoded = json_decode($r->body, true);
+        $this->assertNull($decoded['origin'], 'a value with a line break is dropped, not trimmed');
+        $this->assertNull($decoded['injected']);
+        $this->assertSame('bytes=0-1', $decoded['range'], 'the good header still goes');
+    }
+
+    public function testAProbeKeepsTheStatusAndTheFirstBytesOfABodyLargerThanTheLimit(): void
+    {
+        $r = (new CurlPinnedTransport())->get($this->url('/sized'), '127.0.0.1', self::$port, 65_536, 5, '', [], true);
+
+        $this->assertSame(200, $r->status);
+        $this->assertSame(65_536, strlen($r->body));
+        $this->assertTrue($r->truncated);
+    }
+
+    public function testWithoutAProbeALargerAnnouncedLengthGivesNoBodyAtAll(): void
+    {
+        $r = (new CurlPinnedTransport())->get($this->url('/sized'), '127.0.0.1', self::$port, 65_536, 5);
+
+        $this->assertTrue($r->truncated);
+        $this->assertSame('', $r->body);
+    }
+
     public function testATimeoutAndAConnectionRefusedGiveStatusZero(): void
     {
         $slow = (new CurlPinnedTransport())->get($this->url('/slow'), '127.0.0.1', self::$port, 1000, 1);

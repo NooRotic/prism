@@ -14,7 +14,7 @@ final class CurlPinnedTransport implements PinnedTransport
 {
     private const CURLE_FILESIZE_EXCEEDED = 63;
 
-    public function get(string $url, string $ip, int $port, int $maxBytes, int $timeoutSec, string $userAgent = ''): PinnedResponse
+    public function get(string $url, string $ip, int $port, int $maxBytes, int $timeoutSec, string $userAgent = '', array $requestHeaders = [], bool $probe = false): PinnedResponse
     {
         $handle = curl_init($url);
         if ($handle === false) {
@@ -34,7 +34,6 @@ final class CurlPinnedTransport implements PinnedTransport
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_ENCODING => '',
             CURLOPT_NOSIGNAL => true,
-            CURLOPT_MAXFILESIZE => $maxBytes,
             CURLOPT_HEADERFUNCTION => static function ($curl, string $line) use (&$headers): int {
                 $colon = strpos($line, ':');
                 if ($colon !== false) {
@@ -57,8 +56,24 @@ final class CurlPinnedTransport implements PinnedTransport
                 return strlen($chunk);
             },
         ];
+        // A probe wants the first bytes of a body of any length: curl would refuse an announced length over the limit before
+        // reading any of it, so only the write callback above cuts the body.
+        if (!$probe) {
+            $options[CURLOPT_MAXFILESIZE] = $maxBytes;
+        }
         if ($userAgent !== '') {
             $options[CURLOPT_USERAGENT] = $userAgent;
+        }
+        // Only a plain token as the name and a value with no control character: a line break in either would start a header
+        // of its own. Such an entry is dropped, never repaired.
+        $lines = [];
+        foreach ($requestHeaders as $name => $value) {
+            if (preg_match('/^[A-Za-z0-9-]+$/D', (string) $name) === 1 && preg_match('/[\x00-\x1f\x7f]/', $value) !== 1) {
+                $lines[] = $name . ': ' . $value;
+            }
+        }
+        if ($lines !== []) {
+            $options[CURLOPT_HTTPHEADER] = $lines;
         }
         $host = parse_url($url, PHP_URL_HOST);
         if (is_string($host) && $host !== '' && filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) === false) {

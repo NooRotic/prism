@@ -12,7 +12,7 @@ use Throwable;
 /** Plays back queued responses (or exceptions) in order and remembers every request it was given. */
 final class FakeTransport implements PinnedTransport
 {
-    /** @var list<array{url:string,ip:string,port:int,maxBytes:int,timeoutSec:int,userAgent:string}> */
+    /** @var list<array{url:string,ip:string,port:int,maxBytes:int,timeoutSec:int,userAgent:string,headers:array<string,string>,probe:bool}> */
     public array $calls = [];
 
     /** @var list<PinnedResponse|Throwable> */
@@ -37,9 +37,9 @@ final class FakeTransport implements PinnedTransport
         return new PinnedResponse($status, ['location' => $location], $body, false);
     }
 
-    public function get(string $url, string $ip, int $port, int $maxBytes, int $timeoutSec, string $userAgent = ''): PinnedResponse
+    public function get(string $url, string $ip, int $port, int $maxBytes, int $timeoutSec, string $userAgent = '', array $requestHeaders = [], bool $probe = false): PinnedResponse
     {
-        $this->calls[] = compact('url', 'ip', 'port', 'maxBytes', 'timeoutSec', 'userAgent');
+        $this->calls[] = ['url' => $url, 'ip' => $ip, 'port' => $port, 'maxBytes' => $maxBytes, 'timeoutSec' => $timeoutSec, 'userAgent' => $userAgent, 'headers' => $requestHeaders, 'probe' => $probe];
         $next = array_shift($this->queue);
         if ($next === null) {
             throw new RuntimeException('FakeTransport: a request was made that the test did not expect: ' . $url);

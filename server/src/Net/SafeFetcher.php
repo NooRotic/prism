@@ -15,52 +15,76 @@ use Throwable;
 final class SafeFetcher
 {
     private const REDIRECT_STATUSES = [301, 302, 303, 307, 308];
-    private const PORTS = [80, 443];
+
+    private FetchPolicy $policy;
 
     public function __construct(
         private Resolver $resolver,
         private PinnedTransport $transport,
         private string $userAgent,
         private int $maxRedirects = 3,
+        ?FetchPolicy $policy = null,
     ) {
+        $this->policy = $policy ?? FetchPolicy::logos();
     }
 
-    public function fetch(string $url, int $maxBytes, int $timeoutSec = 8): SafeFetchResult
+    /**
+     * @param array<string,string> $headers extra request headers; an `Origin` among them becomes `null` for the rest of the
+     *                                      chain once a redirect leaves its origin, as a browser does
+     * @param bool $probe read the first $maxBytes of a body of any length and report a cut as a result, not an error
+     *                    (the transport keeps the status); see PinnedTransport::get()
+     */
+    public function fetch(string $url, int $maxBytes, int $timeoutSec = 8, array $headers = [], bool $probe = false): SafeFetchResult
     {
         $current = $url;
+        $hops = [];
         for ($hop = 0; ; $hop++) {
             $target = $this->vet($current);
             if (is_string($target)) {
-                return self::failure($target, $current);
+                return self::failure($target, $current, $hops);
             }
             try {
-                $response = $this->transport->get($current, $target['ip'], $target['port'], $maxBytes, $timeoutSec, $this->userAgent);
+                $response = $this->transport->get($current, $target['ip'], $target['port'], $maxBytes, $timeoutSec, $this->userAgent, $headers, $probe);
             } catch (Throwable) {
-                return self::failure('network', $current);
+                return self::failure('network', $current, $hops);
             }
             if ($response->status === 0) {
-                return self::failure('network', $current);
+                return self::failure('network', $current, $hops);
             }
+            $hops[] = ['status' => $response->status, 'url' => $current, 'headers' => $response->headers];
             $location = $response->headers['location'] ?? null;
             if (in_array($response->status, self::REDIRECT_STATUSES, true) && $location !== null) {
                 if ($hop >= $this->maxRedirects) {
-                    return self::failure('redirects', $current);
+                    return self::failure('redirects', $current, $hops);
                 }
                 $next = self::resolveLocation($current, $location);
                 if ($next === null) {
-                    return self::failure('blocked', $current);
+                    return self::failure('blocked', $current, $hops);
+                }
+                if (isset($headers['Origin']) && self::originOf($next) !== self::originOf($current)) {
+                    $headers['Origin'] = 'null';
                 }
                 $current = $next;
                 continue;
             }
             $body = $response->body;
-            $tooLarge = $response->truncated || strlen($body) > $maxBytes;
+            $tooLarge = !$probe && ($response->truncated || strlen($body) > $maxBytes);
             if (strlen($body) > $maxBytes) {
                 $body = substr($body, 0, $maxBytes);
             }
 
-            return new SafeFetchResult($response->status, $response->headers, $body, $current, $tooLarge ? 'too_large' : null);
+            return new SafeFetchResult($response->status, $response->headers, $body, $current, $tooLarge ? 'too_large' : null, $hops);
         }
+    }
+
+    /** scheme://host:port with the default port spelled out, lower case: what a browser compares to decide "same origin". */
+    private static function originOf(string $url): string
+    {
+        $p = parse_url($url);
+        $scheme = strtolower((string) ($p['scheme'] ?? ''));
+        $port = $p['port'] ?? ($scheme === 'https' ? 443 : 80);
+
+        return $scheme . '://' . strtolower((string) ($p['host'] ?? '')) . ':' . $port;
     }
 
     /**
@@ -134,14 +158,14 @@ final class SafeFetcher
             return 'scheme';
         }
         $scheme = strtolower($p['scheme'] ?? '');
-        if (($scheme !== 'http' && $scheme !== 'https') || !isset($p['host']) || $p['host'] === '') {
+        if (!$this->policy->schemeAllowed($scheme) || !isset($p['host']) || $p['host'] === '') {
             return 'scheme';
         }
         if (isset($p['user']) || isset($p['pass'])) {
             return 'blocked';
         }
         $port = $p['port'] ?? ($scheme === 'https' ? 443 : 80);
-        if (!in_array($port, self::PORTS, true)) {
+        if (!$this->policy->portAllowed($port)) {
             return 'port';
         }
         $host = strtolower(trim($p['host'], '[]'));
@@ -176,8 +200,9 @@ final class SafeFetcher
         return ['ip' => $ips[0], 'port' => $port];
     }
 
-    private static function failure(string $error, string $url): SafeFetchResult
+    /** @param list<array{status:int,url:string,headers:array<string,string>}> $hops */
+    private static function failure(string $error, string $url, array $hops = []): SafeFetchResult
     {
-        return new SafeFetchResult(0, [], '', $url, $error);
+        return new SafeFetchResult(0, [], '', $url, $error, $hops);
     }
 }
