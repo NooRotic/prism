@@ -48,8 +48,8 @@ Design: the same spec, "Piece 2" and "The HLS page". The table comes from `migra
 (scheme and host lower-cased, default port and fragment dropped); the page address uses the first 12 characters
 (`public_id`). **States:** `new` (not checked yet), `working`, `suspect` are shown to visitors; `dead`, `removed`
 (a tombstone, so a re-import cannot bring it back), `unplayable` (an `http://` address: an https page cannot load it, reason
-`http`) and `held` (a port other than 80 or 443, reason `port`) are kept but never shown. Pieces 3 and 4 will move streams
-between `new`, `working`, `suspect` and `dead`.
+`http`) and `held` (a port the checker may not use: below 1024 other than 80 and 443, or one browsers refuse; reason `port`)
+are kept but never shown. The stream checker (below) moves streams between `new`, `working`, `suspect`, `dead` and `removed`.
 
 - **`GET /api/streams`** (public, origin allowlist, `ETag`, `Cache-Control: public, max-age=300`, gzip when accepted, 304 on a
   matching `If-None-Match`, 503 `{"error":"not_ready"}` until the first import) answers the visitor snapshot:
@@ -91,8 +91,68 @@ between `new`, `working`, `suspect` and `dead`.
   transaction with its audit row (`stream.add`, `stream.update`, `stream.pin`, `stream.default`, `stream.remove`, shown on the
   Security screen), and the visitor snapshot is rewritten after the commit; if only that rewrite fails the answer is `ok` with
   `snapshot: false` and the list catches up on the next change.
-- **Deploy order.** `deploy.mjs --go`, then `install.php` (expect `applied 003_streams`), then the import, then the logos. The
-  admin API ships with the server code; the Playlist screen ships with the front end, so deploy the server first.
+- **Deploy order.** `deploy.mjs --go`, then `install.php` (expect `applied 003_streams`, and `applied 004_checker` once the checker
+  is deployed), then the import, then the logos. The admin API ships with the server code; the Playlist screen ships with the
+  front end, so deploy the server first.
+
+## The stream checker (piece 3a)
+
+Design: `docs/superpowers/specs/2026-11-14-playlist-checker-design.md` (it wins over the older "Piece 3" section of the playlist spec
+where they differ). The checker plays each stream's first moments the way a PRISM visitor's browser would, hides the streams that
+fail, and brings them back if they recover. Migration `004_checker.sql` adds its columns (`host`, `ever_passed`, `fail_days`,
+`last_fail_day`, `check_result`, `check_bytes`, `state_changed_at`, `next_check_at`).
+
+- **A check** (`src/Checker/StreamChecker.php`): GET only, always with `Origin: https://prism.nooroticx.tv`. HLS: the playlist, its
+  first variant, then the first bytes of a segment (the second one when the list is live and has three or more, because a live
+  list's first segment is about to expire; `Range: bytes=0-65535`, a cut at 64 KiB is a pass). DASH: the manifest only. CORS must
+  hold on every response of the chain, hop by hop as a browser sees it (`Origin: null` after a cross-origin redirect). Hosts of
+  Twitch and YouTube are never fetched (`skipped`). Everything goes through the guarded fetcher with the checker's policy: https
+  only, ports 80, 443 and 1024 up except the ports Chromium refuses, a public address vetted on every hop. Results are one of a
+  fixed set of codes (`pass`, `no_cors`, `unreachable`, `http_status`, `not_playlist`, `no_variant`, `no_segment`,
+  `segment_failed`, `too_large`, `insecure`, `blocked`, `redirects`, and the no-information codes `host_guard`, `voided`,
+  `skipped`): never an address, never text from the other side. Limits: 8 s per request and 30 s per stream, 256 KB per
+  playlist, 64 KiB per segment, 3 redirects, at most one request a second to the host in a stream's address (`HostPacer`).
+- **States and timing** (`StateMachine`, `Schedule`): `new` and `held(awaiting_check)` are checked first; `working` daily;
+  `suspect` (a once-working stream that failed) about every 6 hours, `dead` after failures on three different UTC days
+  (`failed_3_days`, every 2 days); a stream that never passed is `dead(never_passed)` after one failed check (daily);
+  `unplayable(no_cors)` weekly; `removed(dead_14_days)` monthly (a pass brings any of them back to `working`). **A stream the
+  owner removed is never checked or revived.** A pinned or default stream is hidden like any other when it fails, but it keeps its
+  pin and default flag and is never auto-removed (the page falls back to its demo default meanwhile).
+- **Guards.** The host guard: when more than half of a host's streams (at least four) fail in a run, the failures of streams that
+  passed before are set aside (`host_guard`); streams that never passed are not protected. The run guard: when two thirds of a
+  worker's last 50 checks fail, the checker's own network is the likely cause, so the worker stops and voids those checks
+  (`voided`, treated as not checked). A failing check is tried once more at the end of its batch before it counts.
+- **Shadow run, then Apply.** Until the owner presses Apply on the Health screen the checker only *records* results: no state
+  changes and the visitor snapshot is not rewritten. Apply (`POST /api/admin/checker/apply`) runs the recorded first-pass results
+  through the same state machine a live run uses, in one transaction with the audit row `checker.apply`, then rewrites the
+  snapshot. It refuses (409 `refused` with a reason) while a stream has no result (`incomplete`), when a result is older than 3
+  days (`stale`), or when two thirds or more of the results are failures (`too_many_failures`). After Apply the checker is live.
+- **Commands** (command line only, `/usr/bin/php8.4-cli`; they print counts and fixed words, never an address or a config value):
+  - `prism-data/bin/check-streams.php [--first-pass] [--limit=<1..2000>]`: the launcher. One launch at a time (database lock
+    `prism_playlist_check`; a second prints `skipped (another run is active)`). With `checker.workers` above 1 it starts that many
+    `bin/check-worker.php <k>/<n>` processes, each owning the streams whose host hashes into its slice; if processes cannot be
+    started it runs one worker over everything. Prints `workers=<n> checked=<n> passed=<n> failed=<n> guarded=<n> voided=<n>
+    bytes=<n>` (plus ` stopped=<paused|cap|run_guard>` when a worker stopped early). `--first-pass` keeps taking batches until
+    nothing is due. `--pause`, `--resume` (the kill switch) and `--status` (`mode=<shadow|live> paused=<0|1> checked=<n>
+    eligible=<n>`) do not check anything.
+  - `prism-data/bin/rejudge-held.php [--apply]`: moves streams held only because of their port, that the current rule allows, to
+    `held(awaiting_check)` (still hidden until the first pass checks them). Dry run by default; audit row `stream.rejudge`.
+- **Config** (all optional, see `config.example.php`): `playlist.check_origin`, `playlist.check_user_agent` (default
+  `PRISM-StreamChecker/1.0 (+https://prism.nooroticx.tv/stream-checker/)`: a link to the public page `public/stream-checker/`,
+  no personal contact address), `checker.workers` (1 to 12, default 1), `checker.batch` (1 to 2000, default 300),
+  `checker.first_pass_cap_mb` (4096) and `checker.daily_cap_mb` (1024). Bytes are counted as read from the network; the first pass
+  has its own total, every UTC day after Apply has the daily one; a worker stops with `cap` at the limit.
+- **Admin API** (owner only, `Cache-Control: no-store`): `GET /api/admin/checker` (status: mode, progress, outcome by result code,
+  what Apply would hide, host clusters, guarded hosts, flagged streams, budget, last early stop), `POST /api/admin/checker/apply`,
+  `/pause`, `/resume` (an empty body or `{}`). Pause and resume are audited (`checker.pause`, `checker.resume`). The Playlist
+  list rows also carry `last_checked_at` and `check_result`.
+- **Rollout order (each live step needs the owner's go).** 1. Deploy the server code and run `install.php` (expect
+  `applied 004_checker`; nothing changes for visitors). 2. `rejudge-held.php` dry run, then `--apply`. 3. Probe how many PHP
+  processes and cron entries the host allows: start with `checker.workers` 2. 4. The shadow first pass in one sitting:
+  `check-streams.php --first-pass` (not from cron: until Apply only the first pass is run, by hand). 5. Review the Health screen
+  (progress, outcome, host clusters) and press Apply. 6. Enable the steady cron entry, for example every 15 minutes:
+  `*/15 * * * * /usr/bin/php8.4-cli /prism-data/bin/check-streams.php` (each stream is due once a day, so the load spreads
+  itself). 7. Remove the logo copier's cron line when its work is done.
 
 ## IONOS host notes
 

@@ -435,6 +435,12 @@ Stages A (server), B (HLS page) and C (the Playlist screen above) are built. Wha
 
 ## Piece 3: the checker (decisions)
 
+> **Piece 3 was split in two at its check-in (2026-11-14).** 3a (the checker, its states, the shadow run and Apply, a minimal Health
+> screen and the checker's public page) is designed in `2026-11-14-playlist-checker-design.md`, which wins over this section where
+> they differ (its last section lists the differences: ports from 1024 up, the shadow first pass, never-passed streams, the host
+> guard, CORS hop by hop, pinned and default streams, the explicit deny list). 3b (the full Health screen with actions, and the
+> visitor-reports endpoint described below) comes later. This section stays as the original decision record.
+
 ### States (my call; numbers are starting points)
 
 new, working, suspect, dead, removed, and "unplayable here" with a reason (http, no CORS for PRISM).
@@ -460,18 +466,22 @@ it sees what a PRISM visitor's browser would see.
 - A scheduled job, with the same cron pattern as the refresh job, picks the streams that are due (oldest-checked first,
   suspect before others, then streams with a recent visitor failure report), up to a per-run cap, and spreads the first full
   pass over several days under a daily download budget. Starting points: a few hundred streams per run, a 256 KB cap per
-  playlist, 8 to 10 seconds per request, at most one request per host per second.
+  playlist, 8 to 10 seconds per request, at most one request per host per second. (Decided at the check-in: the first full pass
+  runs in one sitting as a **shadow run** that the owner applies once; the daily cap applies after Apply.)
 - GET, not HEAD (many servers refuse HEAD). Redirects are followed manually, at most three, each re-checked.
 - For HLS: fetch the manifest, fetch the first media playlist, then the first video chunk (reading no more than needed).
   Record live or on-demand, quality levels, caption tracks, audio languages, codecs, and whether the CORS header was present.
-- **Guarding what it fetches (the one security-sensitive part).** Only `http` and `https` on ports 80 and 443. The checker resolves
+- **Guarding what it fetches (the one security-sensitive part).** (As decided at the check-in: `https` only, on ports 80, 443 and
+  1024 up except the ports browsers refuse; see the piece 3a design.) The checker resolves
   the name itself, refuses loopback, private ranges, link-local and cloud-metadata addresses, shared address space, and
   the IPv6 equivalents including IPv4-mapped forms, and connects to the vetted address (defeating DNS tricks). It repeats this on every redirect. It
   never returns what it fetched, and error details are not returned to callers. It identifies itself with its own user agent
   naming PRISM and the contact address from config. It never fetches Twitch or YouTube addresses.
-- **Other ports.** 772 of the 5,234 addresses (15%) use ports other than 80 and 443 (1935, 1936, 8081, 19360, 8080 and
-  others). The guard above allows only 80 and 443, so until the owner decides at piece 3's check-in whether to allow more,
-  the import stores those entries as "unchecked: port", they are not listed, and the import reports their count. (my call)
+- **Other ports (decided 2026-11-14).** 772 of the 5,234 addresses (15%) use ports other than 80 and 443 (1935, 1936, 8081,
+  19360, 8080 and others); 490 of them are https. The owner decided the checker may contact **any https port from 1024 up, except
+  the ports browsers refuse** (Chromium's restricted list); `http://` is never checked. The import now stores such an address as
+  `new`; an entry on a port the rule still refuses stays `held(port)`; the 483 already stored as `held(port)` are moved to
+  `held(awaiting_check)` by `bin/rejudge-held.php` (hidden until the first pass checks them).
 - A kill switch and a per-run and per-day budget exist, like the TwitchTracker job.
 
 ### Visitor reports (my call on the endpoint)
@@ -485,6 +495,29 @@ list report; pasted addresses never do. The Health and Playlist screens show pla
 
 Counts per state; the lists of suspect, dead, removed and unplayable streams with reason, last result and facts; actions
 recheck now, restore, remove and pin; host-guard events; today's download budget used.
+
+### Piece 3a as built (2026-11-15; design `2026-11-14-playlist-checker-design.md`, plan `docs/superpowers/plans/2026-11-15-playlist-piece-3a-stream-checker.md`)
+
+- **The fetcher** (`server/src/Net/`): `FetchPolicy` (the logo copier keeps http and https on 80 and 443; the checker is https on
+  80, 443 and 1024 up minus Chromium's restricted ports), request headers (`Origin`, `Range`) with unsafe values dropped, a probe
+  mode that keeps the first bytes of a segment of any length, and `SafeFetchResult::hops` (every response of a redirect chain).
+- **The checker** (`server/src/Checker/`): `StreamChecker` + `PlaylistReader` (the check), `CheckResult` (the fixed codes),
+  `StateMachine` + `Transition` + `Schedule` (one pure function used by live runs and by Apply), `HostGuard`, `RunGuard`,
+  `HostPacer` (one request a second to a host, before every request), `CheckWorker` (a slice of hosts, shadow or live writes,
+  compare-and-set), `CheckerState` (applied or not, the kill switch, byte counts). `bin/check-streams.php` launches workers
+  (`bin/check-worker.php`); `bin/rejudge-held.php` re-judges held ports. Migration `004_checker.sql`; the store's checker methods
+  are in `StreamStore`; `ImportRules::stateOf` is the one shared port rule.
+- **The owner's side:** `server/src/Admin/CheckerAdmin.php` (status, Apply, pause) behind `GET /api/admin/checker` and
+  `POST .../apply|pause|resume`; the Playlist rows carry `last_checked_at` and `check_result`; front end
+  `src/components/admin/HealthScreen.tsx` (route `/admin/health`, replaces the "coming later" menu item) with `adminApi.ts`.
+- **The public page:** `public/stream-checker/index.html` (static, so it answers HTTP 200 to a script; the checker's user agent
+  links to it, and it says how to ask for a stream's removal through the repository's GitHub issues).
+- **Differences from the design, ruled while building:** pacing is per request in `HostPacer` (a check makes up to three requests
+  to a host back to back); failures are written at the end of their batch (after the retry and the host guard), passes at once;
+  Apply's two-thirds refusal counts failures against all checked results; a voided result does not count as checked; the Health
+  screen links to the Playlist screen rather than to a filtered address (the Playlist screen keeps its filter in component state).
+- **Not in 3a:** visitor reports and the Health actions (recheck now, restore, remove), segment checks for DASH, checking
+  more than the first variant of a master playlist.
 
 ## Piece 4: player extras (decisions)
 
