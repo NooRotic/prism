@@ -6,6 +6,7 @@ namespace Prism\History\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Prism\History\Net\FetchPolicy;
 use Prism\History\Net\PinnedResponse;
 use Prism\History\Net\SafeFetcher;
 use Prism\History\Tests\Support\FakeResolver;
@@ -267,6 +268,155 @@ final class SafeFetcherTest extends TestCase
             $this->assertContains($error, ['dns', 'scheme', 'blocked'], $url);
         }
         $this->assertSame([], $this->transport->calls);
+    }
+
+    private function checkerFetcher(): SafeFetcher
+    {
+        return new SafeFetcher(
+            new FakeResolver(['x.test' => ['93.184.216.34'], 'cdn.test' => ['93.184.216.35']]),
+            $this->transport,
+            'PRISM-test/1',
+            3,
+            FetchPolicy::checker(),
+        );
+    }
+
+    public function testTheCheckerPolicyRefusesHttpAndFetchesAnHttpsHighPort(): void
+    {
+        $this->transport->push(FakeTransport::ok('x'));
+        $fetcher = $this->checkerFetcher();
+
+        $this->assertSame('scheme', $fetcher->fetch('http://x.test/a.m3u8', 100)->error);
+        $this->assertSame([], $this->transport->calls, 'an http address is never requested');
+
+        $r = $fetcher->fetch('https://x.test:8443/a.m3u8', 100);
+
+        $this->assertNull($r->error);
+        $this->assertSame(8443, $this->transport->calls[0]['port']);
+    }
+
+    public function testTheCheckerPolicyStillRefusesARestrictedPort(): void
+    {
+        $this->assertSame('port', $this->checkerFetcher()->fetch('https://x.test:6000/a', 100)->error);
+        $this->assertSame([], $this->transport->calls);
+    }
+
+    public function testTheDefaultPolicyStillRefusesAnUnusualPort(): void
+    {
+        $this->assertSame('port', $this->fetcher()->fetch('https://logo.test:8443/a.png', 100)->error);
+        $this->assertSame([], $this->transport->calls);
+    }
+
+    public function testRequestHeadersAndTheProbeFlagReachTheTransport(): void
+    {
+        $this->transport->push(FakeTransport::ok('x'));
+
+        $this->checkerFetcher()->fetch('https://x.test/s.ts', 65536, 8, ['Origin' => 'https://prism.test', 'Range' => 'bytes=0-65535'], true);
+
+        $call = $this->transport->calls[0];
+        $this->assertSame(['Origin' => 'https://prism.test', 'Range' => 'bytes=0-65535'], $call['headers']);
+        $this->assertTrue($call['probe']);
+    }
+
+    public function testAProbeCutIsAResultNotAnErrorButAPlaylistCutStillIs(): void
+    {
+        $cut = new PinnedResponse(200, ['content-type' => 'video/mp2t'], str_repeat('B', 10), true);
+        $this->transport->push($cut, $cut);
+
+        $probe = $this->checkerFetcher()->fetch('https://x.test/s.ts', 10, 8, [], true);
+        $plain = $this->checkerFetcher()->fetch('https://x.test/s.ts', 10);
+
+        $this->assertNull($probe->error);
+        $this->assertSame(200, $probe->status);
+        $this->assertSame(10, strlen($probe->body));
+        $this->assertSame('too_large', $plain->error, 'without a probe a cut body is still too_large');
+    }
+
+    public function testThereAreNoHeadersAndNoProbeByDefault(): void
+    {
+        $this->transport->push(FakeTransport::ok('x'));
+
+        $this->checkerFetcher()->fetch('https://x.test/a', 100);
+
+        $this->assertSame([], $this->transport->calls[0]['headers']);
+        $this->assertFalse($this->transport->calls[0]['probe']);
+    }
+
+    public function testEveryHopIsRecordedInOrder(): void
+    {
+        $this->transport->push(
+            FakeTransport::redirect('https://cdn.test/b.m3u8'),
+            FakeTransport::ok('#EXTM3U', ['access-control-allow-origin' => '*']),
+        );
+
+        $r = $this->checkerFetcher()->fetch('https://x.test/a.m3u8', 1000);
+
+        $this->assertCount(2, $r->hops);
+        $this->assertSame(302, $r->hops[0]['status']);
+        $this->assertSame('https://x.test/a.m3u8', $r->hops[0]['url']);
+        $this->assertSame('https://cdn.test/b.m3u8', $r->hops[0]['headers']['location']);
+        $this->assertSame(200, $r->hops[1]['status']);
+        $this->assertSame('https://cdn.test/b.m3u8', $r->hops[1]['url']);
+        $this->assertSame('*', $r->hops[1]['headers']['access-control-allow-origin']);
+    }
+
+    public function testAPlainResponseIsOneHop(): void
+    {
+        $this->transport->push(FakeTransport::ok('x', ['x-a' => 'b']));
+
+        $r = $this->checkerFetcher()->fetch('https://x.test/a', 100);
+
+        $this->assertSame([['status' => 200, 'url' => 'https://x.test/a', 'headers' => ['x-a' => 'b']]], $r->hops);
+    }
+
+    public function testAFailureBeforeAnyRequestHasNoHops(): void
+    {
+        $r = $this->checkerFetcher()->fetch('http://x.test/a', 100);
+
+        $this->assertSame([], $r->hops);
+    }
+
+    public function testOriginBecomesNullAfterACrossOriginRedirectAndOtherHeadersStay(): void
+    {
+        $this->transport->push(FakeTransport::redirect('https://cdn.test/b.m3u8'), FakeTransport::ok());
+
+        $this->checkerFetcher()->fetch('https://x.test/a.m3u8', 1000, 8, ['Origin' => 'https://prism.test', 'Range' => 'bytes=0-1']);
+
+        $this->assertSame('https://prism.test', $this->transport->calls[0]['headers']['Origin']);
+        $this->assertSame('null', $this->transport->calls[1]['headers']['Origin']);
+        $this->assertSame('bytes=0-1', $this->transport->calls[1]['headers']['Range']);
+    }
+
+    public function testOriginStaysOnASameOriginRedirect(): void
+    {
+        $this->transport->push(FakeTransport::redirect('/b.m3u8'), FakeTransport::ok());
+
+        $this->checkerFetcher()->fetch('https://x.test/a.m3u8', 1000, 8, ['Origin' => 'https://prism.test']);
+
+        $this->assertSame('https://prism.test', $this->transport->calls[1]['headers']['Origin']);
+    }
+
+    public function testAPortChangeIsAlsoACrossOriginRedirect(): void
+    {
+        $this->transport->push(FakeTransport::redirect('https://x.test:8443/b'), FakeTransport::ok());
+
+        $this->checkerFetcher()->fetch('https://x.test/a', 1000, 8, ['Origin' => 'https://prism.test']);
+
+        $this->assertSame('null', $this->transport->calls[1]['headers']['Origin']);
+    }
+
+    public function testOriginStaysNullOnceItHasBecomeNull(): void
+    {
+        $this->transport->push(
+            FakeTransport::redirect('https://cdn.test/b'),
+            FakeTransport::redirect('https://x.test/c'),
+            FakeTransport::ok(),
+        );
+
+        $this->checkerFetcher()->fetch('https://x.test/a', 1000, 8, ['Origin' => 'https://prism.test']);
+
+        $this->assertSame('null', $this->transport->calls[1]['headers']['Origin']);
+        $this->assertSame('null', $this->transport->calls[2]['headers']['Origin'], 'a browser stays tainted for the rest of the chain');
     }
 
     /** @return array<string,array{0:string,1:string,2:?string}> */

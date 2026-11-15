@@ -12,11 +12,20 @@ switch ($path) {
             'host' => $_SERVER['HTTP_HOST'] ?? null,
             'ua' => $_SERVER['HTTP_USER_AGENT'] ?? null,
             'method' => $_SERVER['REQUEST_METHOD'],
+            'origin' => $_SERVER['HTTP_ORIGIN'] ?? null,
+            'range' => $_SERVER['HTTP_RANGE'] ?? null,
+            'injected' => $_SERVER['HTTP_INJECTED'] ?? null,
         ]);
         break;
     case '/big':
         header('Content-Type: image/png');
         echo str_repeat('A', 200_000);
+        break;
+    case '/sized':
+        // A 200 KB body with its length announced up front, and Range ignored: what many video servers do.
+        header('Content-Type: video/mp2t');
+        header('Content-Length: 200000');
+        echo str_repeat('B', 200_000);
         break;
     case '/redirect':
         http_response_code(302);

@@ -243,11 +243,11 @@ final class LogoFetcherTest extends DbTestCase
             {
             }
 
-            public function get(string $url, string $ip, int $port, int $maxBytes, int $timeoutSec, string $userAgent = ''): PinnedResponse
+            public function get(string $url, string $ip, int $port, int $maxBytes, int $timeoutSec, string $userAgent = '', array $requestHeaders = [], bool $probe = false): PinnedResponse
             {
                 $this->clock->advanceMs(400);
 
-                return $this->inner->get($url, $ip, $port, $maxBytes, $timeoutSec, $userAgent);
+                return $this->inner->get($url, $ip, $port, $maxBytes, $timeoutSec, $userAgent, $requestHeaders, $probe);
             }
         };
         $fetcher = new LogoFetcher(
