@@ -382,6 +382,22 @@ final class StreamStore
         return ['eligible' => (int) $row['eligible'], 'checked' => (int) $row['checked'], 'oldest_result_at' => $row['oldest'] === null ? null : (string) $row['oldest']];
     }
 
+    /**
+     * The eligible streams that have a recorded result (a voided one does not count), with exactly what the state machine
+     * reads: what Apply applies.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function checkedForApply(): array
+    {
+        $stmt = $this->pdo->query(
+            'SELECT id, state, state_reason, ever_passed, fail_days, last_fail_day, pinned, is_default, state_changed_at, check_result
+             FROM streams WHERE ' . self::ELIGIBLE . " AND check_result IS NOT NULL AND check_result <> 'voided' ORDER BY id",
+        );
+
+        return array_map(self::typed(...), $stmt->fetchAll());
+    }
+
     /** @return array<string,int> the latest result code of each eligible stream that has one, counted by code */
     public function resultCounts(): array
     {
