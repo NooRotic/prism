@@ -20,6 +20,7 @@ use Prism\History\Net\PinnedTransport;
 use Prism\History\Net\Resolver;
 use Prism\History\Net\SafeFetcher;
 use Prism\History\Net\SystemResolver;
+use Prism\History\Playlist\HeldRejudge;
 use Prism\History\Playlist\Importer;
 use Prism\History\Playlist\LogoFetcher;
 use Prism\History\Playlist\SnapshotWriter;
@@ -134,6 +135,14 @@ final class Container
         $clock ??= new SystemClock();
 
         return new Importer(new StreamStore($pdo, $clock), $clock);
+    }
+
+    /** The re-judge of streams held for their port (bin/rejudge-held.php). */
+    public static function heldRejudge(Config $config, PDO $pdo, ?Clock $clock = null): HeldRejudge
+    {
+        $clock ??= new SystemClock();
+
+        return new HeldRejudge(new StreamStore($pdo, $clock), new AuditStore($pdo, $clock), $clock);
     }
 
     public static function snapshotWriter(Config $config, PDO $pdo, ?Clock $clock = null): SnapshotWriter

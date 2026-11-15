@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Prism\History\Playlist;
 
+use Prism\History\Net\FetchPolicy;
+
 /**
  * Which playlist entries may be stored at all, and in what state. These rules guard the import and, later, the admin
  * panel's "add a stream", so both let in exactly the same things.
@@ -87,14 +89,20 @@ final class ImportRules
         return false;
     }
 
-    /** @return array{0:string,1:?string} */
-    private static function stateOf(string $normalised): array
+    /**
+     * The state a normalised address is stored in: `http://` can never play on PRISM's https page (unplayable); an https
+     * address on a port the checker may not contact (below 1024 other than 80 and 443, or one browsers refuse) is held;
+     * everything else is new and gets checked. The import, the owner's Add and the held-rows re-judge all use this one rule.
+     *
+     * @return array{0:string,1:?string}
+     */
+    public static function stateOf(string $normalised): array
     {
         if (str_starts_with($normalised, 'http://')) {
             return ['unplayable', 'http'];
         }
         $port = parse_url($normalised, PHP_URL_PORT);
-        if (is_int($port) && $port !== 80 && $port !== 443) {
+        if (is_int($port) && !FetchPolicy::checker()->portAllowed($port)) {
             return ['held', 'port'];
         }
 

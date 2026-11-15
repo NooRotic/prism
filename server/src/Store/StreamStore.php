@@ -425,6 +425,36 @@ final class StreamStore
         return array_map(static fn (array $r): array => ['host' => (string) $r['host'], 'streams' => (int) $r['streams']], $rows);
     }
 
+    /** @return list<array<string,mixed>> the streams held only because of their port */
+    public function heldByPort(): array
+    {
+        $stmt = $this->pdo->query('SELECT ' . self::READ . " FROM streams WHERE state = 'held' AND state_reason = 'port' ORDER BY id");
+
+        return array_map(self::typed(...), $stmt->fetchAll());
+    }
+
+    /**
+     * Moves held-by-port streams to `held(awaiting_check)`: still hidden, now due for their first check. Only a row that is
+     * still held for its port is touched. Returns how many moved.
+     *
+     * @param list<string> $ids
+     */
+    public function awaitCheck(array $ids, int $nowMs): int
+    {
+        $moved = 0;
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $in = implode(', ', array_fill(0, count($chunk), '?'));
+            $stmt = $this->pdo->prepare(
+                "UPDATE streams SET state_reason = 'awaiting_check', state_changed_at = ?
+                 WHERE state = 'held' AND state_reason = 'port' AND id IN ({$in})",
+            );
+            $stmt->execute([Time::datetime($nowMs), ...$chunk]);
+            $moved += $stmt->rowCount();
+        }
+
+        return $moved;
+    }
+
     private static function bytes(int $bytes): int
     {
         return min(max(0, $bytes), self::MAX_BYTES);
