@@ -138,6 +138,26 @@ final class CurlPinnedTransportTest extends TestCase
         $this->assertSame('', $r->body);
     }
 
+    public function testAProbeThatTimesOutAfterBytesHaveArrivedKeepsTheStatusAndTheBytes(): void
+    {
+        // A segment delivered slowly is still a segment that played: "at least one byte" is the spec's test.
+        $r = (new CurlPinnedTransport())->get($this->url('/trickle'), '127.0.0.1', self::$port, 65_536, 1, '', [], true);
+
+        $this->assertSame(200, $r->status);
+        $this->assertSame(1000, strlen($r->body));
+        $this->assertTrue($r->truncated);
+    }
+
+    public function testAPlaylistReadThatTimesOutIsStillNoAnswerAndAProbeWithNoBytesToo(): void
+    {
+        $playlist = (new CurlPinnedTransport())->get($this->url('/trickle'), '127.0.0.1', self::$port, 300_000, 1);
+        $this->assertSame(0, $playlist->status, 'a playlist that stalls is not a playlist');
+        $this->assertSame('', $playlist->body);
+
+        $silent = (new CurlPinnedTransport())->get($this->url('/slow'), '127.0.0.1', self::$port, 65_536, 1, '', [], true);
+        $this->assertSame(0, $silent->status, 'a probe that heard nothing at all got no answer');
+    }
+
     public function testATimeoutAndAConnectionRefusedGiveStatusZero(): void
     {
         $slow = (new CurlPinnedTransport())->get($this->url('/slow'), '127.0.0.1', self::$port, 1000, 1);

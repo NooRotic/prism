@@ -13,6 +13,7 @@ namespace Prism\History\Net;
 final class CurlPinnedTransport implements PinnedTransport
 {
     private const CURLE_FILESIZE_EXCEEDED = 63;
+    private const CURLE_OPERATION_TIMEDOUT = 28;
 
     public function get(string $url, string $ip, int $port, int $maxBytes, int $timeoutSec, string $userAgent = '', array $requestHeaders = [], bool $probe = false): PinnedResponse
     {
@@ -86,6 +87,11 @@ final class CurlPinnedTransport implements PinnedTransport
         $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
 
         if ($truncated || $errno === self::CURLE_FILESIZE_EXCEEDED) {
+            return new PinnedResponse($status, $headers, $body, true);
+        }
+        // A probe wants the first bytes of a segment, not all of it: when the time runs out after a good answer has begun to
+        // arrive (a slow server, a low-bitrate stream), what came is the answer, cut short like any other probe.
+        if ($probe && $errno === self::CURLE_OPERATION_TIMEDOUT && $body !== '' && $status >= 200 && $status < 300) {
             return new PinnedResponse($status, $headers, $body, true);
         }
         if ($ok === false) {
