@@ -207,7 +207,7 @@ https://A.test:443/alpha.m3u8
 #EXTINF:-1 tvg-id="Beta.uk" tvg-logo="" group-title="Undefined",Beta
 https://b.test/beta.m3u8
 #EXTINF:-1 tvg-id="Gamma.us" tvg-logo="" group-title="News",Gamma
-https://c.test:8443/gamma.m3u8
+https://c.test:6000/gamma.m3u8
 #EXTINF:-1 tvg-id="Delta.us" tvg-logo="" group-title="News",Delta
 https://d.test/delta.m3u8?token=abc
 #EXTINF:-1 tvg-id="Eps.us" tvg-logo="" group-title="XXX",Epsilon
