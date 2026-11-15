@@ -37,6 +37,7 @@ vi.mock('../../components/admin/TtCallsScreen', () => ({ default: () => <p>tt sc
 vi.mock('../../components/admin/SecurityScreen', () => ({ default: () => <p>security screen</p> }))
 vi.mock('../../components/admin/ChannelsScreen', () => ({ default: () => <p>channels screen</p> }))
 vi.mock('../../components/admin/PlaylistScreen', () => ({ default: () => <p>playlist screen</p> }))
+vi.mock('../../components/admin/HealthScreen', () => ({ default: () => <p>health screen</p> }))
 
 import { clearAdminToken, endAdminSession, startAdminSignIn } from '../../lib/adminAuth'
 
@@ -85,7 +86,7 @@ describe('AdminPage', () => {
   })
 
   describe('the session check', () => {
-    it('shows the menu and the screen for the owner, with only Health greyed out', async () => {
+    it('shows the menu and the screen for the owner, every screen a link, Health included', async () => {
       api.getSession.mockResolvedValue(SESSION)
 
       renderAt('/admin')
@@ -99,13 +100,12 @@ describe('AdminPage', () => {
         ['Security', '/admin/security'],
         ['Channels', '/admin/channels'],
         ['Playlist', '/admin/playlist'],
+        ['Health', '/admin/health'],
       ]) {
         expect(screen.getByRole('link', { name })).toHaveAttribute('href', href)
       }
-      expect(nav).toHaveTextContent('Health')
-      expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(1)
-      expect(screen.queryByRole('link', { name: /Health/ })).not.toBeInTheDocument()
-      expect(screen.getAllByText('coming later')).toHaveLength(1)
+      expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(0)
+      expect(screen.queryByText('coming later')).not.toBeInTheDocument()
     })
 
     it.each([
@@ -114,6 +114,7 @@ describe('AdminPage', () => {
       ['/admin/security', 'security screen'],
       ['/admin/channels', 'channels screen'],
       ['/admin/playlist', 'playlist screen'],
+      ['/admin/health', 'health screen'],
     ])('shows the right screen at %s', async (path, marker) => {
       api.getSession.mockResolvedValue(SESSION)
 
