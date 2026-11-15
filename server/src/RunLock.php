@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Prism\History;
 
 use PDO;
+use Throwable;
 
 /**
  * One scheduled run at a time. A MariaDB named lock needs no table and is released by the database itself if
@@ -25,13 +26,26 @@ final class RunLock
     {
     }
 
-    /** True when this connection now holds the lock; false when another run has it. Never waits. */
+    /**
+     * True when this connection now holds the lock; false when another run has it. Never waits. The holder's connection may sit
+     * idle for as long as its run takes (the checker's launcher waits for its workers for up to an hour), and a database that
+     * closes idle connections early would free the lock silently, so a holder asks to be left connected for eight hours. A host
+     * that does not allow it keeps its own limit.
+     */
     public function acquire(): bool
     {
         $stmt = $this->pdo->prepare('SELECT GET_LOCK(?, 0)');
         $stmt->execute([$this->name]);
+        $held = (int) $stmt->fetchColumn() === 1;
+        if ($held) {
+            try {
+                $this->pdo->exec('SET SESSION wait_timeout = 28800');
+            } catch (Throwable) {
+                // not allowed here: the lock is still held
+            }
+        }
 
-        return (int) $stmt->fetchColumn() === 1;
+        return $held;
     }
 
     public function release(): void

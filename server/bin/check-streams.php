@@ -19,6 +19,7 @@ if (PHP_SAPI !== 'cli') {
 
 require dirname(__DIR__) . '/src/autoload.php';
 
+use Prism\History\Checker\WorkerLauncher;
 use Prism\History\Config;
 use Prism\History\Container;
 use Prism\History\Db;
@@ -85,38 +86,10 @@ try {
             }
             $stopped = $r['stopped'];
         } else {
-            $children = [];
-            for ($k = 0; $k < $workers; $k++) {
-                $command = [PHP_BINARY, __DIR__ . '/check-worker.php', $k . '/' . $workers, '--limit=' . $batch];
-                if ($firstPass) {
-                    $command[] = '--first-pass';
-                }
-                $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-                if (!is_resource($process)) {
-                    throw new RuntimeException('worker not started');
-                }
-                $children[] = [$process, $pipes];
-            }
-            $failed = false;
-            foreach ($children as [$process, $pipes]) {
-                $out = (string) stream_get_contents($pipes[1]);
-                stream_get_contents($pipes[2]);
-                fclose($pipes[1]);
-                fclose($pipes[2]);
-                $code = proc_close($process);
-                $pattern = '/^checked=(\d+) passed=(\d+) failed=(\d+) guarded=(\d+) voided=(\d+) bytes=(\d+)(?: stopped=([a-z_]+))?$/m';
-                if ($code !== 0 || preg_match($pattern, $out, $m) !== 1) {
-                    $failed = true;
-                    continue;
-                }
-                foreach (array_keys($totals) as $i => $key) {
-                    $totals[$key] += (int) $m[$i + 1];
-                }
-                $stopped ??= $m[7] ?? null;
-            }
-            if ($failed) {
-                throw new RuntimeException('a worker failed');
-            }
+            // Starts the workers and waits for every one that started: the lock is held until they have all finished.
+            $launched = (new WorkerLauncher(PHP_BINARY, __DIR__ . '/check-worker.php'))->run($workers, $batch, $firstPass);
+            $totals = $launched['totals'];
+            $stopped = $launched['stopped'];
         }
     } finally {
         $lock->release();
