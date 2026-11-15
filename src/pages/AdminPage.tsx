@@ -4,6 +4,7 @@ import AdminShell from '../components/admin/AdminShell'
 import { AdminSessionContext } from '../components/admin/AdminSessionContext'
 import ChannelsScreen from '../components/admin/ChannelsScreen'
 import OverviewScreen from '../components/admin/OverviewScreen'
+import HealthScreen from '../components/admin/HealthScreen'
 import PlaylistScreen from '../components/admin/PlaylistScreen'
 import SecurityScreen from '../components/admin/SecurityScreen'
 import SignInCard from '../components/admin/SignInCard'
@@ -101,6 +102,7 @@ export default function AdminPage() {
               <Route path="security" element={<SecurityScreen />} />
               <Route path="channels" element={<ChannelsScreen />} />
               <Route path="playlist" element={<PlaylistScreen />} />
+              <Route path="health" element={<HealthScreen />} />
               <Route path="*" element={<p>That admin page does not exist.</p>} />
             </Routes>
           </AdminShell>

@@ -13,10 +13,8 @@ const SCREENS = [
   { to: '/admin/security', label: 'Security', end: false },
   { to: '/admin/channels', label: 'Channels', end: false },
   { to: '/admin/playlist', label: 'Playlist', end: false },
+  { to: '/admin/health', label: 'Health', end: false },
 ]
-
-/** A later piece: shown so the owner sees where the playlist's health will live, but not a link yet. */
-const COMING_LATER = ['Health']
 
 /** The admin layout: a menu down the left (a row above the screen on a narrow window) and the screen beside it. */
 export default function AdminShell({ onSignOut, children }: AdminShellProps) {
@@ -40,11 +38,6 @@ export default function AdminShell({ onSignOut, children }: AdminShellProps) {
             >
               {screen.label}
             </NavLink>
-          ))}
-          {COMING_LATER.map((label) => (
-            <span key={label} aria-disabled="true" className="rounded px-3 py-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-              {label} <small>coming later</small>
-            </span>
           ))}
         </nav>
         <div className="mt-4 flex flex-col items-start gap-2 text-sm">
