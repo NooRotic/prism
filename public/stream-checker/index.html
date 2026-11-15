@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PRISM stream checker</title>
+  <meta name="description" content="What the PRISM stream checker is, what it requests from a stream's host, and how to ask for a stream to be removed.">
+  <meta name="robots" content="noindex">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1b1b1f;
+      --muted: #55555f;
+      --accent: #5b2bd0;
+      --code-bg: #f1f1f5;
+      --rule: #d9d9e2;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f0f14;
+        --text: #ececf2;
+        --muted: #a7a7b6;
+        --accent: #b79bff;
+        --code-bg: #1c1c25;
+        --rule: #2d2d3a;
+      }
+    }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      padding: 24px 16px 48px;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 42rem; margin: 0 auto; }
+    h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 0.75rem; }
+    h2 { font-size: 1.1rem; margin: 2rem 0 0.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+    p, ul { margin: 0 0 0.9rem; }
+    ul { padding-left: 1.25rem; }
+    li { margin-bottom: 0.35rem; }
+    code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.92em; overflow-wrap: anywhere; }
+    a { color: var(--accent); overflow-wrap: anywhere; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>PRISM stream checker</h1>
+    <p class="muted">If you found <code>PRISM-StreamChecker</code> in your server's logs, this page explains who it is and how to make it stop.</p>
+
+    <h2>What it is</h2>
+    <p><a href="https://prism.nooroticx.tv">PRISM</a> is a free web page for watching public live and on-demand video streams (HLS and DASH). Its list is built from public playlists, so a stream of yours may be in it. The stream checker is a small program on PRISM's server that checks the listed streams still play, so people who open PRISM are not shown dead ones.</p>
+
+    <h2>What it does</h2>
+    <p>For each stream, once a day, it makes a few plain <code>GET</code> requests, the same ones a viewer's browser makes to start playback:</p>
+    <ul>
+      <li>the stream's playlist (<code>.m3u8</code>, or the manifest for DASH);</li>
+      <li>the first rendition's playlist, when the first one is a list of renditions;</li>
+      <li>the first few kilobytes of one video segment.</li>
+    </ul>
+    <p>Each request carries an <code>Origin</code> header naming <code>https://prism.nooroticx.tv</code>, so the checker sees whether your server lets PRISM's page play the stream (the CORS answer). It sends at most one request a second to the host named in a stream's address (a playlist that points at a shared video host can add requests to that host too). It reads no more than 256 KB of a playlist and 64 KB of a segment, follows at most three redirects, never signs in, and never fetches addresses on private or internal networks.</p>
+    <p>Its user agent is <code>PRISM-StreamChecker/1.0 (+https://prism.nooroticx.tv/stream-checker/)</code>.</p>
+
+    <h2>What it keeps</h2>
+    <p>The checker stores only pass or fail for each stream: a short result word and the time of the check, plus whether the stream is live and which formats it offers. It does not keep the playlist, the video or anything else it read.</p>
+
+    <h2>Asking for a stream to be removed</h2>
+    <p>If you would rather PRISM did not list or check a stream, or any of the streams on your host, open an issue on PRISM's repository with the stream's address (or your host's name), and it will be removed from the list so the checker does not visit it again:</p>
+    <p><a href="https://github.com/NooRotic/prism/issues/new">https://github.com/NooRotic/prism/issues/new</a></p>
+    <p class="muted">A host that answers with an error, or refuses PRISM's origin, is left out of PRISM's list; nothing needs to be done for that.</p>
+  </main>
+</body>
+</html>
