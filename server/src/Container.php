@@ -13,9 +13,14 @@ use Prism\History\Admin\PlaylistAdmin;
 use Prism\History\Admin\TokenCache;
 use Prism\History\Api\Router;
 use Prism\History\Api\StreamsController;
+use Prism\History\Checker\CheckerState;
+use Prism\History\Checker\CheckWorker;
+use Prism\History\Checker\HostPacer;
+use Prism\History\Checker\StreamChecker;
 use Prism\History\Http\CurlHttp;
 use Prism\History\Http\HttpClient;
 use Prism\History\Net\CurlPinnedTransport;
+use Prism\History\Net\FetchPolicy;
 use Prism\History\Net\PinnedTransport;
 use Prism\History\Net\Resolver;
 use Prism\History\Net\SafeFetcher;
@@ -171,6 +176,37 @@ final class Container
             $sleeper ?? new SystemSleeper(),
             $clock,
             $config->playlistLogoDir(),
+        );
+    }
+
+    /**
+     * One checker worker: the guarded fetcher with the checker's policy (https only, ports 80, 443 and 1024 up minus the ones
+     * browsers refuse), the configured user agent and origin, and a pacer so no host sees more than a request a second.
+     * Tests pass a fake resolver, transport, sleeper and clock; the real ones are used when they are null.
+     */
+    public static function checkWorker(
+        Config $config,
+        PDO $pdo,
+        ?Resolver $resolver = null,
+        ?PinnedTransport $transport = null,
+        ?Sleeper $sleeper = null,
+        ?Clock $clock = null,
+    ): CheckWorker {
+        $clock ??= new SystemClock();
+        $store = new StreamStore($pdo, $clock);
+        $pacer = new HostPacer($sleeper ?? new SystemSleeper(), $clock);
+        $fetcher = new SafeFetcher($resolver ?? new SystemResolver(), $transport ?? new CurlPinnedTransport(), $config->checkerUserAgent(), 3, FetchPolicy::checker());
+
+        return new CheckWorker(
+            $store,
+            new StreamChecker($fetcher, $config->checkerOrigin(), $clock, StreamChecker::DENY_HOSTS, $pacer),
+            new CheckerState(new JobState($pdo, $clock), $clock),
+            $clock,
+            new SnapshotWriter($store, $clock, $config->playlistDataDir()),
+            $config->playlistLogoDir(),
+            $config->checkerDailyCapBytes(),
+            $config->checkerFirstPassCapBytes(),
+            $pacer,
         );
     }
 
