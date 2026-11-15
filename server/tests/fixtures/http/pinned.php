@@ -31,6 +31,18 @@ switch ($path) {
         http_response_code(302);
         header('Location: /echo');
         break;
+    case '/trickle':
+        // A video segment that starts to arrive at once and then stalls: 1,000 bytes now, the rest after three seconds.
+        header('Content-Type: video/mp2t');
+        header('Content-Length: 200000');
+        echo str_repeat('T', 1000);
+        while (ob_get_level() > 0) {
+            ob_end_flush();
+        }
+        flush();
+        sleep(3);
+        echo str_repeat('T', 199_000);
+        break;
     case '/slow':
         sleep(3);
         echo 'late';
