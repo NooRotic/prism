@@ -284,6 +284,33 @@ final class CheckWorkerTest extends DbTestCase
         $this->assertFileExists($this->dir . '/logos/abcdef012346.png', 'a pinned stream keeps its picture');
     }
 
+    public function testAStreamThePinnedOrDefaultedByTheOwnerWhileItIsBeingCheckedIsNotAutoRemoved(): void
+    {
+        $this->state->markApplied();
+        $this->modes['dead.test'] = 'dead';
+        file_put_contents($this->dir . '/logos/abcdef012345.png', 'png');
+        file_put_contents($this->dir . '/logos/abcdef012346.png', 'png');
+        $old = '2026-10-01 00:00:00';
+        $toPin = $this->put('dead.test', '1', ['state' => 'dead', 'state_reason' => 'failed_3_days', 'ever_passed' => 1, 'state_changed_at' => $old, 'logo_file' => 'abcdef012345.png']);
+        $toDefault = $this->put('dead.test', '2', ['state' => 'dead', 'state_reason' => 'failed_3_days', 'ever_passed' => 1, 'state_changed_at' => $old, 'logo_file' => 'abcdef012346.png']);
+        // The owner acts after the worker read the rows and before it writes: failures are written at the end of the batch.
+        $this->transport->onCall = function (string $url) use ($toPin, $toDefault): void {
+            if (str_ends_with($url, '/s1.m3u8')) {
+                $this->pdo->exec("UPDATE streams SET pinned = 1 WHERE id = '" . $toPin['id'] . "'");
+            }
+            if (str_ends_with($url, '/s2.m3u8')) {
+                $this->pdo->exec("UPDATE streams SET is_default = 1 WHERE id = '" . $toDefault['id'] . "'");
+            }
+        };
+
+        $this->worker()->run(0, 1, 100, false);
+
+        $this->assertSame(['dead', 'failed_3_days', 1], [$this->raw($toPin)['state'], $this->raw($toPin)['state_reason'], (int) $this->raw($toPin)['pinned']]);
+        $this->assertSame(['dead', 'failed_3_days', 1], [$this->raw($toDefault)['state'], $this->raw($toDefault)['state_reason'], (int) $this->raw($toDefault)['is_default']]);
+        $this->assertFileExists($this->dir . '/logos/abcdef012345.png', 'the picture of a stream the owner pinned stays');
+        $this->assertFileExists($this->dir . '/logos/abcdef012346.png');
+    }
+
     // ---- retries and guards
 
     public function testAFailedCheckIsRetriedOnceAtTheEndOfTheBatchAndAPassOnTheRetryCounts(): void
