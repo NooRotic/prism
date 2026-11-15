@@ -38,7 +38,7 @@ https://a.test:443/alpha.m3u8
 #EXTINF:-1 tvg-id="Gamma.us" tvg-logo="" group-title="News",Gamma
 http://c.test/gamma.m3u8
 #EXTINF:-1 tvg-id="Delta.us" tvg-logo="" group-title="News",Delta
-https://d.test:8443/delta.m3u8
+https://d.test:6000/delta.m3u8
 #EXTINF:-1 tvg-id="Eps.us" tvg-logo="" group-title="News",Epsilon
 #EXTVLCOPT:http-referrer=https://e.test/
 https://e.test/eps.m3u8
@@ -109,8 +109,19 @@ M3U;
 
         $http = $this->store->findByPublicId(StreamUrl::publicId(StreamUrl::id('http://c.test/gamma.m3u8')));
         $this->assertSame(['unplayable', 'http'], [$http['state'] ?? null, $http['state_reason'] ?? null]);
-        $held = $this->store->findByPublicId(StreamUrl::publicId(StreamUrl::id('https://d.test:8443/delta.m3u8')));
-        $this->assertSame(['held', 'port'], [$held['state'] ?? null, $held['state_reason'] ?? null]);
+        $held = $this->store->findByPublicId(StreamUrl::publicId(StreamUrl::id('https://d.test:6000/delta.m3u8')));
+        $this->assertSame(['held', 'port'], [$held['state'] ?? null, $held['state_reason'] ?? null], 'a browser-restricted port is still held');
+    }
+
+    public function testAnHttpsStreamOnAHighPortIsStoredAsNewNotHeld(): void
+    {
+        $file = "#EXTM3U\n#EXTINF:-1 group-title=\"News\",Odd\nhttps://o.test:8443/odd.m3u8\n#EXTINF:-1 group-title=\"News\",Low\nhttps://l.test:22/low.m3u8\n";
+
+        $counts = $this->importer->import($file, 'ports', true);
+
+        $this->assertSame(1, $counts['held_port'], 'only the port below 1024 is held');
+        $odd = $this->store->findByPublicId(StreamUrl::publicId(StreamUrl::id('https://o.test:8443/odd.m3u8')));
+        $this->assertSame(['new', null], [$odd['state'] ?? null, $odd['state_reason'] ?? null]);
     }
 
     public function testReimportChangesNothing(): void

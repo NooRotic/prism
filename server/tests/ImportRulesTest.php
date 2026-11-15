@@ -93,14 +93,38 @@ final class ImportRulesTest extends TestCase
         $this->assertSame('http://x.test/a.m3u8', $d->normalisedUrl);
     }
 
-    public function testOddPortIsHeldNotRejected(): void
+    /** @return array<string,array{0:string,1:string,2:?string}> */
+    public static function ports(): array
     {
-        $d = ImportRules::judge($this->entry('https://X.test:8443/a.m3u8'));
+        return [
+            'https on 8443' => ['https://X.test:8443/a.m3u8', 'new', null],
+            'https on 1936' => ['https://x.test:1936/a.m3u8', 'new', null],
+            'https on 1024' => ['https://x.test:1024/a.m3u8', 'new', null],
+            'https on 19360' => ['https://x.test:19360/a.m3u8', 'new', null],
+            'https below 1024' => ['https://x.test:8/a.m3u8', 'held', 'port'],
+            'https on 1023' => ['https://x.test:1023/a.m3u8', 'held', 'port'],
+            'https on a browser-restricted port' => ['https://x.test:6000/a.m3u8', 'held', 'port'],
+            'https on 10080' => ['https://x.test:10080/a.m3u8', 'held', 'port'],
+            'http on any port is unplayable for being http' => ['http://x.test:8080/a.m3u8', 'unplayable', 'http'],
+        ];
+    }
+
+    #[DataProvider('ports')]
+    public function testPortsFrom1024UpAreStoredAndTheRestAreHeldNotRejected(string $url, string $state, ?string $reason): void
+    {
+        $d = ImportRules::judge($this->entry($url));
 
         $this->assertSame('accept', $d->verdict);
-        $this->assertSame('held', $d->state);
-        $this->assertSame('port', $d->reason);
-        $this->assertSame('https://x.test:8443/a.m3u8', $d->normalisedUrl);
+        $this->assertSame([$state, $reason], [$d->state, $d->reason]);
+        $this->assertSame(strtolower($url), $d->normalisedUrl);
+    }
+
+    public function testTheStateOfAnAddressIsOneSharedRule(): void
+    {
+        $this->assertSame(['new', null], ImportRules::stateOf('https://x.test:8443/a'));
+        $this->assertSame(['held', 'port'], ImportRules::stateOf('https://x.test:22/a'));
+        $this->assertSame(['unplayable', 'http'], ImportRules::stateOf('http://x.test/a'));
+        $this->assertSame(['new', null], ImportRules::stateOf('https://x.test/a'));
     }
 
     public function testHttpsOn443AndHttpOn80AreNormalPorts(): void
