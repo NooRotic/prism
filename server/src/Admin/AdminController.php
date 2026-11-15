@@ -28,6 +28,7 @@ final class AdminController
         private AdminReports $reports,
         private ChannelAdmin $channelAdmin,
         private PlaylistAdmin $playlist,
+        private CheckerAdmin $checker,
     ) {
     }
 
@@ -97,8 +98,40 @@ final class AdminController
 
                 return $id === null ? null : $this->playlist->remove($id);
             }),
+            '/api/admin/checker' => $this->read($request, fn (): array => $this->checker->status()),
+            '/api/admin/checker/apply' => $this->checkerAction($request, fn (): array => $this->checker->apply()),
+            '/api/admin/checker/pause' => $this->checkerAction($request, fn (): array => $this->checker->setPaused(true)),
+            '/api/admin/checker/resume' => $this->checkerAction($request, fn (): array => $this->checker->setPaused(false)),
             default => $this->error(404, 'not_found'),
         };
+    }
+
+    /**
+     * One POST that takes no input (an empty body or an empty JSON object is fine; anything else is a 400). `$act` answers a
+     * CheckerAdmin result: ok (200) or a refusal with its reason (409).
+     *
+     * @param callable():array<string,mixed> $act
+     */
+    private function checkerAction(Request $request, callable $act): ApiResponse
+    {
+        if ($request->method !== 'POST') {
+            return $this->notAllowed('POST, OPTIONS');
+        }
+        if (strlen($request->body) > self::MAX_BODY_BYTES) {
+            return $this->error(413, 'too_large');
+        }
+        if (trim($request->body) !== '') {
+            $data = json_decode($request->body, true);
+            if (!is_array($data) || ($data !== [] && array_is_list($data))) {
+                return $this->error(400, 'bad_request');
+            }
+        }
+        $result = $act();
+        if ($result['ok'] === true) {
+            return ApiResponse::json(200, $result, self::NO_STORE);
+        }
+
+        return ApiResponse::json(409, ['error' => (string) $result['error'], 'reason' => (string) $result['reason']], self::NO_STORE);
     }
 
     /** GET /api/admin/streams?text=&state=&group=&country=&limit=&offset= : every stream, every state, paged. */

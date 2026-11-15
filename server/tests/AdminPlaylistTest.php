@@ -188,7 +188,7 @@ final class AdminPlaylistTest extends DbTestCase
         $row = $this->json($this->call('GET', '/api/admin/streams'))['streams'][0];
 
         $this->assertSame(
-            ['public_id' => $id, 'name' => 'Alpha News', 'url' => 'https://alphanews.test/live.m3u8', 'groups' => ['News', 'Sports'], 'country' => 'us', 'kind' => 'hls', 'state' => 'working', 'state_reason' => null, 'pinned' => true, 'is_default' => true, 'source' => 'test', 'has_logo' => true, 'added_at' => '2026-11-12 03:00:00'],
+            ['public_id' => $id, 'name' => 'Alpha News', 'url' => 'https://alphanews.test/live.m3u8', 'groups' => ['News', 'Sports'], 'country' => 'us', 'kind' => 'hls', 'state' => 'working', 'state_reason' => null, 'pinned' => true, 'is_default' => true, 'source' => 'test', 'has_logo' => true, 'added_at' => '2026-11-12 03:00:00', 'last_checked_at' => null, 'check_result' => null],
             $row,
         );
     }

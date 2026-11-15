@@ -279,6 +279,8 @@ final class PlaylistAdmin
             'source' => (string) $row['source'],
             'has_logo' => $row['logo_file'] !== null,
             'added_at' => (string) $row['added_at'],
+            'last_checked_at' => $row['last_checked_at'] === null ? null : (string) $row['last_checked_at'],
+            'check_result' => $row['check_result'] === null ? null : (string) $row['check_result'],
         ];
     }
 

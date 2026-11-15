@@ -9,6 +9,7 @@ use Prism\History\Admin\AdminController;
 use Prism\History\Admin\AdminGuard;
 use Prism\History\Admin\AdminReports;
 use Prism\History\Admin\ChannelAdmin;
+use Prism\History\Admin\CheckerAdmin;
 use Prism\History\Admin\PlaylistAdmin;
 use Prism\History\Admin\TokenCache;
 use Prism\History\Api\Router;
@@ -102,7 +103,18 @@ final class Container
             $s['clock'],
         );
 
-        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit), $playlistAdmin), new StreamsController($config->playlistDataDir()));
+        $checkerAdmin = new CheckerAdmin(
+            $pdo,
+            $streams,
+            $audit,
+            new CheckerState($s['state'], $s['clock']),
+            new SnapshotWriter($streams, $s['clock'], $config->playlistDataDir()),
+            $s['clock'],
+            $config->checkerDailyCapBytes(),
+            $config->checkerFirstPassCapBytes(),
+        );
+
+        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit), $playlistAdmin, $checkerAdmin), new StreamsController($config->playlistDataDir()));
     }
 
     /** The schema migrator over the migrations/ folder that ships next to src/. */
