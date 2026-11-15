@@ -18,6 +18,9 @@ final class RunLock
     /** The logo copier's own lock, so a slow run of it never blocks the history refresh (and the other way round). */
     public const LOGOS = 'prism_playlist_logos';
 
+    /** The stream checker's launch lock: one launch at a time, whatever the number of workers it starts. */
+    public const CHECKER = 'prism_playlist_check';
+
     public function __construct(private PDO $pdo, private string $name = self::NAME)
     {
     }
