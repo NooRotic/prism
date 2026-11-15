@@ -17,7 +17,8 @@ use Prism\History\Store\StreamStore;
  * A passing check and a result with no information are written at once. A failing one waits until the end of its batch, is
  * tried once more then (so a short outage has had time to clear), and is written after the host guard has looked at the whole
  * run: failures of streams that passed before are set aside (`host_guard`) on a host where more than half failed. The run
- * guard stops the worker, and voids the checks it made last, when two thirds of a window of its checks fail.
+ * guard stops the worker, and voids the streams that voted, when two thirds of the last 50 different hosts it asked did not
+ * answer at all (one vote per host, only from streams expected to play).
  *
  * Nothing it returns or records names a stream: counts and fixed codes only.
  */
