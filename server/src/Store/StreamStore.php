@@ -364,14 +364,18 @@ final class StreamStore
             ->execute([Time::datetime($nowMs), ...array_values($ids)]);
     }
 
-    /** @return array{eligible:int,checked:int,oldest_result_at:?string} how far the first pass has got */
+    /**
+     * How far the first pass has got. A voided result (the run guard threw the check away) does not count as checked.
+     *
+     * @return array{eligible:int,checked:int,oldest_result_at:?string}
+     */
     public function firstPass(): array
     {
         $row = $this->pdo
             ->query(
-                'SELECT COUNT(*) AS eligible, SUM(check_result IS NOT NULL) AS checked,
-                        MIN(CASE WHEN check_result IS NOT NULL THEN last_checked_at END) AS oldest
-                 FROM streams WHERE ' . self::ELIGIBLE,
+                "SELECT COUNT(*) AS eligible, SUM(check_result IS NOT NULL AND check_result <> 'voided') AS checked,
+                        MIN(CASE WHEN check_result IS NOT NULL AND check_result <> 'voided' THEN last_checked_at END) AS oldest
+                 FROM streams WHERE " . self::ELIGIBLE,
             )
             ->fetch();
 
