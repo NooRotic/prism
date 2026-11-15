@@ -287,6 +287,14 @@ final class StreamStoreCheckerTest extends DbTestCase
         $this->assertSame(['eligible' => 5, 'checked' => 3, 'oldest_result_at' => '2026-11-10 00:00:00'], $this->store->firstPass());
     }
 
+    public function testAVoidedResultIsNotACheckedStream(): void
+    {
+        $this->put('1', ['state' => 'new', 'check_result' => 'pass', 'last_checked_at' => '2026-11-10 00:00:00']);
+        $this->put('2', ['state' => 'new', 'check_result' => 'voided', 'last_checked_at' => '2026-11-05 00:00:00']);
+
+        $this->assertSame(['eligible' => 2, 'checked' => 1, 'oldest_result_at' => '2026-11-10 00:00:00'], $this->store->firstPass(), 'the run guard threw that check away: it still has to be done');
+    }
+
     public function testResultCountsCountTheLatestResultOfEachEligibleStream(): void
     {
         $this->put('1', ['check_result' => 'pass']);
