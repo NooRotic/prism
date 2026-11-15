@@ -53,8 +53,6 @@ final class CheckWorker
             public array $tally = [];
             /** @var array<string,true> */
             public array $seen = [];
-            /** @var list<string> */
-            public array $recent = [];
             public bool $listingChanged = false;
         };
         $run->guard = new RunGuard();
@@ -97,16 +95,13 @@ final class CheckWorker
             $result = $this->checker->check($row);
             $this->spend($result, $out);
 
-            $run->recent[] = (string) $row['id'];
-            if (count($run->recent) > 50) {
-                array_shift($run->recent);
-            }
-            if (!$result->isNoInformation()) {
-                $run->guard->record($result->isFailure());
+            if (self::votes($row, $result)) {
+                $run->guard->record((string) $row['host'], $result->code === 'unreachable', (string) $row['id']);
             }
             if ($run->guard->tripped()) {
-                $this->store->markVoided($run->recent, $this->clock->nowMs());
-                $out['voided'] = count($run->recent);
+                $voters = $run->guard->voters();
+                $this->store->markVoided($voters, $this->clock->nowMs());
+                $out['voided'] = count($voters);
 
                 return 'run_guard';
             }
@@ -190,6 +185,19 @@ final class CheckWorker
     {
         $out['bytes'] += $result->bytes;
         $this->state->addBytes($result->bytes);
+    }
+
+    /**
+     * Whether this check is evidence about the checker's own network, for the run guard: only a stream that is expected to play
+     * (new, held for its first check, or working: not suspect, dead or any other state whose streams are known to fail) and a
+     * result that says something about the stream's host. Whether the host ANSWERED is the question, so only "no answer at all"
+     * will count as a failure when it is recorded.
+     *
+     * @param array<string,mixed> $row
+     */
+    private static function votes(array $row, CheckResult $result): bool
+    {
+        return in_array($row['state'], ['new', 'held', 'working'], true) && !$result->isNoInformation();
     }
 
     /** A result the worker tries a second time and counts as a failure: a failing check, or an answer without CORS. */
