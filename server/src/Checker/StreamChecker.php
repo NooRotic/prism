@@ -33,6 +33,7 @@ final class StreamChecker
         private string $origin,
         private Clock $clock,
         private array $denyHosts = self::DENY_HOSTS,
+        private ?HostPacer $pacer = null,
     ) {
     }
 
@@ -165,6 +166,7 @@ final class StreamChecker
         if ($this->clock->nowMs() > $deadlineMs) {
             return 'unreachable';
         }
+        $this->pacer?->wait($url);
         $r = $this->fetcher->fetch($url, $maxBytes, self::REQUEST_SECONDS, $headers, $probe);
         $bytes += strlen($r->body);
         if ($r->error !== null) {

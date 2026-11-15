@@ -311,6 +311,19 @@ final class StreamCheckerTest extends TestCase
         $this->assertSame('pass', $this->checker()->check($this->row('https://mytwitch.tv/a/m.m3u8'))->code);
     }
 
+    public function testRequestsToOneHostAreSpacedByThePacerBeforeEachRequest(): void
+    {
+        $sleeper = new \Prism\History\Tests\Support\FakeSleeper($this->clock);
+        $pacer = new \Prism\History\Checker\HostPacer($sleeper, $this->clock);
+        $fetcher = new SafeFetcher(new FakeResolver(['x.test' => ['93.184.216.34']]), $this->transport, 'PRISM-test/1', 3, FetchPolicy::checker());
+        $this->transport->push(self::cors(self::MASTER), self::cors(self::VOD), self::segment());
+
+        $r = (new StreamChecker($fetcher, self::ORIGIN, $this->clock, StreamChecker::DENY_HOSTS, $pacer))->check($this->row());
+
+        $this->assertSame('pass', $r->code);
+        $this->assertSame([1000, 1000], $sleeper->calls, 'manifest, variant and segment come a second apart');
+    }
+
     public function testAStreamThatTakesMoreThanThirtySecondsInTotalIsUnreachable(): void
     {
         $clock = $this->clock;
