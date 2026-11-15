@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useApp } from '../../contexts/AppContext'
 import { useHeaderHeight } from '../../hooks/useHeaderHeight'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import { PrismMark } from '../brand/PrismMark'
 import { SmartUrlInput } from '../search/SmartUrlInput'
 import HeaderNav from './HeaderNav'
 
@@ -39,8 +40,9 @@ export function Header() {
         <Link
           to="/"
           aria-label="Return to home"
-          className="transition-opacity hover:opacity-80"
+          className="flex items-center gap-2 transition-opacity hover:opacity-80"
         >
+          <PrismMark variant="icon" hover className="h-8 w-16 shrink-0" />
           <h1
             className="font-heading text-lg select-none"
             style={{ color: 'var(--accent-green)', letterSpacing: '0.15em' }}
