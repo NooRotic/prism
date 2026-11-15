@@ -37,6 +37,14 @@ describe('the stream checker page', () => {
     expect(text).toContain('Origin')
   })
 
+  it('does not promise more than the checker does: about once a day (more often for a few days after a failure), and a redirect can add a request', () => {
+    const text = page()
+
+    expect(text).toContain('about once a day')
+    expect(text).toMatch(/more often/i)
+    expect(text).toContain('a redirect can add a request')
+  })
+
   it('tells a stream owner how to ask for removal, through the repository issues, with no email address', () => {
     const html = page()
 
