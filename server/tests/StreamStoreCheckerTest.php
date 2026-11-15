@@ -237,6 +237,28 @@ final class StreamStoreCheckerTest extends DbTestCase
         $this->assertNull($r['logo_file']);
     }
 
+    public function testAnAutoRemovalIsRefusedForARowThatHasBeenPinnedOrMadeTheDefaultSinceItWasRead(): void
+    {
+        foreach (['pinned', 'is_default'] as $flag) {
+            $row = $this->put($flag, ['state' => 'dead', 'state_reason' => 'failed_3_days', 'ever_passed' => 1, 'logo_file' => 'abcdef012345.png', $flag => 1]);
+            $t = new Transition('removed', 'dead_14_days', true, 3, '2026-11-12', true);
+
+            $this->assertFalse($this->store->applyTransition($row['id'], 'dead', 'failed_3_days', $t, new CheckResult('unreachable'), $this->now()), $flag);
+
+            $raw = $this->raw($row['id']);
+            $this->assertSame(['dead', 'failed_3_days', 'abcdef012345.png'], [$raw['state'], $raw['state_reason'], $raw['logo_file']], $flag . ': nothing changed');
+        }
+    }
+
+    public function testOtherTransitionsOfAPinnedStreamAreStillWritten(): void
+    {
+        $row = $this->put('p', ['state' => 'working', 'ever_passed' => 1, 'pinned' => 1]);
+        $t = new Transition('suspect', null, true, 1, '2026-11-12', true);
+
+        $this->assertTrue($this->store->applyTransition($row['id'], 'working', null, $t, new CheckResult('unreachable'), $this->now()));
+        $this->assertSame('suspect', $this->raw($row['id'])['state']);
+    }
+
     public function testApplyingWithoutRecordingTheResultLeavesTheResultColumnsAlone(): void
     {
         $row = $this->put('1', ['check_result' => 'http_status', 'check_bytes' => 7, 'facts_json' => '{"a":1}', 'last_checked_at' => '2026-11-10 00:00:00']);

@@ -320,8 +320,10 @@ final class StreamStore
     {
         return $this->transaction(function () use ($id, $expectedState, $expectedReason, $t, $result, $nowMs, $recordResult): bool {
             // The row is locked, so "still as it was" and "write" are one step; the update count cannot say it (a write of
-            // identical values counts as zero rows).
-            $lock = $this->pdo->prepare('SELECT 1 FROM streams WHERE id = ? AND state = ? AND state_reason <=> ? FOR UPDATE');
+            // identical values counts as zero rows). An auto-removal clears the logo and ends the owner's ability to act on the
+            // row, so it also needs the row not to have been pinned or made the default since the worker read it.
+            $removal = $t->state === 'removed' ? ' AND pinned = 0 AND is_default = 0' : '';
+            $lock = $this->pdo->prepare('SELECT 1 FROM streams WHERE id = ? AND state = ? AND state_reason <=> ?' . $removal . ' FOR UPDATE');
             $lock->execute([$id, $expectedState, $expectedReason]);
             if ($lock->fetchColumn() === false) {
                 return false;
