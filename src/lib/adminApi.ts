@@ -350,6 +350,10 @@ export interface AdminStream {
   source: string
   hasLogo: boolean
   addedAt: string
+  /** When the checker last looked at it (`Y-m-d H:i:s`, UTC), or null when it never has. */
+  lastCheckedAt: string | null
+  /** What that look came to, a fixed word (`pass`, `unreachable`, `no_cors`, ...), or null. */
+  checkResult: string | null
 }
 export interface AdminStreams {
   streams: AdminStream[]
@@ -388,6 +392,8 @@ const parseStreams = (json: unknown): AdminStreams => {
         source: str(r.source),
         hasLogo: bool(r.has_logo),
         addedAt: str(r.added_at),
+        lastCheckedAt: strOrNull(r.last_checked_at),
+        checkResult: strOrNull(r.check_result),
       }
     }),
     total: num(o.total),
@@ -466,3 +472,105 @@ export const setDefaultStream = (publicId: string, signal?: AbortSignal) =>
 /** Removes a stream (it stays as a tombstone, so a re-import cannot bring it back). */
 export const removeStream = (publicId: string, signal?: AbortSignal) =>
   streamAct('/api/admin/streams/remove', { public_id: publicId }, signal)
+
+// ---- The stream checker (the Health screen)
+
+export const CHECKER_MODES = ['shadow', 'live'] as const
+export type CheckerMode = (typeof CHECKER_MODES)[number]
+
+/** What the Health screen shows: where the first pass stands, what Apply would do, what looks wrong, and the download budget. */
+export interface AdminChecker {
+  /** `shadow` until the owner applies the first pass (nothing visitors see has changed), `live` after. */
+  mode: CheckerMode
+  appliedAt: string | null
+  paused: boolean
+  progress: { eligible: number; checked: number; oldestResultAt: string | null }
+  /** The latest result of each eligible stream that has one, counted by result code. */
+  outcome: Record<string, number>
+  /** How many streams visitors can see now that Apply would hide. 0 once live. */
+  wouldHide: number
+  counts: Partial<Record<StreamState, number>>
+  /** Hosts with at least four streams where more than half failed: they may be down, or blocking the server. */
+  clusters: { host: string; streams: number; failed: number }[]
+  /** Hosts whose failures the host guard set aside, with how many streams. */
+  guardedHosts: { host: string; streams: number }[]
+  /** Pinned or default streams that are dead: the checker never removes them. */
+  flagged: { publicId: string; name: string; pinned: boolean; isDefault: boolean; state: StreamState }[]
+  budget: { bytesToday: number; dailyCap: number; firstPassBytes: number; firstPassCap: number }
+  lastStop: { reason: string; at: string } | null
+}
+
+/** PHP sends an empty map as an empty list: read it as an empty map. */
+function map(value: unknown): Record<string, unknown> {
+  return Array.isArray(value) && value.length === 0 ? {} : rec(value)
+}
+
+const parseChecker = (json: unknown): AdminChecker => {
+  const o = rec(json)
+  const progress = rec(o.progress)
+  const budget = rec(o.budget)
+  const counts: Partial<Record<StreamState, number>> = {}
+  for (const [state, n] of Object.entries(map(o.counts))) counts[oneOf(state, STREAM_STATES)] = num(n)
+  const outcome: Record<string, number> = {}
+  for (const [code, n] of Object.entries(map(o.outcome))) outcome[code] = num(n)
+  const stop = o.last_stop === null ? null : rec(o.last_stop)
+  return {
+    mode: oneOf(o.mode, CHECKER_MODES),
+    appliedAt: strOrNull(o.applied_at),
+    paused: bool(o.paused),
+    progress: { eligible: num(progress.eligible), checked: num(progress.checked), oldestResultAt: strOrNull(progress.oldest_result_at) },
+    outcome,
+    wouldHide: num(o.would_hide),
+    counts,
+    clusters: list(o.clusters).map((c) => {
+      const r = rec(c)
+      return { host: str(r.host), streams: num(r.streams), failed: num(r.failed) }
+    }),
+    guardedHosts: list(o.guarded_hosts).map((g) => {
+      const r = rec(g)
+      return { host: str(r.host), streams: num(r.streams) }
+    }),
+    flagged: list(o.flagged).map((f) => {
+      const r = rec(f)
+      return { publicId: str(r.public_id), name: str(r.name), pinned: bool(r.pinned), isDefault: bool(r.is_default), state: oneOf(r.state, STREAM_STATES) }
+    }),
+    budget: { bytesToday: num(budget.bytes_today), dailyCap: num(budget.daily_cap), firstPassBytes: num(budget.first_pass_bytes), firstPassCap: num(budget.first_pass_cap) },
+    lastStop: stop === null ? null : { reason: str(stop.reason), at: str(stop.at) },
+  }
+}
+
+export const getChecker = (signal?: AbortSignal) => read('/api/admin/checker', parseChecker, signal)
+
+export const APPLY_REFUSALS = ['incomplete', 'stale', 'too_many_failures'] as const
+export type CheckerApplyRefusal = (typeof APPLY_REFUSALS)[number]
+
+/** What pressing Apply came to. `refused_apply` carries why nothing changed. */
+export type CheckerApplyResult =
+  | AdminResult<{ hidden: number; listed: number; snapshot: boolean; already: boolean }>
+  | { kind: 'refused_apply'; reason: CheckerApplyRefusal }
+
+const parseApplyDone = (json: unknown) => {
+  const o = rec(json)
+  if (o.ok !== true) throw new ShapeError()
+  return { hidden: num(o.hidden), listed: num(o.listed), snapshot: bool(o.snapshot), already: o.already === true }
+}
+
+function parseApplyRefusal(status: number, body: unknown): { kind: 'refused_apply'; reason: CheckerApplyRefusal } | null {
+  if (status !== 409 || !isRecord(body) || body.error !== 'refused' || typeof body.reason !== 'string') return null
+  const reason = body.reason
+  return (APPLY_REFUSALS as readonly string[]).includes(reason) ? { kind: 'refused_apply', reason: reason as CheckerApplyRefusal } : null
+}
+
+/** Applies the first pass: hides what failed, makes the checker live. */
+export const applyChecker = (signal?: AbortSignal) =>
+  request('/api/admin/checker/apply', parseApplyDone, { method: 'POST', body: {}, signal, onRefusal: parseApplyRefusal }) as Promise<CheckerApplyResult>
+
+const parsePaused = (json: unknown): { paused: boolean } => {
+  const o = rec(json)
+  if (o.ok !== true) throw new ShapeError()
+  return { paused: bool(o.paused) }
+}
+
+/** The kill switch: a paused checker does nothing until resumed. */
+export const setCheckerPaused = (paused: boolean, signal?: AbortSignal) =>
+  request(`/api/admin/checker/${paused ? 'pause' : 'resume'}`, parsePaused, { method: 'POST', body: {}, signal }) as Promise<AdminResult<{ paused: boolean }>>

@@ -13,6 +13,7 @@ import {
   type StreamActionResult,
   type StreamState,
 } from '../../lib/adminApi'
+import { formatUtc } from '../../lib/adminFormat'
 import { regionName } from '../../lib/countries'
 import { useAdminSession } from './AdminSessionContext'
 import StreamPreview from './StreamPreview'
@@ -341,7 +342,12 @@ export default function PlaylistScreen() {
                               {host(s.url)}
                             </div>
                           </td>
-                          <td className="py-1 pr-3">{s.stateReason ? `${s.state} (${s.stateReason})` : s.state}</td>
+                          <td className="py-1 pr-3">
+                            <div>{s.stateReason ? `${s.state} (${s.stateReason})` : s.state}</div>
+                            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {s.checkResult !== null && s.lastCheckedAt !== null ? `${s.checkResult}, ${formatUtc(s.lastCheckedAt)}` : 'never checked'}
+                            </div>
+                          </td>
                           <td className="py-1 pr-3">{s.country ? regionName(s.country) : '–'}</td>
                           <td className="py-1 pr-3">{s.groups.join(', ')}</td>
                           <td className="py-1 pr-3">{s.source}</td>

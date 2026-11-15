@@ -43,6 +43,8 @@ function stream(over: Partial<AdminStream> = {}): AdminStream {
     source: 'hls-valid-2026-11',
     hasLogo: false,
     addedAt: '2026-11-14 03:00:00',
+    lastCheckedAt: null,
+    checkResult: null,
     ...over,
   }
 }
@@ -81,6 +83,20 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+})
+
+describe('PlaylistScreen: the last check', () => {
+  it('says when a stream was last checked and what came of it, or that it never was', async () => {
+    api.getStreams.mockResolvedValue(page([ALPHA, stream({ publicId: 'ffffffffffff', name: 'Checked one', lastCheckedAt: '2026-11-15 02:00:00', checkResult: 'unreachable' })]))
+
+    renderScreen()
+
+    expect(await row('Alpha News')).toHaveTextContent('never checked')
+    const checked = await row('Checked one')
+    expect(checked).toHaveTextContent('unreachable')
+    expect(checked).toHaveTextContent('2026-11-15 02:00 UTC')
+    expect(checked).not.toHaveTextContent('never checked')
+  })
 })
 
 describe('PlaylistScreen: reading', () => {

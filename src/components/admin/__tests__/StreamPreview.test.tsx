@@ -32,6 +32,8 @@ function stream(over: Partial<AdminStream> = {}): AdminStream {
     source: 'manual',
     hasLogo: false,
     addedAt: '2026-11-14 03:00:00',
+    lastCheckedAt: null,
+    checkResult: null,
     ...over,
   }
 }

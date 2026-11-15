@@ -39,3 +39,8 @@ export function formatUtc(value: string | number): string {
   const iso = typeof value === 'number' ? new Date(value).toISOString() : value.replace(' ', 'T')
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`
 }
+
+/** Bytes as megabytes (1,048,576 bytes) with thousands separators: "50.0 MB", or "1,024 MB" with no decimals. */
+export function formatMb(bytes: number, digits = 1): string {
+  return `${(bytes / 1_048_576).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })} MB`
+}

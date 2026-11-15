@@ -27,6 +27,8 @@ const WIRE_STREAM = {
   source: 'hls-valid-2026-11',
   has_logo: true,
   added_at: '2026-11-14 03:00:00',
+  last_checked_at: '2026-11-15 02:00:00',
+  check_result: 'pass',
 }
 const WIRE_LIST = { streams: [WIRE_STREAM], total: 1, counts: { working: 1, held: 4 }, limit: 50, offset: 0 }
 
@@ -93,6 +95,8 @@ describe('getStreams', () => {
             source: 'hls-valid-2026-11',
             hasLogo: true,
             addedAt: '2026-11-14 03:00:00',
+            lastCheckedAt: '2026-11-15 02:00:00',
+            checkResult: 'pass',
           },
         ],
         total: 1,
@@ -101,6 +105,14 @@ describe('getStreams', () => {
         offset: 0,
       },
     })
+  })
+
+  it('reads a stream the checker has never looked at', async () => {
+    fetchMock.mockReturnValue(reply(200, { ...WIRE_LIST, streams: [{ ...WIRE_STREAM, last_checked_at: null, check_result: null }] }))
+
+    const result = await getStreams({ text: '', state: '', country: '' }, { limit: 50, offset: 0 })
+
+    expect(result).toMatchObject({ kind: 'ok', data: { streams: [{ lastCheckedAt: null, checkResult: null }] } })
   })
 
   it('accepts a state reason and a stream with no country', async () => {

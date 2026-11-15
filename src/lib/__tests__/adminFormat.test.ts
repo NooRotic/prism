@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AdminUsage } from '../adminApi'
-import { changeVsYesterday, formatCount, formatUtc, toBuckets, weeklyTotals } from '../adminFormat'
+import { changeVsYesterday, formatCount, formatMb, formatUtc, toBuckets, weeklyTotals } from '../adminFormat'
 
 const day = (date: string, total: number): AdminUsage['days'][number] => ({
   date,
@@ -62,6 +62,20 @@ describe('toBuckets', () => {
       { day: '2026-11-12', at: Date.parse('2026-11-12'), value: 5 },
       { day: '2026-11-13', at: Date.parse('2026-11-13'), value: 0 },
     ])
+  })
+})
+
+describe('formatMb', () => {
+  it('shows bytes as megabytes (1,048,576 bytes) with one decimal by default and thousands separators', () => {
+    expect(formatMb(0)).toBe('0.0 MB')
+    expect(formatMb(5000)).toBe('0.0 MB')
+    expect(formatMb(52_428_800)).toBe('50.0 MB')
+    expect(formatMb(1_610_612_736)).toBe('1,536.0 MB')
+  })
+
+  it('can show whole megabytes, for a cap', () => {
+    expect(formatMb(1_073_741_824, 0)).toBe('1,024 MB')
+    expect(formatMb(4_294_967_296, 0)).toBe('4,096 MB')
   })
 })
 
