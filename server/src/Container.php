@@ -179,6 +179,20 @@ final class Container
         );
     }
 
+    /** The playlist's streams table (for the commands that only read or count). */
+    public static function streamStore(Config $config, PDO $pdo, ?Clock $clock = null): StreamStore
+    {
+        return new StreamStore($pdo, $clock ?? new SystemClock());
+    }
+
+    /** The checker's bookkeeping: applied or not, the kill switch, the byte counts. */
+    public static function checkerState(Config $config, PDO $pdo, ?Clock $clock = null): CheckerState
+    {
+        $clock ??= new SystemClock();
+
+        return new CheckerState(new JobState($pdo, $clock), $clock);
+    }
+
     /**
      * One checker worker: the guarded fetcher with the checker's policy (https only, ports 80, 443 and 1024 up minus the ones
      * browsers refuse), the configured user agent and origin, and a pacer so no host sees more than a request a second.
