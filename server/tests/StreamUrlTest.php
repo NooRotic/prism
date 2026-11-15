@@ -77,6 +77,14 @@ final class StreamUrlTest extends TestCase
         );
     }
 
+    public function testHostIsLowerCaseWithNoPortAndNoBrackets(): void
+    {
+        $this->assertSame('cdn.example', StreamUrl::host('https://Cdn.Example:8443/a.m3u8'));
+        $this->assertSame('cdn.example', StreamUrl::host('https://cdn.example/a.m3u8'));
+        $this->assertSame('2001:db8::1', StreamUrl::host('https://[2001:db8::1]:8443/x'));
+        $this->assertSame('', StreamUrl::host('not an address'));
+    }
+
     public function testIdIs64HexAndPublicIdItsFirst12(): void
     {
         $id = StreamUrl::id('https://example.com/a.m3u8');
