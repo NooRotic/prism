@@ -7,82 +7,124 @@ namespace Prism\History\Tests;
 use PHPUnit\Framework\TestCase;
 use Prism\History\Checker\RunGuard;
 
+/**
+ * The run guard asks "is the checker's own network down?", so it takes ONE vote per host: a big host that is down is one
+ * piece of evidence, not fifty. Many different hosts failing to answer at the same time is the sign of a network problem.
+ */
 final class RunGuardTest extends TestCase
 {
-    private static function feed(RunGuard $guard, int $failures, int $passes): void
+    /** Distinct hosts $from to $to-1, the first $failures of them voting "did not answer". */
+    private static function hosts(RunGuard $guard, int $from, int $to, int $failures, string $prefix = 'host'): void
     {
-        for ($i = 0; $i < $failures; $i++) {
-            $guard->record(true);
-        }
-        for ($i = 0; $i < $passes; $i++) {
-            $guard->record(false);
+        for ($i = $from; $i < $to; $i++) {
+            $guard->record($prefix . $i . '.test', $i - $from < $failures, 'id-' . $prefix . $i);
         }
     }
 
-    public function testItDoesNotTripBeforeTheWindowIsFull(): void
+    public function testItDoesNotTripBeforeTheWindowHoldsFiftyHosts(): void
     {
         $guard = new RunGuard();
 
-        self::feed($guard, 49, 0);
+        self::hosts($guard, 0, 49, 49);
 
         $this->assertFalse($guard->tripped());
-        $this->assertSame(0, $guard->lastResults());
+        $this->assertSame([], $guard->voters());
     }
 
-    public function testFiftyFailuresTripIt(): void
+    public function testFiftyDifferentHostsAllFailingTripIt(): void
     {
         $guard = new RunGuard();
 
-        self::feed($guard, 50, 0);
+        self::hosts($guard, 0, 50, 50);
 
         $this->assertTrue($guard->tripped());
-        $this->assertSame(50, $guard->lastResults(), 'the whole window is to be voided');
+        $this->assertCount(50, $guard->voters(), 'the streams that voted are the ones to void');
+        $this->assertSame('id-host0', $guard->voters()[0]);
     }
 
-    public function testTwoThirdsIsTheLine(): void
+    public function testTwoThirdsOfTheHostsIsTheLine(): void
     {
         $under = new RunGuard();
-        self::feed($under, 33, 17);
+        self::hosts($under, 0, 50, 33);
         $over = new RunGuard();
-        self::feed($over, 34, 16);
+        self::hosts($over, 0, 50, 34);
 
-        $this->assertFalse($under->tripped(), '33 of 50 is under two thirds');
-        $this->assertTrue($over->tripped(), '34 of 50 is over two thirds');
+        $this->assertFalse($under->tripped(), '33 of 50 hosts is under two thirds');
+        $this->assertTrue($over->tripped(), '34 of 50 hosts is over two thirds');
     }
 
-    public function testAUsualDayOfAThirdFailingNeverTrips(): void
+    public function testOneHostThatIsDownIsOneVoteHoweverManyOfItsStreamsFail(): void
+    {
+        $guard = new RunGuard();
+
+        for ($i = 0; $i < 500; $i++) {
+            $guard->record('big.test', true, 'stream-' . $i);
+        }
+        self::hosts($guard, 0, 20, 0);
+
+        $this->assertFalse($guard->tripped());
+        self::hosts($guard, 20, 60, 0, 'ok');
+        $this->assertFalse($guard->tripped(), 'one failing host among fifty is nowhere near two thirds');
+    }
+
+    public function testAHostsNewestAnswerReplacesItsEarlierOne(): void
+    {
+        $guard = new RunGuard();
+        self::hosts($guard, 0, 50, 34);
+        $this->assertTrue($guard->tripped());
+
+        $guard->record('host0.test', false, 'id-again'); // host0 answers this time
+
+        $this->assertFalse($guard->tripped(), 'the same host now counts as an answer: 33 of 50');
+        $this->assertCount(50, $guard->voters());
+    }
+
+    public function testTheWindowRollsOverDistinctHosts(): void
+    {
+        $guard = new RunGuard();
+        self::hosts($guard, 0, 50, 50);
+        $this->assertTrue($guard->tripped());
+
+        self::hosts($guard, 50, 100, 0);
+
+        $this->assertFalse($guard->tripped(), 'fifty answering hosts pushed the failing ones out');
+        $this->assertSame('id-host50', $guard->voters()[0]);
+    }
+
+    public function testAUsualDayWithAThirdOfHostsNotAnsweringNeverTrips(): void
     {
         $guard = new RunGuard();
 
         for ($i = 0; $i < 600; $i++) {
-            $guard->record($i % 3 === 0);
+            $guard->record('h' . $i . '.test', $i % 3 === 0, 'id' . $i);
             $this->assertFalse($guard->tripped());
         }
     }
 
-    public function testTheWindowRolls(): void
+    public function testHostNamesThatLookLikeNumbersDoNotBreakTheWindow(): void
     {
         $guard = new RunGuard();
-        self::feed($guard, 50, 0);
+
+        for ($i = 0; $i < 80; $i++) {
+            $guard->record((string) (1000 + $i), true, 'id' . $i);
+        }
+
         $this->assertTrue($guard->tripped());
-
-        self::feed($guard, 0, 50);
-
-        $this->assertFalse($guard->tripped(), 'fifty passes pushed the failures out of the window');
+        $this->assertCount(50, $guard->voters());
+        $this->assertSame('id30', $guard->voters()[0], 'the oldest 30 were pushed out, in order');
     }
 
     public function testTheWindowAndTheThresholdCanBeChosen(): void
     {
         $guard = new RunGuard(6, 0.5);
 
-        self::feed($guard, 2, 4);
+        self::hosts($guard, 0, 6, 2);
         $this->assertFalse($guard->tripped());
 
-        // Three more failures push the two old ones out of the window one by one: it ends as pass, pass, pass, fail, fail, fail.
-        self::feed($guard, 2, 0);
-        $this->assertFalse($guard->tripped(), 'two of six after two more');
-        self::feed($guard, 1, 0);
-        $this->assertTrue($guard->tripped(), 'three of six is exactly the line of one half');
-        $this->assertSame(6, $guard->lastResults());
+        $guard->record('late.test', true, 'late');
+        $guard->record('later.test', true, 'later'); // host0 and host1 (failed) are pushed out
+        $this->assertFalse($guard->tripped(), 'host2..5 answered, late and later did not: 2 of 6');
+        $guard->record('latest.test', true, 'latest');
+        $this->assertTrue($guard->tripped(), '3 of 6 is the line of one half');
     }
 }

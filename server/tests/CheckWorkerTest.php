@@ -32,7 +32,7 @@ final class CheckWorkerTest extends DbTestCase
     private RoutedTransport $transport;
     private string $dir;
 
-    /** @var array<string,string> host => ok|dead|flaky; a host not listed is ok */
+    /** @var array<string,string> host => ok|dead (HTTP 500)|down (no answer at all)|flaky (the playlist fails once); a host not listed is ok */
     private array $modes = [];
 
     protected function setUp(): void
@@ -61,6 +61,9 @@ final class CheckWorkerTest extends DbTestCase
     {
         $mode = $this->modes[$host] ?? 'ok';
         $segment = str_ends_with($url, '.ts');
+        if ($mode === 'down') {
+            return new \RuntimeException('no answer');
+        }
         if ($mode === 'dead' || ($mode === 'flaky' && !$segment && $attempt === 1)) {
             return RoutedTransport::dead();
         }
@@ -337,10 +340,10 @@ final class CheckWorkerTest extends DbTestCase
         $this->assertSame(1, $r['failed']);
     }
 
-    public function testTheRunGuardStopsTheWorkerAndVoidsTheLastFiftyChecks(): void
+    public function testTheRunGuardStopsTheWorkerAndVoidsTheStreamsThatVoted(): void
     {
         for ($i = 1; $i <= 60; $i++) {
-            $this->modes['d' . $i . '.test'] = 'dead';
+            $this->modes['d' . $i . '.test'] = 'down';
             $this->put('d' . $i . '.test', (string) $i);
         }
 
@@ -354,6 +357,70 @@ final class CheckWorkerTest extends DbTestCase
         $this->assertCount(50, $this->transport->calls, 'it stopped before any retry');
         $this->assertSame('run_guard', $this->state->lastStop()['reason'] ?? null);
         $this->assertSame(['eligible' => 60, 'checked' => 0, 'oldest_result_at' => null], $this->store->firstPass(), 'a voided check is still to be done');
+    }
+
+    public function testOneBigHostThatIsDownIsNotANetworkProblem(): void
+    {
+        $this->modes['big.test'] = 'down';
+        for ($i = 1; $i <= 60; $i++) {
+            $this->put('big.test', 'b' . $i);
+        }
+        for ($i = 1; $i <= 55; $i++) {
+            $this->put('ok' . $i . '.test', 'o' . $i);
+        }
+
+        $r = $this->worker()->run(0, 1, 200, false);
+
+        $this->assertNull($r['stopped'], 'round-robin leaves the big host alone at the end of the batch, and it is one host');
+        $this->assertSame([115, 55, 60], [$r['checked'], $r['passed'], $r['failed']]);
+        $this->assertSame(0, (int) $this->pdo->query("SELECT COUNT(*) FROM streams WHERE check_result = 'voided'")->fetchColumn());
+    }
+
+    public function testStreamsThatAreExpectedToFailDoNotFeedTheGuard(): void
+    {
+        $this->state->markApplied();
+        for ($i = 1; $i <= 60; $i++) {
+            $this->modes['s' . $i . '.test'] = 'down';
+            $this->put('s' . $i . '.test', 's' . $i, ['state' => 'suspect', 'ever_passed' => 1]);
+        }
+        for ($i = 1; $i <= 20; $i++) {
+            $this->put('ok' . $i . '.test', 'o' . $i, ['state' => 'working', 'ever_passed' => 1]);
+        }
+
+        $r = $this->worker()->run(0, 1, 200, false);
+
+        $this->assertNull($r['stopped'], 'suspect streams head the queue and are expected to fail: they are not evidence about the network');
+        $this->assertSame([80, 60], [$r['checked'], $r['failed']]);
+    }
+
+    public function testAnAnswerFromAHostIsNeverEvidenceOfANetworkProblem(): void
+    {
+        for ($i = 1; $i <= 60; $i++) {
+            $this->modes['e' . $i . '.test'] = 'dead'; // every host answers, with an error
+            $this->put('e' . $i . '.test', (string) $i);
+        }
+
+        $r = $this->worker()->run(0, 1, 200, false);
+
+        $this->assertNull($r['stopped']);
+        $this->assertSame([60, 60], [$r['checked'], $r['failed']]);
+    }
+
+    public function testAfterATripTheNextLaunchFinishesTheJobOnceTheNetworkIsBack(): void
+    {
+        for ($i = 1; $i <= 60; $i++) {
+            $this->modes['d' . $i . '.test'] = 'down';
+            $this->put('d' . $i . '.test', (string) $i);
+        }
+        $first = $this->worker()->run(0, 1, 100, false);
+        $this->assertSame('run_guard', $first['stopped']);
+
+        $this->modes = []; // the network is back
+        $second = $this->worker()->run(0, 1, 100, false);
+
+        $this->assertNull($second['stopped']);
+        $this->assertSame([60, 60], [$second['checked'], $second['passed']], 'the voided streams and the ones never reached are all checked');
+        $this->assertSame(['eligible' => 60, 'checked' => 60], array_intersect_key($this->store->firstPass(), ['eligible' => 1, 'checked' => 1]));
     }
 
     // ---- stops, slices, pacing, batches
