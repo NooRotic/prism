@@ -59,6 +59,14 @@ final class StreamUrl
         return preg_match('/^[a-z0-9_](?:[a-z0-9_.\-]*[a-z0-9_])?\.?$/D', $host) === 1;
     }
 
+    /** The host of a normalised address: lower case, no port, no brackets around an IPv6 address; '' when there is none. */
+    public static function host(string $normalisedUrl): string
+    {
+        $host = parse_url($normalisedUrl, PHP_URL_HOST);
+
+        return is_string($host) ? strtolower(trim($host, '[]')) : '';
+    }
+
     /** The stream's key: 64 lower-case hex characters. */
     public static function id(string $normalised): string
     {

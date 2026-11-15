@@ -30,6 +30,14 @@ final class JobStateTest extends DbTestCase
         $this->assertSame([], $this->state->getByPrefix('nothing'));
     }
 
+    public function testAddAddsToACounterAndReturnsTheNewValue(): void
+    {
+        $this->assertSame(5, $this->state->add('bytes', 5), 'a missing key starts from zero');
+        $this->assertSame(1_005, $this->state->add('bytes', 1_000));
+        $this->assertSame('1005', $this->state->get('bytes'));
+        $this->assertSame(1, $this->state->add('other', 1), 'counters are independent');
+    }
+
     public function testGetMissingReturnsNull(): void
     {
         $this->assertNull($this->state->get('nothing'));

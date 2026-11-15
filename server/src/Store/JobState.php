@@ -50,6 +50,23 @@ final class JobState
         return (int) $this->pdo->query('SELECT LAST_INSERT_ID()')->fetchColumn();
     }
 
+    /**
+     * Adds $n to a counter (a missing one starts from zero) and returns the new value, with the same single statement and
+     * LAST_INSERT_ID(expr) hand-back as incr(), so two callers never read each other's result.
+     */
+    public function add(string $key, int $n): int
+    {
+        $n = max(0, $n);
+        $this->pdo
+            ->prepare(
+                "INSERT INTO job_state (k, v, updated_at) VALUES (?, LAST_INSERT_ID({$n}), ?)
+                 ON DUPLICATE KEY UPDATE v = LAST_INSERT_ID(CAST(v AS UNSIGNED) + {$n}), updated_at = VALUES(updated_at)",
+            )
+            ->execute([$key, $this->now()]);
+
+        return (int) $this->pdo->query('SELECT LAST_INSERT_ID()')->fetchColumn();
+    }
+
     public function delete(string $key): void
     {
         $this->pdo->prepare('DELETE FROM job_state WHERE k = ?')->execute([$key]);

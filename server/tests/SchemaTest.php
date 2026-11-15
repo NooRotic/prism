@@ -6,6 +6,8 @@ namespace Prism\History\Tests;
 
 use PDO;
 use PDOException;
+use Prism\History\Migrator;
+use Prism\History\Tests\Support\Database;
 use Prism\History\Tests\Support\DbTestCase;
 
 final class SchemaTest extends DbTestCase
@@ -30,6 +32,59 @@ final class SchemaTest extends DbTestCase
         $this->pdo->prepare(
             'INSERT INTO bio_links (twitch_id, platform, url, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?)',
         )->execute([$id, $platform, $url, '2026-11-12 03:00:00', '2026-11-12 03:00:00']);
+    }
+
+    public function testMigration004AddsTheCheckerColumnsAndIndexes(): void
+    {
+        $columns = $this->pdo->query('SHOW COLUMNS FROM streams')->fetchAll(PDO::FETCH_COLUMN);
+        foreach (['host', 'ever_passed', 'fail_days', 'last_fail_day', 'check_result', 'check_bytes', 'state_changed_at', 'next_check_at'] as $column) {
+            $this->assertContains($column, $columns, $column);
+        }
+        $indexes = $this->pdo->query('SHOW INDEX FROM streams')->fetchAll(PDO::FETCH_COLUMN, 2);
+        $this->assertContains('idx_streams_host', $indexes);
+        $this->assertContains('idx_streams_due', $indexes);
+    }
+
+    public function testMigration004BackfillsTheHostAndWhoHasPassed(): void
+    {
+        Database::dropAll($this->pdo);
+        $dir = sys_get_temp_dir() . '/prism-mig-' . bin2hex(random_bytes(4));
+        mkdir($dir);
+        try {
+            foreach (['001_schema', '002_admin', '003_streams'] as $file) {
+                copy(__DIR__ . '/../migrations/' . $file . '.sql', $dir . '/' . $file . '.sql');
+            }
+            (new Migrator($this->pdo, $dir))->run();
+            $insert = $this->pdo->prepare(
+                "INSERT INTO streams (id, public_id, url, name, groups_json, kind, state, source, added_at)
+                 VALUES (?, ?, ?, 'n', '[\"A\"]', 'hls', ?, 't', '2026-11-12 03:00:00')",
+            );
+            $insert->execute([str_repeat('a', 64), str_repeat('a', 12), 'https://Cdn.Example:8443/a.m3u8', 'working']);
+            $insert->execute([str_repeat('b', 64), str_repeat('b', 12), 'https://other.test/b.m3u8', 'new']);
+
+            $applied = (new Migrator($this->pdo, __DIR__ . '/../migrations'))->run();
+        } finally {
+            array_map('unlink', glob($dir . '/*.sql') ?: []);
+            rmdir($dir);
+        }
+
+        $this->assertSame(['004_checker'], $applied);
+        $rows = $this->pdo->query('SELECT host, ever_passed FROM streams ORDER BY id')->fetchAll();
+        $this->assertSame([['cdn.example', '1'], ['other.test', '0']], array_map(static fn (array $r): array => [$r['host'], (string) $r['ever_passed']], $rows));
+    }
+
+    public function testMigration004CanBeRunAgain(): void
+    {
+        $sql = (string) file_get_contents(__DIR__ . '/../migrations/004_checker.sql');
+        $lines = array_filter(preg_split('/\R/', $sql) ?: [], static fn (string $l): bool => !str_starts_with(ltrim($l), '--'));
+        $statements = array_values(array_filter(array_map('trim', preg_split('/;\s*(?:\R|$)/', implode("\n", $lines)) ?: []), static fn (string $s): bool => $s !== ''));
+        $this->assertNotSame([], $statements);
+
+        foreach ($statements as $statement) {
+            $this->pdo->exec($statement);
+        }
+
+        $this->assertSame([], (new Migrator($this->pdo, __DIR__ . '/../migrations'))->run(), 'nothing new to apply');
     }
 
     public function testSnapshotKeyIsIdAndDate(): void
