@@ -78,7 +78,7 @@ final class SafeFetcher
     }
 
     /** scheme://host:port with the default port spelled out, lower case: what a browser compares to decide "same origin". */
-    private static function originOf(string $url): string
+    public static function originOf(string $url): string
     {
         $p = parse_url($url);
         $scheme = strtolower((string) ($p['scheme'] ?? ''));
