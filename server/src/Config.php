@@ -202,12 +202,55 @@ final class Config
      */
     public function playlistUserAgent(): string
     {
-        $value = $this->value('playlist.user_agent');
-        if (is_string($value) && $value !== '' && strlen($value) <= 200 && preg_match('/^[\x20-\x7e]+$/D', $value) === 1) {
+        return $this->plainText('playlist.user_agent', 'PRISM/1.0 (+https://prism.nooroticx.tv)');
+    }
+
+    /**
+     * The origin the stream checker presents, so it sees what a PRISM visitor's browser sees: scheme, host and optional port,
+     * no path. Anything else means PRISM's own address; this never throws.
+     */
+    public function checkerOrigin(): string
+    {
+        $value = $this->value('playlist.check_origin');
+        if (is_string($value) && strlen($value) <= 200 && preg_match('#^https?://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::\d{1,5})?$#D', $value) === 1) {
             return $value;
         }
 
-        return 'PRISM/1.0 (+https://prism.nooroticx.tv)';
+        return 'https://prism.nooroticx.tv';
+    }
+
+    /**
+     * What the stream checker says about itself to every host it visits: the product, and a link to a public page that says
+     * what the checker is and how to ask for a stream to be removed. No contact address of the owner. A value that is not a
+     * short single line of text means the default; this never throws.
+     */
+    public function checkerUserAgent(): string
+    {
+        return $this->plainText('playlist.check_user_agent', 'PRISM-StreamChecker/1.0 (+https://prism.nooroticx.tv/stream-checker/)');
+    }
+
+    /** How many checker worker processes one launch starts (1 to 12, default 1; the host's limits are unverified). */
+    public function checkerWorkers(): int
+    {
+        return $this->boundedInt('checker.workers', 1, 1, 12);
+    }
+
+    /** How many streams one worker takes in a run that is not the first pass (1 to 2000, default 300). */
+    public function checkerBatch(): int
+    {
+        return $this->boundedInt('checker.batch', 300, 1, 2000);
+    }
+
+    /** The most the first full pass may download, in bytes (config in megabytes, default 4096). */
+    public function checkerFirstPassCapBytes(): int
+    {
+        return $this->boundedInt('checker.first_pass_cap_mb', 4096, 1, 1_000_000) * 1_048_576;
+    }
+
+    /** The most the checker may download per UTC day once the first pass is applied, in bytes (config in megabytes, default 1024). */
+    public function checkerDailyCapBytes(): int
+    {
+        return $this->boundedInt('checker.daily_cap_mb', 1024, 1, 1_000_000) * 1_048_576;
     }
 
     /** Where the copied channel pictures are written: inside public/, so Apache serves them straight. */
@@ -269,6 +312,22 @@ final class Config
         }
 
         return $value;
+    }
+
+    /** A short single line of printable ASCII, or the default: for text that goes out in a request header. */
+    private function plainText(string $path, string $default): string
+    {
+        $value = $this->value($path);
+
+        return is_string($value) && $value !== '' && strlen($value) <= 200 && preg_match('/^[\x20-\x7e]+$/D', $value) === 1 ? $value : $default;
+    }
+
+    /** A whole number in [$min, $max], or the default for anything else (never throws). */
+    private function boundedInt(string $path, int $default, int $min, int $max): int
+    {
+        $value = $this->value($path);
+
+        return is_int($value) && $value >= $min && $value <= $max ? $value : $default;
     }
 
     private function stringOr(string $path, string $default): string

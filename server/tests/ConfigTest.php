@@ -119,6 +119,72 @@ final class ConfigTest extends TestCase
         }
     }
 
+    public function testCheckerSettingsHaveDefaultsAndNeverThrow(): void
+    {
+        $c = Config::fromArray($this->base());
+
+        $this->assertSame('https://prism.nooroticx.tv', $c->checkerOrigin());
+        $this->assertSame('PRISM-StreamChecker/1.0 (+https://prism.nooroticx.tv/stream-checker/)', $c->checkerUserAgent());
+        $this->assertSame(1, $c->checkerWorkers());
+        $this->assertSame(300, $c->checkerBatch());
+        $this->assertSame(4096 * 1_048_576, $c->checkerFirstPassCapBytes());
+        $this->assertSame(1024 * 1_048_576, $c->checkerDailyCapBytes());
+    }
+
+    public function testCheckerSettingsCanBeSet(): void
+    {
+        $a = $this->base();
+        $a['playlist'] = ['check_origin' => 'https://staging.example.test', 'check_user_agent' => 'Checker/2 (+https://example.test/c/)'];
+        $a['checker'] = ['workers' => 6, 'batch' => 500, 'first_pass_cap_mb' => 2048, 'daily_cap_mb' => 512];
+
+        $c = Config::fromArray($a);
+
+        $this->assertSame('https://staging.example.test', $c->checkerOrigin());
+        $this->assertSame('Checker/2 (+https://example.test/c/)', $c->checkerUserAgent());
+        $this->assertSame([6, 500, 2048 * 1_048_576, 512 * 1_048_576], [$c->checkerWorkers(), $c->checkerBatch(), $c->checkerFirstPassCapBytes(), $c->checkerDailyCapBytes()]);
+    }
+
+    /** @return array<string,array{0:array<string,mixed>}> */
+    public static function badCheckerSettings(): array
+    {
+        return [
+            'zero workers' => [['checker' => ['workers' => 0]]],
+            'too many workers' => [['checker' => ['workers' => 13]]],
+            'workers as text' => [['checker' => ['workers' => '6']]],
+            'workers as a float' => [['checker' => ['workers' => 2.5]]],
+            'zero batch' => [['checker' => ['batch' => 0]]],
+            'a huge batch' => [['checker' => ['batch' => 2001]]],
+            'a zero cap' => [['checker' => ['first_pass_cap_mb' => 0, 'daily_cap_mb' => 0]]],
+            'a negative cap' => [['checker' => ['first_pass_cap_mb' => -5, 'daily_cap_mb' => -5]]],
+            'a cap as text' => [['checker' => ['first_pass_cap_mb' => 'big', 'daily_cap_mb' => 'big']]],
+            'checker is not an array' => [['checker' => 'yes']],
+            'an origin with a script scheme' => [['playlist' => ['check_origin' => 'javascript:alert(1)']]],
+            'an origin without a host' => [['playlist' => ['check_origin' => 'https://']]],
+            'an origin with a path' => [['playlist' => ['check_origin' => 'https://a.test/path']]],
+            'an origin with a line break' => [['playlist' => ['check_origin' => "https://a.test\r\nX: y"]]],
+            'an origin that is a number' => [['playlist' => ['check_origin' => 123]]],
+            'a user agent with a line break' => [['playlist' => ['check_user_agent' => "bad\nagent"]]],
+            'an empty user agent' => [['playlist' => ['check_user_agent' => '']]],
+            'a very long user agent' => [['playlist' => ['check_user_agent' => str_repeat('a', 201)]]],
+            'a user agent that is a number' => [['playlist' => ['check_user_agent' => 5]]],
+        ];
+    }
+
+    /** @param array<string,mixed> $bad */
+    #[\PHPUnit\Framework\Attributes\DataProvider('badCheckerSettings')]
+    public function testABadCheckerSettingMeansTheDefaultAndDoesNotThrow(array $bad): void
+    {
+        $default = Config::fromArray($this->base());
+        $c = Config::fromArray($this->base() + $bad);
+
+        $this->assertSame($default->checkerOrigin(), $c->checkerOrigin());
+        $this->assertSame($default->checkerUserAgent(), $c->checkerUserAgent());
+        $this->assertSame($default->checkerWorkers(), $c->checkerWorkers());
+        $this->assertSame($default->checkerBatch(), $c->checkerBatch());
+        $this->assertSame($default->checkerFirstPassCapBytes(), $c->checkerFirstPassCapBytes());
+        $this->assertSame($default->checkerDailyCapBytes(), $c->checkerDailyCapBytes());
+    }
+
     public function testAnIntegerOwnerIdIsReadAsText(): void
     {
         $a = $this->base();

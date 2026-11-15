@@ -51,6 +51,21 @@ return [
     //     // What the logo copier tells the hosts it fetches pictures from. The default is 'PRISM/1.0 (+https://prism.nooroticx.tv)';
     //     // it never uses the contact address in tt.user_agent (that one is for TwitchTracker only).
     //     'user_agent' => 'PRISM/1.0 (+https://prism.nooroticx.tv)',
+    //     // The stream checker: the origin it presents (so it sees what a PRISM visitor's browser sees) and what it says about
+    //     // itself to every host it visits. The defaults are right; there is no contact address in the user agent on purpose,
+    //     // the public page it links to says how to ask for a stream's removal.
+    //     'check_origin' => 'https://prism.nooroticx.tv',
+    //     'check_user_agent' => 'PRISM-StreamChecker/1.0 (+https://prism.nooroticx.tv/stream-checker/)',
+    // ],
+    // Optional. The stream checker. All values here are the defaults. `workers` is how many processes one launch starts (1 to
+    // 12; start with 2 and raise it only after the host has shown it allows that many), `batch` how many streams a worker takes
+    // per run outside the first pass, and the caps are megabytes downloaded: the first pass has its own total, every UTC day
+    // after Apply has the daily one.
+    // 'checker' => [
+    //     'workers' => 1,
+    //     'batch' => 300,
+    //     'first_pass_cap_mb' => 4096,
+    //     'daily_cap_mb' => 1024,
     // ],
     // Kill switches: set to false to switch behaviour off without a redeploy.
     'flags' => [
