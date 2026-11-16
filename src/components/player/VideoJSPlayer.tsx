@@ -1,3 +1,4 @@
+import { applySavedVolume, saveVolume } from '../../lib/playerVolume'
 import { useEffect, useRef } from 'react'
 import videojs from 'video.js'
 import 'video.js/dist/video-js.css'
@@ -198,8 +199,14 @@ export default function VideoJSPlayer({
       logger.warn('[VideoJSPlayer] play() rejected:', err)
     }
 
+    let volumeRestored = false
+
     /** Plays, with sound first when `withSound` (a reload keeps whatever the sound state is now). */
     const startPlayback = (withSound: boolean) => {
+      // The viewer's saved volume goes on before every start (muted is untouched: only the volume is restored). Saving
+      // begins after this, so the element's default volume, reported by an early event, never overwrites the saved one.
+      applySavedVolume((volume) => player.volume(volume))
+      volumeRestored = true
       if (withSound) player.muted(false)
       player.play()?.catch(onPlayRejected)
     }
@@ -207,6 +214,10 @@ export default function VideoJSPlayer({
     // The sound came on (the speaker button, or the page's "Turn sound on"): the page stops saying it is playing muted.
     player.on('volumechange', () => {
       if (!player.muted()) out.setSoundBlocked(false)
+      if (volumeRestored) {
+        const volume = player.volume()
+        if (typeof volume === 'number') saveVolume(volume)
+      }
     })
     player.on('loadstart', () => log('info', 'loadstart'))
     player.on('loadedmetadata', () => log('info', `loadedmetadata (${videoEl.videoWidth}x${videoEl.videoHeight})`))

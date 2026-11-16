@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ReactPlayer from 'react-player'
 import type { PlayerProps } from '../../types/player'
 import { setPlayerMetrics, makeMetrics } from '../../lib/playerMetrics'
+import { readSavedVolume, saveVolume } from '../../lib/playerVolume'
 
 /**
  * YouTube player wrapping react-player. Handles both VOD
@@ -23,6 +24,11 @@ export default function YouTubePlayer({
   onPause,
   onEnded,
 }: PlayerProps) {
+  // The viewer's saved volume (volume only: the muted start below is the autoplay policy's, never overridden). A change is
+  // saved only once playback has begun, so an early report of the element's default volume cannot overwrite it.
+  const [savedVolume] = useState(readSavedVolume)
+  const playedRef = useRef(false)
+
   // Minimal metrics emission — react-player doesn't expose a
   // playbackStats API, so we can only report the engine name + the
   // lifecycle state we know from events. Bitrate/buffer/resolution
@@ -48,6 +54,10 @@ export default function YouTubePlayer({
         // Muted start so autoplay works under browser policies.
         // Users can unmute via the embedded YouTube control bar.
         muted
+        volume={savedVolume ?? undefined}
+        onVolumeChange={(event) => {
+          if (playedRef.current) saveVolume(event.currentTarget.volume)
+        }}
         width="100%"
         height="100%"
         onReady={() => {
@@ -55,6 +65,7 @@ export default function YouTubePlayer({
           onReady?.()
         }}
         onPlay={() => {
+          playedRef.current = true
           emitState({ paused: false, muted: true })
           onPlay?.()
         }}

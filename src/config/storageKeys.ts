@@ -47,6 +47,8 @@ export const STORAGE_KEYS = {
   LOCAL_HLS_GROUP: 'prism_hls_group',
   /** Prefix for cached TwitchTracker summaries, one per lower-cased login (e.g. prism_tt_cache_streamer). */
   LOCAL_TWITCHTRACKER_CACHE_PREFIX: 'prism_tt_cache_',
+  /** Player volume the viewer last chose, 0..1 as a decimal string (e.g. '0.35'). Muted state is deliberately not saved: autoplay policy forces muted starts. */
+  LOCAL_PLAYER_VOLUME: 'prism_player_volume',
   /** Id of this browser tab, so a chat pop-out knows which tab owns it. Survives a reload. */
   SESSION_TAB_ID: 'prism_tab_id',
   /** The owner's admin token (identity only, no permissions). Never the viewer token, and gone when the tab closes. */

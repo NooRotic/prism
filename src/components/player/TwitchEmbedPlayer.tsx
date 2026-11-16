@@ -1,3 +1,4 @@
+import { applySavedVolume, saveVolume } from '../../lib/playerVolume'
 import { useEffect, useRef, useCallback } from 'react'
 import type { PlayerProps } from '../../types/player'
 import { setPlayerMetrics, makeMetrics, isTabVisible } from '../../lib/playerMetrics'
@@ -29,6 +30,7 @@ interface TwitchPlayerInstance {
   pause: () => void
   play: () => void
   setMuted?: (muted: boolean) => void
+  setVolume?: (volume: number) => void
   // Absent on the live SDK's player proxy — see fireReady.
   addEventListener?: (event: string, callback: () => void) => void
   // Playback state getters — present on real Twitch.Player at runtime
@@ -277,6 +279,8 @@ export default function TwitchEmbedPlayer({
         try {
           const player = embed.getPlayer()
           playerRef.current = player
+          // The viewer's saved volume (only the volume: muted stays with the sound-first logic below).
+          applySavedVolume((volume) => player.setVolume?.(volume))
 
           // The current Twitch SDK's getPlayer() returns a proxy with getters
           // and play/pause but NO addEventListener (observed 2026-11-03).
@@ -348,6 +352,9 @@ export default function TwitchEmbedPlayer({
           if (!mountedRef.current || !p || !isTabVisible()) return
           try {
             const stats = p.getPlaybackStats?.()
+            // The embed has no volume event, so the viewer's choice is read here and saved (ready has applied the saved one).
+            const volume = p.getVolume?.()
+            if (typeof volume === 'number') saveVolume(volume)
             setPlayerMetrics(
               makeMetrics('twitch-sdk', {
                 currentTime: p.getCurrentTime?.() ?? null,

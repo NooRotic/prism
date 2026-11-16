@@ -3,6 +3,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TwitchEmbedPlayer from '../TwitchEmbedPlayer'
 import type { URLDetectionResult } from '../../../lib/urlDetection'
+import { readSavedVolume, saveVolume } from '../../../lib/playerVolume'
 
 // ---- Mock Twitch SDK -------------------------------------------------------
 // The real SDK mounts an iframe and fires events on two objects:
@@ -16,6 +17,8 @@ interface MockPlayer {
   pause: ReturnType<typeof vi.fn>
   play: ReturnType<typeof vi.fn>
   setMuted: ReturnType<typeof vi.fn>
+  setVolume: ReturnType<typeof vi.fn>
+  getVolume: ReturnType<typeof vi.fn>
   addEventListener: ReturnType<typeof vi.fn>
   __fire: (event: string) => void
 }
@@ -38,6 +41,8 @@ function makeMockPlayer(): MockPlayer {
     pause: vi.fn(),
     play: vi.fn(),
     setMuted: vi.fn(),
+    setVolume: vi.fn(),
+    getVolume: vi.fn(() => 1),
     addEventListener: vi.fn((event: string, cb: Listener) => {
       const arr = listeners.get(event) ?? []
       arr.push(cb)
@@ -314,6 +319,27 @@ describe('TwitchEmbedPlayer', () => {
       embed.__fire('video.ready')
       return { ...utils, embed }
     }
+
+    it('sets the saved volume when the player is ready (volume only: muted is left to the autoplay logic)', async () => {
+      saveVolume(0.4)
+      const { embed } = await renderReady()
+      expect(embed.__player.setVolume).toHaveBeenCalledWith(0.4)
+      expect(embed.__player.setMuted).not.toHaveBeenCalled()
+    })
+
+    it('sets no volume when none is saved', async () => {
+      localStorage.clear()
+      const { embed } = await renderReady()
+      expect(embed.__player.setVolume).not.toHaveBeenCalled()
+    })
+
+    it('saves the volume the player reports as the viewer changes it', async () => {
+      localStorage.clear()
+      const { embed } = await renderReady()
+      embed.__player.getVolume.mockReturnValue(0.25)
+      vi.advanceTimersByTime(1000)
+      expect(readSavedVolume()).toBe(0.25)
+    })
 
     it('mutes and plays when unmuted autoplay has not started 3s after ready', async () => {
       const { embed } = await renderReady()
