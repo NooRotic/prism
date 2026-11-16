@@ -1,6 +1,8 @@
 import { applySavedVolume, saveVolume } from '../../lib/playerVolume'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MediaPlayerClass } from 'dashjs'
+import LiveSeekBar from './LiveSeekBar'
+import { liveScrubState, timeBehindLive, type LiveScrubState } from '../../lib/liveWindow'
 import type { PlayerProps } from '../../types/player'
 import type { DashPlayerWithTracks } from '../../types/player-sdk'
 import { useCallbackRefs } from '../../hooks/useCallbackRefs'
@@ -28,6 +30,8 @@ export default function DashJSPlayer({
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<MediaPlayerClass | null>(null)
   const mountedRef = useRef(true)
+  // The rewind window of a live stream, or null (not live, or a window too short to scrub). Read once a second.
+  const [scrub, setScrub] = useState<LiveScrubState | null>(null)
 
   const cb = useCallbackRefs({
     onReady,
@@ -174,6 +178,25 @@ export default function DashJSPlayer({
 
     init()
 
+    // ─── Live rewind window at 1Hz ─────────────────────────────
+    // Only a live (dynamic) manifest has a window. Every read is guarded: a player that cannot say simply shows no bar.
+    const scrubInterval = window.setInterval(() => {
+      const player = playerRef.current
+      if (!mountedRef.current || !player || !isTabVisible()) return
+      let next: LiveScrubState | null = null
+      try {
+        if (player.isDynamic?.()) next = liveScrubState(player.getDvrWindow?.(), videoEl.currentTime)
+      } catch {
+        next = null
+      }
+      // Whole seconds only, so the bar re-renders when the picture moves, not on every tick.
+      setScrub((prev) => {
+        if (!next || !prev) return next
+        const same = Math.round(prev.windowSeconds) === Math.round(next.windowSeconds) && Math.round(prev.behindLive) === Math.round(next.behindLive)
+        return same ? prev : next
+      })
+    }, 1000)
+
     // ─── QoE metrics emission at 1Hz ───────────────────────────
     // dashjs exposes its own metric API (getDashMetrics +
     // getMetricsFor) for per-track buffer level, dropped frames,
@@ -269,6 +292,8 @@ export default function DashJSPlayer({
       mountedRef.current = false
       clearTimeout(loadTimeout)
       window.clearInterval(metricsInterval)
+      window.clearInterval(scrubInterval)
+      setScrub(null)
       setPlayerMetrics(null)
       videoEl.removeEventListener('play', handlePlay)
       videoEl.removeEventListener('pause', handlePause)
@@ -286,14 +311,32 @@ export default function DashJSPlayer({
     // satisfies exhaustive-deps without causing re-runs.
   }, [url, detection.type, detection.playableUrl, cb])
 
+  const seekBehindLive = (secondsBehind: number) => {
+    const player = playerRef.current
+    if (!player) return
+    try {
+      player.seek(timeBehindLive(player.getDvrWindow(), secondsBehind))
+    } catch {
+      // A seek that cannot be made leaves the picture where it is.
+    }
+  }
+  const goLive = () => {
+    try {
+      playerRef.current?.seekToOriginalLive()
+    } catch {
+      // Same: nothing to do if the player refuses.
+    }
+  }
+
   return (
-    <div className="w-full h-full" style={{ minHeight: 300 }}>
+    <div className="flex h-full w-full flex-col" style={{ minHeight: 300 }}>
       <video
         ref={videoRef}
         controls
-        className="w-full h-full bg-black"
+        className="w-full min-h-0 flex-1 bg-black"
         style={{ minHeight: 300 }}
       />
+      {scrub && <LiveSeekBar windowSeconds={scrub.windowSeconds} behindLive={scrub.behindLive} onSeek={seekBehindLive} onGoLive={goLive} />}
     </div>
   )
 }
