@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { INTRO_SECONDS, mountPrismMark } from '../../lib/prismMark'
+import { mountPrismMark, STILL_SECONDS } from '../../lib/prismMark'
 
 interface PrismMarkProps {
   /** `icon` is the static header pose (hover pulses the rays); `hero` is the landing mark with its intro and routing loop. */
@@ -13,8 +13,8 @@ interface PrismMarkProps {
 
 /**
  * The PRISM mark. Decorative: the real name of the app stays in text beside or above it, so the SVG is aria-hidden.
- * The hero draws itself with requestAnimationFrame (which the browser pauses in a background tab) and shows a single static
- * final frame when the visitor prefers reduced motion.
+ * The hero draws itself with requestAnimationFrame (which the browser pauses in a background tab) and shows a single still frame
+ * (the first address read and routed) when the visitor prefers reduced motion.
  */
 export function PrismMark({ variant = 'hero', hover = false, wordmark = true, className }: PrismMarkProps) {
   const host = useRef<HTMLDivElement>(null)
@@ -45,7 +45,7 @@ export function PrismMark({ variant = 'hero', hover = false, wordmark = true, cl
         cleanups.push(() => target.removeEventListener('mouseenter', onEnter))
       }
     } else if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      mark.render(INTRO_SECONDS)
+      mark.render(STILL_SECONDS)
     } else {
       const start = performance.now()
       const tick = (now: number) => {
