@@ -40,6 +40,7 @@ function stream(over: Partial<AdminStream> = {}): AdminStream {
     addedAt: '2026-11-14 03:00:00',
     lastCheckedAt: null,
     checkResult: null,
+    favorites: 0,
     ...over,
   }
 }

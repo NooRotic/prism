@@ -29,6 +29,7 @@ const WIRE_STREAM = {
   added_at: '2026-11-14 03:00:00',
   last_checked_at: '2026-11-15 02:00:00',
   check_result: 'pass',
+  favorites: 12,
 }
 const WIRE_LIST = { streams: [WIRE_STREAM], total: 1, counts: { working: 1, held: 4 }, limit: 50, offset: 0 }
 
@@ -97,6 +98,7 @@ describe('getStreams', () => {
             addedAt: '2026-11-14 03:00:00',
             lastCheckedAt: '2026-11-15 02:00:00',
             checkResult: 'pass',
+            favorites: 12,
           },
         ],
         total: 1,

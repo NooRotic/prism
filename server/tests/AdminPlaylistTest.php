@@ -188,9 +188,26 @@ final class AdminPlaylistTest extends DbTestCase
         $row = $this->json($this->call('GET', '/api/admin/streams'))['streams'][0];
 
         $this->assertSame(
-            ['public_id' => $id, 'name' => 'Alpha News', 'url' => 'https://alphanews.test/live.m3u8', 'groups' => ['News', 'Sports'], 'country' => 'us', 'kind' => 'hls', 'state' => 'working', 'state_reason' => null, 'pinned' => true, 'is_default' => true, 'source' => 'test', 'has_logo' => true, 'added_at' => '2026-11-12 03:00:00', 'last_checked_at' => null, 'check_result' => null],
+            ['public_id' => $id, 'name' => 'Alpha News', 'url' => 'https://alphanews.test/live.m3u8', 'groups' => ['News', 'Sports'], 'country' => 'us', 'kind' => 'hls', 'state' => 'working', 'state_reason' => null, 'pinned' => true, 'is_default' => true, 'source' => 'test', 'has_logo' => true, 'added_at' => '2026-11-12 03:00:00', 'last_checked_at' => null, 'check_result' => null, 'favorites' => 0],
             $row,
         );
+    }
+
+    public function testListRowsCarryHowManyVisitorsStarredTheStream(): void
+    {
+        $starred = $this->stream('Alpha News', ['state' => 'working']);
+        $quiet = $this->stream('Quiet One', ['state' => 'working']);
+        $hidden = $this->stream('Hidden Two', ['state' => 'dead']); // the owner sees a hidden stream's count too
+        $favorites = new \Prism\History\Store\FavoriteStore($this->pdo, $this->clock);
+        $favorites->add($starred);
+        $favorites->add($starred);
+        $favorites->add($starred);
+        $favorites->add($hidden);
+
+        $rows = $this->json($this->call('GET', '/api/admin/streams'))['streams'];
+        $byId = array_column($rows, 'favorites', 'public_id');
+
+        $this->assertEqualsCanonicalizing([$starred => 3, $quiet => 0, $hidden => 1], $byId);
     }
 
     public function testListQueryMustBeValid(): void

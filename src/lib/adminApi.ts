@@ -354,6 +354,8 @@ export interface AdminStream {
   lastCheckedAt: string | null
   /** What that look came to, a fixed word (`pass`, `unreachable`, `no_cors`, ...), or null. */
   checkResult: string | null
+  /** How many visitors starred it (the same total the public list shows for a listed stream; the owner sees it for hidden ones too). */
+  favorites: number
 }
 export interface AdminStreams {
   streams: AdminStream[]
@@ -394,6 +396,7 @@ const parseStreams = (json: unknown): AdminStreams => {
         addedAt: str(r.added_at),
         lastCheckedAt: strOrNull(r.last_checked_at),
         checkResult: strOrNull(r.check_result),
+        favorites: num(r.favorites),
       }
     }),
     total: num(o.total),

@@ -139,6 +139,44 @@ describe('StreamCard', () => {
     expect(onSelect).toHaveBeenCalledWith('0123456789ab')
   })
 
+  it('draws no star button unless it is given something to call', () => {
+    render(<StreamCard stream={stream()} selected={false} onSelect={() => {}} />)
+
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+  })
+
+  it('has a star button beside the card (not inside it) that stars without selecting', () => {
+    const onSelect = vi.fn()
+    const onToggleFavorite = vi.fn()
+    render(<StreamCard stream={stream()} selected={false} onSelect={onSelect} onToggleFavorite={onToggleFavorite} />)
+
+    const star = screen.getByRole('button', { name: 'Add Alpha News to favorites' })
+    expect(star.getAttribute('aria-pressed')).toBe('false')
+    expect(star.closest('button:not([aria-pressed])')).toBeNull()
+    fireEvent.click(star)
+
+    expect(onToggleFavorite).toHaveBeenCalledWith('0123456789ab')
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('says when a stream is starred', () => {
+    render(<StreamCard stream={stream()} selected={false} onSelect={() => {}} favorite onToggleFavorite={() => {}} />)
+
+    const star = screen.getByRole('button', { name: 'Remove Alpha News from favorites' })
+    expect(star.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('shows the star total only above zero', () => {
+    const { rerender } = render(<StreamCard stream={stream()} selected={false} onSelect={() => {}} favoriteCount={0} />)
+    expect(screen.queryByLabelText(/stars?$/)).toBeNull()
+
+    rerender(<StreamCard stream={stream()} selected={false} onSelect={() => {}} favoriteCount={1} />)
+    expect(screen.getByLabelText('1 star')).toHaveTextContent('1')
+
+    rerender(<StreamCard stream={stream()} selected={false} onSelect={() => {}} favoriteCount={12} />)
+    expect(screen.getByLabelText('12 stars')).toHaveTextContent('12')
+  })
+
   it('says which card is selected', () => {
     const { rerender } = render(<StreamCard stream={stream()} selected={false} onSelect={() => {}} />)
     expect(screen.getByRole('button').getAttribute('aria-current')).toBeNull()

@@ -45,6 +45,7 @@ function stream(over: Partial<AdminStream> = {}): AdminStream {
     addedAt: '2026-11-14 03:00:00',
     lastCheckedAt: null,
     checkResult: null,
+    favorites: 0,
     ...over,
   }
 }
@@ -96,6 +97,18 @@ describe('PlaylistScreen: the last check', () => {
     expect(checked).toHaveTextContent('unreachable')
     expect(checked).toHaveTextContent('2026-11-15 02:00 UTC')
     expect(checked).not.toHaveTextContent('never checked')
+  })
+})
+
+describe('PlaylistScreen: stars', () => {
+  it('shows how many visitors starred each stream, and a dash for none', async () => {
+    api.getStreams.mockResolvedValue(page([stream({ name: 'Loved one', publicId: 'eeeeeeeeeeee', favorites: 12 }), ALPHA]))
+
+    renderScreen()
+
+    expect(within(await table()).getByRole('columnheader', { name: 'Stars' })).toBeInTheDocument()
+    expect(within(await row('Loved one')).getByText('12')).toBeInTheDocument()
+    expect(within(await row('Alpha News')).getByText('–', { selector: 'td.font-mono' })).toBeInTheDocument()
   })
 })
 
