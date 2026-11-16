@@ -36,6 +36,14 @@ on demand, and the follow rail out of the way.
 - The chat's saved placement (`hidden`, `side`) and the saved fill setting are the
   desktop's; landscape phone mode must neither read them as its own nor overwrite them.
 - Chat visibility in this mode is runtime state, default closed, not persisted.
+- Twitch's embedded player has a documented minimum of 400x300 and autoplay needs it, so
+  the open chat column is capped to leave the video at least 400px wide (223px chat on a
+  667px phone). Researched 2026-11-16 against dev.twitch.tv/docs/embed/video-and-clips.
+- Twitch's mobile site cannot be used: `m.twitch.tv` sends `X-Frame-Options: SAMEORIGIN`
+  (checked 2026-11-16), so it cannot be framed. Only `player.twitch.tv` and the chat embed
+  allow framing (their CSP lists `frame-ancestors` for the parent site). The embed has no
+  mobile-view option; the player adapts to its own size. So the layout is PRISM's own.
+- Desktop windows resized short get this layout too (owner wants it). The way out is resizing.
 
 ## Approaches considered
 
