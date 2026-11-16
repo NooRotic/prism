@@ -7,6 +7,7 @@ import ChatSource from './ChatSource'
 import ChatStrip from './ChatStrip'
 import FloatingBar from './FloatingBar'
 import FloatingPanel from './FloatingPanel'
+import LandscapeChatHandle from './LandscapeChatHandle'
 import ScaledChat from './ScaledChat'
 import {
   availableChatHeight,
@@ -25,6 +26,18 @@ import { useChatScale } from './useChatScale'
 import { useDockDrag } from './useDockDrag'
 import { useFillMode } from './useFillMode'
 import { useFullscreen } from './useFullscreen'
+import { useLandscapePhone } from './useLandscapePhone'
+
+// Landscape phone mode (see landscapePhone.ts): the row is a sideways row at every width, the
+// player takes what the chat leaves, and the chat is a column that stays mounted and changes
+// width, so opening it never reloads the iframe. Open, it takes about 38% of the row (at least
+// 280px) but never so much that the video falls under Twitch's 400px embed minimum; the
+// handle column beside it is 2.75rem wide. Literal strings, because Tailwind cannot see
+// classes built from pieces (the underscores are spaces inside calc).
+const LANDSCAPE_CHAT_BASE =
+  'min-w-0 grow-0 shrink-0 rounded-lg overflow-hidden flex flex-col transition-[flex-basis,visibility] duration-200 motion-reduce:transition-none'
+const LANDSCAPE_CHAT_OPEN = 'basis-[max(0px,min(max(38%,280px),calc(100%_-_2.75rem_-_400px)))]'
+const LANDSCAPE_CHAT_CLOSED = 'basis-0 invisible'
 
 // Literal class strings, because Tailwind cannot see classes built from pieces.
 // The md-only variants are the fill layout when chat is docked: below the md
@@ -88,6 +101,15 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
 
   const video = useFloatingVideo()
   const floating = video.isFloating
+
+  // A phone held sideways: full-screen video, chat on demand. Its own runtime state, never
+  // saved, and independent of the saved placement (`hidden`, `side` stay the desktop's).
+  // While the video floats in its own window there is no video to make room around, so the
+  // ordinary layout applies.
+  const landscape = useLandscapePhone()
+  const landscapeLayout = landscape && !floating
+  const [landscapeChatOpen, setLandscapeChatOpen] = useState(false)
+  const landscapeOpen = landscapeChatOpen && !popout.isOpen
   const floatingWithChat = floating && chatVisible
   const videoControl =
     floating || video.canOpen
@@ -100,11 +122,14 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const fullscreen = useFullscreen(containerRef)
   const { fill, setFill, toggleFill } = useFillMode()
-  const scope = fillScopeFor({
-    fill,
-    fullscreen: fullscreen.isFullscreen,
-    chatDocked: chatVisible,
-  })
+  // Landscape phone mode is fill mode at every width, whatever the saved setting says.
+  const scope = landscapeLayout
+    ? 'all'
+    : fillScopeFor({
+        fill,
+        fullscreen: fullscreen.isFullscreen,
+        chatDocked: chatVisible,
+      })
   useLayoutEffect(() => {
     if (!scope) return
     const root = document.documentElement
@@ -179,7 +204,15 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   const playerPercent = `${(playerRatio * 100).toFixed(1)}%`
   const chatPercent = `${((1 - playerRatio) * 100).toFixed(1)}%`
 
-  const direction = side === 'left' ? 'md:flex-row-reverse' : 'md:flex-row'
+  const direction = landscapeLayout
+    ? side === 'left'
+      ? 'flex-row-reverse'
+      : 'flex-row'
+    : side === 'left'
+      ? 'md:flex-row-reverse'
+      : 'md:flex-row'
+  // The ordinary row stacks below md; the landscape row never does.
+  const rowFlex = landscapeLayout ? 'flex' : 'flex flex-col'
   const baseRowClass =
     scope === 'all' ? ROW_FILL_ALL : scope === 'md' ? `${ROW_NORMAL} ${ROW_FILL_MD}` : ROW_NORMAL
   // A fill row is already positioned (fixed); only an ordinary row needs `relative`.
@@ -212,7 +245,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
       <div
         ref={containerRef}
         data-testid="chat-dock"
-        className={`flex flex-col ${direction} ${rowClass}`}
+        className={`${rowFlex} ${direction} ${rowClass}`}
         style={rowStyle}
       >
         {/* Player */}
@@ -220,7 +253,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
           data-testid="chat-player"
           className={playerClass}
           style={{
-            flex: chatVisible ? `0 0 ${playerPercent}` : '1 1 0%',
+            flex: chatVisible && !landscapeLayout ? `0 0 ${playerPercent}` : '1 1 0%',
             backgroundColor: 'var(--bg-card)',
           }}
         >
@@ -233,7 +266,65 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
           )}
         </div>
 
-        {!chatVisible ? (
+        {landscapeLayout ? (
+          <>
+            {/* Beside the video, never over it: Twitch pauses an embed that anything covers. */}
+            <LandscapeChatHandle
+              side={side}
+              open={landscapeOpen}
+              label={
+                popout.isOpen ? 'Return chat to the page' : landscapeOpen ? 'Hide chat' : 'Show chat'
+              }
+              onToggle={popout.isOpen ? popout.close : () => setLandscapeChatOpen((open) => !open)}
+            />
+            <div
+              data-testid="chat-panel"
+              aria-hidden={!landscapeOpen}
+              className={`${LANDSCAPE_CHAT_BASE} ${landscapeOpen ? LANDSCAPE_CHAT_OPEN : LANDSCAPE_CHAT_CLOSED}`}
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                border: landscapeOpen ? '1px solid var(--border)' : 'none',
+              }}
+            >
+              <ChatHeader
+                side={side}
+                onHide={() => setLandscapeChatOpen(false)}
+                onSwapSide={swapSide}
+                onPopOut={popout.open}
+                fill={fill}
+                onToggleFill={toggleFill}
+                fullscreenSupported={fullscreen.supported}
+                isFullscreen={fullscreen.isFullscreen}
+                onToggleFullscreen={fullscreen.toggle}
+                textSize={{
+                  scale: chatScale.scale,
+                  canSmaller: chatScale.canSmaller,
+                  canLarger: chatScale.canLarger,
+                  onSmaller: chatScale.smaller,
+                  onLarger: chatScale.larger,
+                  onReset: chatScale.reset,
+                }}
+                dragHandleProps={{}}
+                dockControls={false}
+                fillControls={false}
+              />
+              <div className="flex-1 min-h-0">
+                {channel ? (
+                  <ScaledChat scale={chatScale.scale}>
+                    <ChatSource channel={channel} />
+                  </ScaledChat>
+                ) : (
+                  <div
+                    className="flex items-center justify-center w-full h-full"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    <span className="text-sm">No channel</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : !chatVisible ? (
           <ChatStrip
             side={side}
             restoreLabel={popout.isOpen ? 'Return chat to the page' : 'Show chat'}
