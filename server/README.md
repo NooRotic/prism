@@ -152,6 +152,13 @@ fail, and brings them back if they recover. Migration `004_checker.sql` adds its
   what Apply would hide, host clusters, guarded hosts, flagged streams, budget, last early stop), `POST /api/admin/checker/apply`,
   `/pause`, `/resume` (an empty body or `{}`). Pause and resume are audited (`checker.pause`, `checker.resume`). The Playlist
   list rows also carry `last_checked_at` and `check_result`.
+- **Restore by host** (migration `005_trusted_hosts`). The checker runs from one datacenter, so a host that blocks its address
+  fails every check while it plays for visitors. `GET /api/admin/hosts` lists the trusted hosts and the hosts with the most
+  hidden streams; `POST /api/admin/hosts/trust` `{host}` vouches for a host: its `new`, `suspect`, `dead`, `unplayable(no_cors)`,
+  `held(awaiting_check)` and auto-removed (`dead_14_days`) streams become `working`, and from then on a failing check there is
+  recorded (`check_result`) but never changes the state (`CheckWorker::write`). Never touched: the owner's own removals, `http`
+  and port holds. `POST /api/admin/hosts/untrust` hands the streams back to the checker. Audited as `host.trust` and
+  `host.untrust`; the Health screen has the section. Trust a host again to pick up streams added since.
 - **Rollout order (each live step needs the owner's go).** 1. Deploy the server code and run `install.php` (expect
   `applied 004_checker`; nothing changes for visitors). 2. `rejudge-held.php` dry run, then `--apply`. 3. Probe how many PHP
   processes and cron entries the host allows: start with `checker.workers` 2, read the database's `wait_timeout`

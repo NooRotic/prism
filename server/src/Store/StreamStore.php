@@ -434,6 +434,88 @@ final class StreamStore
         return array_map(static fn (array $r): array => ['host' => (string) $r['host'], 'streams' => (int) $r['streams'], 'failed' => (int) $r['failed']], $stmt->fetchAll());
     }
 
+    /** States and reasons that restoring a trusted host brings back: never the owner's own removals or a refused address. */
+    private const RESTORABLE = "(state IN ('new', 'suspect', 'dead') OR (state = 'unplayable' AND state_reason = 'no_cors')
+        OR (state = 'held' AND state_reason = 'awaiting_check') OR (state = 'removed' AND state_reason = 'dead_14_days'))";
+
+    /** @return array<string,true> the hosts the owner has vouched for, as a set */
+    public function trustedHostSet(): array
+    {
+        $set = [];
+        foreach ($this->pdo->query('SELECT host FROM trusted_hosts')->fetchAll(PDO::FETCH_COLUMN) as $host) {
+            $set[(string) $host] = true;
+        }
+
+        return $set;
+    }
+
+    /** @return list<array{host:string,added_at:string,streams:int,listed:int}> trusted hosts, with how many streams they hold and how many are shown */
+    public function trustedHosts(): array
+    {
+        $in = implode(',', array_fill(0, count(self::LISTED), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT t.host, t.added_at, COUNT(s.id) AS streams, COALESCE(SUM(s.state IN ($in)), 0) AS listed
+             FROM trusted_hosts t LEFT JOIN streams s ON s.host = t.host GROUP BY t.host, t.added_at ORDER BY t.host ASC",
+        );
+        $stmt->execute(self::LISTED);
+
+        return array_map(static fn (array $r): array => [
+            'host' => (string) $r['host'], 'added_at' => (string) $r['added_at'], 'streams' => (int) $r['streams'], 'listed' => (int) $r['listed'],
+        ], $stmt->fetchAll());
+    }
+
+    /** @return list<array{host:string,streams:int}> hosts with streams a restore would bring back, most first, trusted ones left out */
+    public function restorableHosts(int $limit = 30): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT host, COUNT(*) AS streams FROM streams
+             WHERE ' . self::RESTORABLE . " AND host <> '' AND host NOT IN (SELECT host FROM trusted_hosts)
+             GROUP BY host ORDER BY streams DESC, host ASC LIMIT " . max(1, min(200, $limit)),
+        );
+        $stmt->execute();
+
+        return array_map(static fn (array $r): array => ['host' => (string) $r['host'], 'streams' => (int) $r['streams']], $stmt->fetchAll());
+    }
+
+    /** Whether any stream is stored under this host. */
+    public function hasHost(string $host): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM streams WHERE host = ? LIMIT 1');
+        $stmt->execute([$host]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Vouches for a host and brings its restorable streams back to `working` (as if they had passed: the failure count
+     * restarts). Returns how many were restored. A host already trusted is restored again, which also picks up streams
+     * added since.
+     */
+    public function trustHost(string $host): int
+    {
+        return $this->transaction(function () use ($host): int {
+            $now = Time::datetime($this->clock->nowMs());
+            $this->pdo->prepare('INSERT IGNORE INTO trusted_hosts (host, added_at) VALUES (?, ?)')->execute([$host, $now]);
+            $stmt = $this->pdo->prepare(
+                "UPDATE streams SET state = 'working', state_reason = NULL, ever_passed = 1, fail_days = 0, last_fail_day = NULL,
+                    state_changed_at = ?, next_check_at = ?
+                 WHERE host = ? AND " . self::RESTORABLE,
+            );
+            $stmt->execute([$now, Time::datetime($this->clock->nowMs() + 86_400_000), $host]);
+
+            return $stmt->rowCount();
+        });
+    }
+
+    /** Stops vouching for a host; its streams are judged by the checker again from now on. Returns whether it was trusted. */
+    public function untrustHost(string $host): bool
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM trusted_hosts WHERE host = ?');
+        $stmt->execute([$host]);
+
+        return $stmt->rowCount() > 0;
+    }
+
     /** @return list<array<string,mixed>> dead streams the owner pinned or made the default: the checker never removes them, the owner should know */
     public function flagged(): array
     {

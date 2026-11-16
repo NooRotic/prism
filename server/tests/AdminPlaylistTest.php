@@ -519,4 +519,100 @@ final class AdminPlaylistTest extends DbTestCase
         }
         $this->assertSame(404, $this->call('POST', '/api/admin/streams/nope', [], '{}')->status);
     }
+
+    /** @param array<string,mixed> $extra @return string the public id; streams given the same host share it */
+    private function onHost(string $host, string $n, array $extra = []): string
+    {
+        $url = 'https://' . $host . '/s' . $n . '.m3u8';
+        $id = StreamUrl::id($url);
+        $this->store->insertIfNew(array_merge([
+            'id' => $id, 'public_id' => StreamUrl::publicId($id), 'url' => $url, 'name' => 'Stream ' . $n, 'groups_json' => '["News"]',
+            'kind' => 'hls', 'state' => 'new', 'source' => 'test', 'added_at' => '2026-11-12 03:00:00',
+        ], $extra));
+
+        return StreamUrl::publicId($id);
+    }
+
+    private function trust(string $host, ?string $token = self::OWNER_TOKEN): ApiResponse
+    {
+        return $this->call('POST', '/api/admin/hosts/trust', [], json_encode(['host' => $host], JSON_THROW_ON_ERROR), $token);
+    }
+
+    public function testTrustingAHostBringsBackItsHiddenStreamsAndLeavesTheOwnersRemovalsAlone(): void
+    {
+        $dead = $this->onHost('uplynk.test', '1', ['state' => 'dead', 'state_reason' => 'never_passed']);
+        $suspect = $this->onHost('uplynk.test', '2', ['state' => 'suspect', 'fail_days' => 2]);
+        $noCors = $this->onHost('uplynk.test', '3', ['state' => 'unplayable', 'state_reason' => 'no_cors']);
+        $http = $this->onHost('uplynk.test', '4', ['state' => 'held', 'state_reason' => 'http']);
+        $removedByOwner = $this->onHost('uplynk.test', '5', ['state' => 'removed']);
+        $autoRemoved = $this->onHost('uplynk.test', '6', ['state' => 'removed', 'state_reason' => 'dead_14_days']);
+        $elsewhere = $this->onHost('other.test', '7', ['state' => 'dead', 'state_reason' => 'never_passed']);
+
+        $response = $this->trust('Uplynk.TEST');
+
+        $this->assertSame(200, $response->status);
+        $this->assertSame(['ok' => true, 'restored' => 4, 'snapshot' => true], $this->json($response));
+        foreach ([$dead, $suspect, $noCors, $autoRemoved] as $id) {
+            $row = $this->row($id);
+            $this->assertSame(['working', null, 1, 0], [$row['state'], $row['state_reason'], (int) $row['ever_passed'], (int) $row['fail_days']], $id);
+        }
+        $this->assertSame(['held', 'http'], [$this->row($http)['state'], $this->row($http)['state_reason']], 'a refused address stays refused');
+        $this->assertSame('removed', $this->row($removedByOwner)['state'], "the owner's own removal is never undone");
+        $this->assertSame('dead', $this->row($elsewhere)['state'], 'another host is untouched');
+        $this->assertEqualsCanonicalizing([$dead, $suspect, $noCors, $autoRemoved], array_column($this->snapshot()['streams'], 'i'));
+        $this->assertSame(['host.trust', 'uplynk.test', 'restored=4'], array_values($this->audit()));
+    }
+
+    public function testTheHostListShowsTrustedAndRestorableHosts(): void
+    {
+        $this->onHost('uplynk.test', '1', ['state' => 'dead', 'state_reason' => 'never_passed']);
+        $this->onHost('uplynk.test', '2', ['state' => 'suspect']);
+        $this->onHost('solo.test', '3', ['state' => 'dead', 'state_reason' => 'never_passed']);
+        $this->onHost('fine.test', '4', ['state' => 'working']);
+        $this->onHost('gone.test', '5', ['state' => 'removed']);
+        $this->trust('solo.test');
+
+        $body = $this->json($this->call('GET', '/api/admin/hosts'));
+
+        $this->assertSame([['host' => 'uplynk.test', 'streams' => 2]], $body['restorable']);
+        $this->assertCount(1, $body['trusted']);
+        $this->assertSame(['solo.test', 1, 1], [$body['trusted'][0]['host'], $body['trusted'][0]['streams'], $body['trusted'][0]['listed']]);
+    }
+
+    public function testTrustingNeedsARealHostThatHoldsStreams(): void
+    {
+        $this->onHost('uplynk.test', '1', ['state' => 'dead']);
+
+        $this->assertSame(404, $this->trust('nothere.test')->status);
+        foreach (['', 'a b', 'bad/host', 'http://uplynk.test', 'host:8080', '-x.test'] as $host) {
+            $r = $this->trust($host);
+            $this->assertSame(422, $r->status, $host);
+            $this->assertSame(['error' => 'rejected', 'reason' => 'bad_host'], $this->json($r));
+        }
+        $this->assertSame(400, $this->call('POST', '/api/admin/hosts/trust', [], json_encode(['host' => 5], JSON_THROW_ON_ERROR))->status);
+        $this->assertSame(0, $this->rows('trusted_hosts'));
+    }
+
+    public function testUntrustingStopsTheVouchingButKeepsTheStreamsAsTheyAre(): void
+    {
+        $id = $this->onHost('uplynk.test', '1', ['state' => 'dead']);
+        $this->trust('uplynk.test');
+
+        $r = $this->call('POST', '/api/admin/hosts/untrust', [], json_encode(['host' => 'uplynk.test'], JSON_THROW_ON_ERROR));
+
+        $this->assertSame(200, $r->status);
+        $this->assertSame(0, $this->rows('trusted_hosts'));
+        $this->assertSame('working', $this->row($id)['state']);
+        $this->assertSame(404, $this->call('POST', '/api/admin/hosts/untrust', [], json_encode(['host' => 'uplynk.test'], JSON_THROW_ON_ERROR))->status, 'already untrusted');
+    }
+
+    public function testHostActionsAreOwnerOnlyAndMethodChecked(): void
+    {
+        $this->onHost('uplynk.test', '1', ['state' => 'dead']);
+
+        $this->assertSame(401, $this->trust('uplynk.test', null)->status);
+        $this->assertSame(0, $this->rows('trusted_hosts'));
+        $this->assertSame('POST, OPTIONS', $this->call('GET', '/api/admin/hosts/trust')->headers['Allow']);
+        $this->assertSame('GET, OPTIONS', $this->call('POST', '/api/admin/hosts')->headers['Allow']);
+    }
 }

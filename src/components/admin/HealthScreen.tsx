@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { applyChecker, getChecker, setCheckerPaused, type AdminChecker, type CheckerApplyRefusal } from '../../lib/adminApi'
 import { formatCount, formatMb, formatUtc } from '../../lib/adminFormat'
 import { useAdminSession } from './AdminSessionContext'
+import HostsSection from './HostsSection'
 import { useAdminResource } from './useAdminResource'
 
 const CARD = { background: 'var(--bg-card)', borderColor: 'var(--border-accent)' }
@@ -255,6 +256,8 @@ export default function HealthScreen() {
           )}
         </section>
       )}
+
+      <HostsSection />
 
       <section className="rounded-lg border p-4" style={CARD}>
         <h3 className="m-0 mb-2 text-xs uppercase tracking-wider" style={HEADING}>

@@ -98,7 +98,10 @@ final class AdminController
 
                 return $id === null ? null : $this->playlist->remove($id);
             }),
-            '/api/admin/checker' => $this->read($request, fn (): array => $this->checker->status()),
+            '/api/admin/hosts' => $this->read($request, fn (): array => $this->playlist->hosts()),
+            '/api/admin/hosts/trust' => $this->streamAction($request, fn (array $d): ?array => is_string($d['host'] ?? null) && strlen($d['host']) <= 253 ? $this->playlist->trustHost($d['host']) : null),
+            '/api/admin/hosts/untrust' => $this->streamAction($request, fn (array $d): ?array => is_string($d['host'] ?? null) && strlen($d['host']) <= 253 ? $this->playlist->untrustHost($d['host']) : null),
+            '/api/admin/checker' =>$this->read($request, fn (): array => $this->checker->status()),
             '/api/admin/checker/apply' => $this->checkerAction($request, fn (): array => $this->checker->apply()),
             '/api/admin/checker/pause' => $this->checkerAction($request, fn (): array => $this->checker->setPaused(true)),
             '/api/admin/checker/resume' => $this->checkerAction($request, fn (): array => $this->checker->setPaused(false)),
