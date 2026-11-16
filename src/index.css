@@ -97,6 +97,21 @@
   }
 }
 
+/* A phone held sideways (or any window this short). The query repeats LANDSCAPE_PHONE_QUERY
+   from components/chat/landscapePhone.ts, which a test pins to this file. The rail is hidden
+   on every route, and the page-edge width it reserves is zeroed so a player page does not
+   keep a 56px gutter for a rail nobody can see. !important because ChannelRail sets those
+   two variables inline on :root. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .landscape-phone-hide {
+    display: none !important;
+  }
+  :root {
+    --rail-reserve-left: 0px !important;
+    --rail-reserve-right: 0px !important;
+  }
+}
+
 /* ─── Brushed metal surface ──────────────────────────────────────────
    A distinctive, anti-slop card/panel material (Law 9: "one memorable
    thing" — unusual surface texture).

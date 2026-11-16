@@ -133,6 +133,11 @@ describe('ChannelRail — layout', () => {
     expect(rail()).toHaveStyle({ position: 'fixed' })
   })
 
+  it('carries landscape-phone-hide so it steps aside when the phone is held sideways', () => {
+    setup()
+    expect(rail()).toHaveClass('landscape-phone-hide')
+  })
+
   it('sits above the player but below the slide-down panels', () => {
     setup()
     // SlidedownPanel is zIndex 30; Header is z-40. The rail's own +N opens
