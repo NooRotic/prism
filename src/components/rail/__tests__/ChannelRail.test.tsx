@@ -133,6 +133,11 @@ describe('ChannelRail — layout', () => {
     expect(rail()).toHaveStyle({ position: 'fixed' })
   })
 
+  it('carries narrow-hide so it steps aside on narrow windows', () => {
+    setup()
+    expect(rail()).toHaveClass('narrow-hide')
+  })
+
   it('carries landscape-phone-hide so it steps aside when the phone is held sideways', () => {
     setup()
     expect(rail()).toHaveClass('landscape-phone-hide')

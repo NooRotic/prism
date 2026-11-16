@@ -54,6 +54,11 @@ describe('OfflineLayout', () => {
     Object.defineProperty(window, 'innerHeight', { value: originalInnerHeight, configurable: true })
   })
 
+  it('the player box is never shorter than 300px (the embed will not go below it)', () => {
+    render(layout(<div>player</div>))
+    expect(screen.getByTestId('offline-player')).toHaveClass('min-h-[300px]')
+  })
+
   it('renders the strip, the chat once and the body, and no player when it is folded', () => {
     render(layout(null))
     expect(screen.getByTestId('strip')).toBeInTheDocument()

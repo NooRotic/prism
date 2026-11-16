@@ -52,6 +52,19 @@ describe('ChatDock', () => {
     expect(chatFrame()).toBeInTheDocument()
   })
 
+  // The Twitch embed will not go below 300px tall, so a 16:9 box shorter than that crops the
+  // video and its controls (a 170px box on a phone in portrait).
+  it('the player box is never shorter than 300px', () => {
+    renderDock()
+    expect(screen.getByTestId('chat-player')).toHaveClass('min-h-[300px]')
+  })
+
+  it('fill mode on md and up lets the player box go below 300px', () => {
+    localStorage.setItem(STORAGE_KEYS.LOCAL_FILL_MODE, 'true')
+    renderDock()
+    expect(screen.getByTestId('chat-player')).toHaveClass('md:min-h-0')
+  })
+
   it('docks the chat on the left after Move chat to the left, and remembers it', () => {
     renderDock()
     fireEvent.click(screen.getByRole('button', { name: 'Move chat to the left' }))

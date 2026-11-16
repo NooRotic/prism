@@ -5,7 +5,16 @@ import ChatSource from '../chat/ChatSource'
 import ChatStrip from '../chat/ChatStrip'
 import FloatingBar from '../chat/FloatingBar'
 import FloatingPanel from '../chat/FloatingPanel'
+import LandscapeChatHandle from '../chat/LandscapeChatHandle'
 import ScaledChat from '../chat/ScaledChat'
+import {
+  LANDSCAPE_CHAT_BASE,
+  LANDSCAPE_CHAT_CLOSED,
+  LANDSCAPE_CHAT_OPEN,
+  landscapeHandleLabel,
+} from '../chat/landscapeChat'
+import { useFillScope } from '../chat/useFillScope'
+import { useLandscapePhone } from '../chat/useLandscapePhone'
 import {
   availableChatHeight,
   floatingHeightCss,
@@ -34,6 +43,14 @@ const AREAS_FOLDED =
   '[grid-template-areas:"strip"_"chat"_"body"] lg:[grid-template-areas:"strip_chat"_"body_chat"]'
 const AREAS_SHOWN =
   '[grid-template-areas:"strip"_"player"_"chat"_"body"] lg:[grid-template-areas:"strip_chat"_"player_chat"_"body_chat"]'
+
+// Landscape phone mode (see landscapePhone.ts), while a recording, clip or stream is playing: the
+// root becomes a full-window row (the same elements, restyled, so the player never remounts when
+// the phone rotates), the video takes what the chat leaves, and the chat is the shared
+// push-in column opened from a handle beside the video.
+const ROOT_SIDEWAYS = 'fixed inset-0 z-50 flex flex-row bg-[var(--bg)]'
+const PLAYER_SIDEWAYS = 'relative flex-1 min-w-0 overflow-hidden'
+const PANEL_SIDEWAYS = 'flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg'
 
 const noop = () => {}
 
@@ -69,6 +86,17 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
     (player !== null || floating) && (floating || video.canOpen)
       ? { floating, onClick: floating ? video.close : video.open }
       : null
+
+  // Sideways only while there is a video to give the window to: folded (nothing playing) the
+  // page stays the ordinary scrolling page. While the video floats in its own window there is
+  // no video to make room around either. The chat's open state is local and never saved.
+  const landscape = useLandscapePhone()
+  const sideways = landscape && player !== null && !floating
+  const [landscapeChatOpen, setLandscapeChatOpen] = useState(false)
+  const landscapeOpen = landscapeChatOpen && !popout.isOpen
+  useFillScope(sideways ? 'all' : null)
+  // Sideways the chat is always in the tree (closed it is a 0px column), whatever was saved.
+  const showChat = sideways || chatVisible
 
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -119,14 +147,20 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
     <div
       ref={rootRef}
       data-testid="offline-layout"
-      className={`${GRID} ${player ? AREAS_SHOWN : AREAS_FOLDED}`}
+      className={sideways ? ROOT_SIDEWAYS : `${GRID} ${player ? AREAS_SHOWN : AREAS_FOLDED}`}
       style={rootStyle}
     >
-      <div className="min-w-0 [grid-area:strip]">{strip}</div>
+      <div className={`min-w-0 [grid-area:strip]${sideways ? ' hidden' : ''}`}>{strip}</div>
 
       {player && (
         <div
-          className="relative min-w-0 aspect-video overflow-hidden rounded-lg border border-[color:var(--border)] [grid-area:player]"
+          data-testid="offline-player"
+          // min-h-[300px]: the Twitch embed will not go below 300px tall; a shorter 16:9 box crops it.
+          className={
+            sideways
+              ? PLAYER_SIDEWAYS
+              : 'relative min-w-0 aspect-video min-h-[300px] overflow-hidden rounded-lg border border-[color:var(--border)] [grid-area:player]'
+          }
           style={{ backgroundColor: 'var(--bg-card)' }}
         >
           {/* While the video floats the slot holds a panel, never a second player. */}
@@ -134,28 +168,50 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
         </div>
       )}
 
+      {/* Beside the video, never over it: Twitch pauses an embed that anything covers. A
+          conditional slot, so the elements around it keep their place in the tree. */}
+      {sideways && (
+        <LandscapeChatHandle
+          side="right"
+          open={landscapeOpen}
+          label={landscapeHandleLabel(landscapeOpen, popout.isOpen)}
+          onToggle={popout.isOpen ? popout.close : () => setLandscapeChatOpen((open) => !open)}
+        />
+      )}
+
       <div
         data-testid="chat-cell"
-        className="min-w-0 [grid-area:chat] lg:sticky lg:top-4 lg:h-[calc(100vh-var(--header-height)-1rem)] lg:self-start"
+        aria-hidden={sideways && !landscapeOpen ? true : undefined}
+        className={
+          sideways
+            ? `${LANDSCAPE_CHAT_BASE} ${landscapeOpen ? LANDSCAPE_CHAT_OPEN : LANDSCAPE_CHAT_CLOSED}`
+            : 'min-w-0 [grid-area:chat] lg:sticky lg:top-4 lg:h-[calc(100vh-var(--header-height)-1rem)] lg:self-start'
+        }
       >
-        {chatVisible ? (
+        {showChat ? (
           <div className="flex h-full min-w-0">
-            <div className="hidden lg:flex">
-              <ResizableHandle
-                label="Resize chat width"
-                onResize={handleWidthResize}
-                onResizeEnd={handleWidthResizeEnd}
-              />
-            </div>
+            {!sideways && (
+              <div className="hidden lg:flex">
+                <ResizableHandle
+                  label="Resize chat width"
+                  onResize={handleWidthResize}
+                  onResizeEnd={handleWidthResizeEnd}
+                />
+              </div>
+            )}
             <div
               data-testid="chat-panel"
-              className="flex h-[var(--offline-chat-height)] min-w-0 flex-1 flex-col overflow-hidden rounded-lg lg:h-full"
+              className={
+                sideways
+                  ? PANEL_SIDEWAYS
+                  : 'flex h-[var(--offline-chat-height)] min-w-0 flex-1 flex-col overflow-hidden rounded-lg lg:h-full'
+              }
               style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}
             >
               {videoControl && <FloatingBar floating={videoControl.floating} onClick={videoControl.onClick} />}
               <ChatHeader
                 side="right"
-                onHide={hide}
+                onHide={sideways ? () => setLandscapeChatOpen(false) : hide}
                 onSwapSide={noop}
                 onPopOut={popout.open}
                 fill={false}
@@ -187,19 +243,22 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
               )}
               <div className="min-h-0 flex-1">
                 <ScaledChat scale={chatScale.scale}>
-                  <ChatSource channel={channel} />
+                  {/* Sideways and popped out, the chat runs in its own window: no second connection here. */}
+                  {!(sideways && popout.isOpen) && <ChatSource channel={channel} />}
                 </ScaledChat>
               </div>
               {/* Thin layout only: drag down for a taller chat. A 24px bar, so a finger can hit it. */}
-              <div className="shrink-0 lg:hidden">
-                <ResizableHandle
-                  direction="vertical"
-                  thickness={24}
-                  label="Resize chat height"
-                  onResize={handleHeightResize}
-                  onResizeEnd={handleHeightResizeEnd}
-                />
-              </div>
+              {!sideways && (
+                <div className="shrink-0 lg:hidden">
+                  <ResizableHandle
+                    direction="vertical"
+                    thickness={24}
+                    label="Resize chat height"
+                    onResize={handleHeightResize}
+                    onResizeEnd={handleHeightResizeEnd}
+                  />
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -219,7 +278,7 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
         )}
       </div>
 
-      <div className="min-w-0 [grid-area:body]">{children}</div>
+      <div className={`min-w-0 [grid-area:body]${sideways ? ' hidden' : ''}`}>{children}</div>
     </div>
   )
 }
