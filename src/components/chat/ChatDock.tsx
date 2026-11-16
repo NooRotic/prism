@@ -43,9 +43,11 @@ const ROW_NORMAL = 'w-full max-w-[1600px] mx-auto min-h-[360px]'
 const ROW_FILL_MD = 'md:fixed md:inset-0 md:z-50 md:max-w-none md:mx-0 md:min-h-0 md:bg-[var(--bg)]'
 const ROW_FILL_ALL = 'w-full fixed inset-0 z-50 bg-[var(--bg)]'
 const PLAYER_NORMAL =
-  'w-full md:flex-none relative overflow-hidden rounded-lg border border-[color:var(--border)] aspect-video min-h-[300px]'
+  'w-full md:flex-none relative overflow-hidden rounded-lg border border-[color:var(--border)] aspect-video min-h-[300px] max-md:pointer-coarse:min-h-0'
 // min-h-[300px] above: the Twitch embed will not go below 300px tall, so a shorter 16:9 box (170px
-// on a phone in portrait) crops the video and its controls. Fill mode sizes the box to the window.
+// on a desktop window narrowed to a phone's width) crops the video and its controls. On a touch
+// phone upright (coarse pointer, below md) the floor is lifted: Twitch's size rule is for desktop
+// browsers, and a true 16:9 box has no black bars. Fill mode sizes the box to the window.
 const PLAYER_FILL_MD = 'md:aspect-auto md:rounded-none md:border-0 md:min-h-0'
 const PLAYER_FILL_ALL = 'w-full md:flex-none relative overflow-hidden aspect-auto'
 // While the video floats and the chat is docked, the player wrapper stays in the row as an
@@ -342,14 +344,15 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
             {/* Chat */}
             <div
               data-testid="chat-panel"
-              className={`w-full md:flex-none rounded-lg overflow-hidden flex flex-col${
+              // Stacked below md the panel has no fixed height, so its minimum is what the chat gets:
+              // a tall one (60dvh) so the chat is usable, not a 300px strip.
+              className={`w-full md:flex-none min-h-[300px] max-md:min-h-[60dvh] rounded-lg overflow-hidden flex flex-col${
                 floating ? ` ${CHAT_FLOATING}` : ''
               }`}
               style={{
                 // Shrinkable: player% + the 8px handle + chat% is 8px over the row,
                 // which a full-window row would clip off-screen.
                 flex: `0 1 ${chatPercent}`,
-                minHeight: '300px',
                 backgroundColor: 'var(--bg-card)',
                 border: '1px solid var(--border)',
               }}
@@ -388,19 +391,23 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
                   Pop-up blocked. Allow pop-ups for this site to use the chat window.
                 </p>
               )}
-              <div className="flex-1 min-h-0">
-                {channel ? (
-                  <ScaledChat scale={chatScale.scale}>
-                    <ChatSource channel={channel} />
-                  </ScaledChat>
-                ) : (
-                  <div
-                    className="flex items-center justify-center w-full h-full"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    <span className="text-sm">No channel</span>
-                  </div>
-                )}
+              {/* The chat fills an absolutely placed box: a percentage height on the iframe would
+                  resolve to auto here (the panel has no fixed height) and shrink it to 150px. */}
+              <div className="relative flex-1 min-h-0">
+                <div className="absolute inset-0">
+                  {channel ? (
+                    <ScaledChat scale={chatScale.scale}>
+                      <ChatSource channel={channel} />
+                    </ScaledChat>
+                  ) : (
+                    <div
+                      className="flex items-center justify-center w-full h-full"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      <span className="text-sm">No channel</span>
+                    </div>
+                  )}
+                </div>
               </div>
               {/* Along the bottom edge, under the chat: drag down for a taller chat. Its slot is
                   `false` otherwise, so the chat above keeps its place and is not reloaded. */}

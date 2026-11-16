@@ -454,8 +454,7 @@ export default function TwitchEmbedPlayer({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full"
-      style={{ minHeight: 300 }}
+      className="w-full h-full min-h-[300px] max-md:pointer-coarse:min-h-0"
     />
   )
 }

@@ -159,7 +159,7 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
           className={
             sideways
               ? PLAYER_SIDEWAYS
-              : 'relative min-w-0 aspect-video min-h-[300px] overflow-hidden rounded-lg border border-[color:var(--border)] [grid-area:player]'
+              : 'relative min-w-0 aspect-video min-h-[300px] max-md:pointer-coarse:min-h-0 overflow-hidden rounded-lg border border-[color:var(--border)] [grid-area:player]'
           }
           style={{ backgroundColor: 'var(--bg-card)' }}
         >
