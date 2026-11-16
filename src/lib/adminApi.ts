@@ -574,3 +574,63 @@ const parsePaused = (json: unknown): { paused: boolean } => {
 /** The kill switch: a paused checker does nothing until resumed. */
 export const setCheckerPaused = (paused: boolean, signal?: AbortSignal) =>
   request(`/api/admin/checker/${paused ? 'pause' : 'resume'}`, parsePaused, { method: 'POST', body: {}, signal }) as Promise<AdminResult<{ paused: boolean }>>
+
+// ---- Restore by host (the Health screen)
+
+/** A host the owner vouched for: how many streams it holds and how many of them visitors can see. */
+export interface TrustedHost {
+  host: string
+  addedAt: string
+  streams: number
+  listed: number
+}
+/** A host with streams a restore would bring back. */
+export interface RestorableHost {
+  host: string
+  streams: number
+}
+export interface AdminHosts {
+  trusted: TrustedHost[]
+  restorable: RestorableHost[]
+}
+
+const parseHosts = (json: unknown): AdminHosts => {
+  const o = rec(json)
+  return {
+    trusted: list(o.trusted).map((t) => {
+      const r = rec(t)
+      return { host: str(r.host), addedAt: str(r.added_at), streams: num(r.streams), listed: num(r.listed) }
+    }),
+    restorable: list(o.restorable).map((h) => {
+      const r = rec(h)
+      return { host: str(r.host), streams: num(r.streams) }
+    }),
+  }
+}
+
+export const getHosts = (signal?: AbortSignal) => read('/api/admin/hosts', parseHosts, signal)
+
+/** What trusting a host came to: `not_found` when no stream is stored under it, `rejected` for a name that is not a host. */
+export type TrustHostResult = AdminResult<{ restored: number; snapshot: boolean }> | { kind: 'not_found' } | { kind: 'rejected' }
+
+const parseTrusted = (json: unknown) => {
+  const o = rec(json)
+  if (o.ok !== true) throw new ShapeError()
+  return { restored: num(o.restored), snapshot: bool(o.snapshot) }
+}
+
+/** Vouches for a host (the checker's datacenter may be what fails against it) and brings its hidden streams back. */
+export const trustHost = (host: string, signal?: AbortSignal) =>
+  request('/api/admin/hosts/trust', parseTrusted, {
+    method: 'POST',
+    body: { host },
+    signal,
+    notFound: true,
+    onRefusal: (status) => (status === 422 ? ({ kind: 'rejected' } as const) : null),
+  }) as Promise<TrustHostResult>
+
+/** Stops vouching for a host; the checker judges its streams again. */
+export const untrustHost = (host: string, signal?: AbortSignal) =>
+  request('/api/admin/hosts/untrust', (json: unknown) => ({ ok: rec(json).ok === true }), { method: 'POST', body: { host }, signal, notFound: true }) as Promise<
+    AdminResult<{ ok: boolean }> | { kind: 'not_found' }
+  >

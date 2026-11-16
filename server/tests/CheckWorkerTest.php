@@ -189,6 +189,36 @@ final class CheckWorkerTest extends DbTestCase
         $this->assertSame(['Stream 1', 'Stream 4'], $names, 'verified only: the new stream that passed and the recovered one are listed; the suspect and the dead one are not');
     }
 
+    public function testAFailingCheckOnAHostTheOwnerVouchedForIsRecordedButNeverHidesTheStream(): void
+    {
+        $this->state->markApplied();
+        $this->modes['bad.test'] = 'dead';
+        $this->modes['worse.test'] = 'dead';
+        $trusted = $this->put('bad.test', '1', ['state' => 'working', 'ever_passed' => 1]);
+        $other = $this->put('worse.test', '2', ['state' => 'working', 'ever_passed' => 1]);
+        $this->store->trustHost('bad.test');
+
+        $this->worker()->run(0, 1, 100, false);
+
+        $this->assertSame('working', $this->raw($trusted)['state'], 'the vouched-for host keeps its stream shown');
+        $this->assertNotSame('pass', $this->raw($trusted)['check_result'], 'but the failure is still recorded');
+        $this->assertNotNull($this->raw($trusted)['check_result']);
+        $this->assertSame('suspect', $this->raw($other)['state'], 'an unvouched host is judged as before');
+    }
+
+    public function testUntrustingAHostHandsItsStreamsBackToTheChecker(): void
+    {
+        $this->state->markApplied();
+        $this->modes['bad.test'] = 'dead';
+        $row = $this->put('bad.test', '1', ['state' => 'working', 'ever_passed' => 1]);
+        $this->store->trustHost('bad.test');
+        $this->store->untrustHost('bad.test');
+
+        $this->worker()->run(0, 1, 100, false);
+
+        $this->assertSame('suspect', $this->raw($row)['state']);
+    }
+
     public function testTheSnapshotIsNotRewrittenWhenNoStreamChangedBetweenListedAndHidden(): void
     {
         $this->state->markApplied();

@@ -26,6 +26,9 @@ final class CheckWorker
 {
     private const LOGO_FILE = '/^[0-9a-f]{12}\.(?:png|jpg|gif|webp)$/D';
 
+    /** @var array<string,true>|null the owner-vouched hosts, read once per run */
+    private ?array $trusted = null;
+
     public function __construct(
         private StreamStore $store,
         private StreamChecker $checker,
@@ -46,6 +49,7 @@ final class CheckWorker
     public function run(int $worker, int $workers, int $limit, bool $firstPass): array
     {
         $this->pacer?->reset();
+        $this->trusted = null;
         $applied = $this->state->appliedAt() !== null;
         $out = ['checked' => 0, 'passed' => 0, 'failed' => 0, 'guarded' => 0, 'voided' => 0, 'stopped' => null, 'bytes' => 0];
         $run = new class {
@@ -152,6 +156,15 @@ final class CheckWorker
         $id = (string) $row['id'];
         $now = $this->clock->nowMs();
         if (!$applied) {
+            $this->store->recordShadow($id, $result, $now);
+            self::count($result, $out);
+
+            return;
+        }
+
+        // A host the owner vouched for (it plays for them, the checker's own address is what fails): the result is recorded,
+        // but a failure never hides its streams.
+        if (!$result->isPass() && !$result->isNoInformation() && isset(($this->trusted ??= $this->store->trustedHostSet())[(string) $row['host']])) {
             $this->store->recordShadow($id, $result, $now);
             self::count($result, $out);
 

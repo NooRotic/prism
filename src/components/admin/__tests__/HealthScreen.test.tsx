@@ -6,7 +6,7 @@ import HealthScreen from '../HealthScreen'
 import { AdminSessionContext } from '../AdminSessionContext'
 import type { AdminChecker } from '../../../lib/adminApi'
 
-const api = vi.hoisted(() => ({ getChecker: vi.fn(), applyChecker: vi.fn(), setCheckerPaused: vi.fn() }))
+const api = vi.hoisted(() => ({ getChecker: vi.fn(), applyChecker: vi.fn(), setCheckerPaused: vi.fn(), getHosts: vi.fn() }))
 vi.mock('../../../lib/adminApi', async (importActual) => ({ ...(await importActual<typeof import('../../../lib/adminApi')>()), ...api }))
 
 const LIMITS = { ttDayBudget: 1500, ttRunBudget: 300, newPerDay: 200, tailDays: 30 }
@@ -46,6 +46,7 @@ beforeEach(() => {
   for (const fn of Object.values(api)) fn.mockReset()
   onExpired.mockReset()
   api.getChecker.mockResolvedValue(ok(checker()))
+  api.getHosts.mockResolvedValue({ kind: 'ok', data: { trusted: [], restorable: [] } })
 })
 
 describe('HealthScreen: reading', () => {

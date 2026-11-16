@@ -204,6 +204,59 @@ final class PlaylistAdmin
         return ['ok' => true, 'snapshot' => $this->rewriteSnapshot()];
     }
 
+    private const HOST = '/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/D';
+
+    /**
+     * What the owner needs to restore by host: the hosts already vouched for, and the hosts with the most streams a restore
+     * would bring back.
+     *
+     * @return array{trusted:list<array<string,mixed>>,restorable:list<array<string,mixed>>}
+     */
+    public function hosts(): array
+    {
+        return ['trusted' => $this->store->trustedHosts(), 'restorable' => $this->store->restorableHosts()];
+    }
+
+    /**
+     * Vouches for a host (the checker's own address may be what fails against it) and brings its hidden streams back. From
+     * then on a failing check there is recorded but never hides a stream. Never touches the owner's own removals.
+     */
+    public function trustHost(string $host): array
+    {
+        $host = strtolower(trim($host));
+        if (preg_match(self::HOST, $host) !== 1) {
+            return self::rejected('bad_host');
+        }
+        if (!$this->store->hasHost($host)) {
+            return self::notFound();
+        }
+        $restored = 0;
+        $this->store->transaction(function () use ($host, &$restored): void {
+            $restored = $this->store->trustHost($host);
+            $this->audit->record('host.trust', $host, 'restored=' . $restored);
+        });
+
+        return ['ok' => true, 'restored' => $restored, 'snapshot' => $this->rewriteSnapshot()];
+    }
+
+    /** Stops vouching for a host. Its streams stay as they are; the checker judges them again from its next visit. */
+    public function untrustHost(string $host): array
+    {
+        $host = strtolower(trim($host));
+        if (preg_match(self::HOST, $host) !== 1) {
+            return self::rejected('bad_host');
+        }
+        $changed = false;
+        $this->store->transaction(function () use ($host, &$changed): void {
+            $changed = $this->store->untrustHost($host);
+            if ($changed) {
+                $this->audit->record('host.untrust', $host, '');
+            }
+        });
+
+        return $changed ? ['ok' => true] : self::notFound();
+    }
+
     /** The stored row of a stream that is not removed, else null. */
     private function open(string $publicId): ?array
     {
