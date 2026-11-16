@@ -17,8 +17,8 @@ interface LandscapeChatHandleProps {
  * The slim column beside the video that slides the chat in and out when the phone is held
  * sideways. Never drawn over the video: Twitch pauses an embed that anything covers, so
  * this is a sibling column of the player wrapper. 44px wide, the touch-target minimum.
- * A tap toggles; so does a swipe toward the chat's opening direction while it is closed,
- * or back toward its edge while it is open.
+ * A tap toggles; so does a swipe back toward the chat's edge while it is open. A swipe never
+ * opens it (see onTouchEnd).
  */
 export default function LandscapeChatHandle({ side, open, label, onToggle }: LandscapeChatHandleProps) {
   const start = useRef<{ x: number; y: number } | null>(null)
@@ -34,7 +34,10 @@ export default function LandscapeChatHandle({ side, open, label, onToggle }: Lan
     start.current = null
     if (!from || !touch) return
     const intent = swipeIntent(from, { x: touch.clientX, y: touch.clientY }, side)
-    if ((intent === 'open' && !open) || (intent === 'close' && open)) onToggle()
+    // Only closing is a swipe. Closed, the handle is flush against the screen edge, where the
+    // OS back gesture starts (Android gesture navigation, iOS Safari): a swipe from there
+    // would navigate away and stop the stream, so opening is a tap.
+    if (intent === 'close' && open) onToggle()
   }
 
   return (

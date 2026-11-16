@@ -140,15 +140,17 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   // Esc leaves fill mode. Best effort only: when focus is inside the chat iframe the
   // page never sees the key, which is why every state also has a visible button. The
   // browser uses Esc to leave fullscreen, so it is left alone while fullscreen.
+  // Not in landscape phone mode: fill is forced there whatever is saved, so Esc would change
+  // nothing visible and silently turn off the setting the viewer chose for the desktop.
   useEffect(() => {
-    if (!fill) return
+    if (!fill || landscapeLayout) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || document.fullscreenElement) return
       setFill(false)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [fill, setFill])
+  }, [fill, landscapeLayout, setFill])
 
   const [playerRatio, setPlayerRatio] = useState(loadRatio)
 

@@ -37,11 +37,14 @@ describe('LandscapeChatHandle', () => {
     expect(column).toHaveClass('w-11')
   })
 
-  it('a swipe in the opening direction toggles while closed', () => {
+  // The closed handle is flush against the screen edge, where Android's and iOS's back
+  // gesture starts: a swipe there must never be taken for "open", or the browser goes back
+  // and the stream stops. Opening is a tap.
+  it('a swipe in the opening direction does nothing while closed', () => {
     const { onToggle, column } = setup()
     fireEvent.touchStart(column, touch(300))
     fireEvent.touchEnd(column, touch(240))
-    expect(onToggle).toHaveBeenCalledTimes(1)
+    expect(onToggle).not.toHaveBeenCalled()
   })
 
   it('the same swipe does not toggle while open', () => {

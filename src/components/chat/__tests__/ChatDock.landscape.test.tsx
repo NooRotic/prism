@@ -78,11 +78,26 @@ describe('ChatDock in landscape phone mode', () => {
     expect(panel().className).not.toContain('basis-0')
   })
 
-  it('a swipe on the handle opens it', () => {
+  it('a swipe on the closed handle does not open it (the screen edge is the OS back gesture)', () => {
     renderDock()
     fireEvent.touchStart(handle(), { touches: [{ clientX: 300, clientY: 0 }] })
     fireEvent.touchEnd(handle(), { changedTouches: [{ clientX: 220, clientY: 4 }] })
-    expect(handleButton()).toHaveAttribute('aria-expanded', 'true')
+    expect(handleButton()).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('a swipe toward the chat edge on the open handle closes it', () => {
+    renderDock()
+    fireEvent.click(handleButton())
+    fireEvent.touchStart(handle(), { touches: [{ clientX: 220, clientY: 0 }] })
+    fireEvent.touchEnd(handle(), { changedTouches: [{ clientX: 300, clientY: 4 }] })
+    expect(handleButton()).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('Escape leaves the saved fill setting alone in landscape', () => {
+    localStorage.setItem(STORAGE_KEYS.LOCAL_FILL_MODE, 'true')
+    renderDock()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FILL_MODE)).toBe('true')
   })
 
   it('Hide in the chat header closes it', () => {
