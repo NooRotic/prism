@@ -1,3 +1,4 @@
+import { applySavedVolume, saveVolume } from '../../lib/playerVolume'
 import { useEffect, useRef } from 'react'
 import type { MediaPlayerClass } from 'dashjs'
 import type { PlayerProps } from '../../types/player'
@@ -72,8 +73,17 @@ export default function DashJSPlayer({
     videoEl.addEventListener('playing', handlePlaying)
     // The sound came on (the video's own controls, or the page's "Turn sound on"): stop saying it is playing muted.
     const handleVolumeChange = () => {
-      if (mountedRef.current && !videoEl.muted) out.setSoundBlocked(false)
+      if (!mountedRef.current) return
+      if (!videoEl.muted) out.setSoundBlocked(false)
+      if (volumeRestored) saveVolume(videoEl.volume)
     }
+    // The viewer's saved volume goes on now and once more when the stream initialises, in case loading reset it. Saving
+    // begins only after that second restore, so a volume reset by loading is never saved over the viewer's choice.
+    // Only the volume is restored, never muted.
+    let volumeRestored = false
+    applySavedVolume((volume) => {
+      videoEl.volume = volume
+    })
     videoEl.addEventListener('volumechange', handleVolumeChange)
 
     let dashPlayer: MediaPlayerClass | null = null
@@ -97,6 +107,10 @@ export default function DashJSPlayer({
           readyFired = true
           clearTimeout(loadTimeout)
           out.log('ok', 'dashjs', 'stream initialised')
+          applySavedVolume((volume) => {
+            videoEl.volume = volume
+          })
+          volumeRestored = true
           if (mountedRef.current) cb.current.onReady?.()
         }
         const onErrorEvent = (e: unknown) => {
