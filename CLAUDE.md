@@ -34,6 +34,8 @@
 - `src/components/admin/HealthScreen.tsx` - the owner's Health screen (`/admin/health`): the first pass's progress, what Apply would hide, host clusters, the budget and the Apply button; `src/lib/adminApi.ts` has `getChecker`, `applyChecker`, `setCheckerPaused`
 - `public/stream-checker/index.html` - the checker's public page (static, a plain HTTP 200): what it requests and how to ask for a stream's removal; its user agent (`Config::checkerUserAgent()`) links to it
 
+- `src/components/chat/landscapePhone.ts` + `useLandscapePhone.ts` - the one definition of "a phone held sideways" (a height-based media query, so a desktop window resized short counts too); `LandscapeChatHandle.tsx` + `landscapeSwipe.ts` - the handle column that slides the chat in and out beside the video; `ChatDock` forces fill mode and pushes the video aside (never overlays it; the open chat leaves the video at least 400px, Twitch's embed minimum) while it matches; `index.css` hides the rail (`landscape-phone-hide`) and zeroes its gutter; spec `docs/superpowers/specs/2026-11-16-landscape-phone-layout-design.md`
+
 ## Design Spec
 Full spec at `docs/superpowers/specs/2026-04-06-prism-design.md`
 
