@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { ResizableHandle } from '../layout/ResizableHandle'
 import { STORAGE_KEYS } from '../../config/storageKeys'
@@ -18,7 +18,7 @@ import {
   nextRatio,
   storeFloatingHeight,
 } from './chatLayout'
-import { FILL_ATTRIBUTE, fillScopeFor } from './fillMode'
+import { fillScopeFor } from './fillMode'
 import { useFloatingVideo } from './floatingVideoContext'
 import { useChatPlacement } from './useChatPlacement'
 import { useChatPopout } from './useChatPopout'
@@ -27,17 +27,13 @@ import { useDockDrag } from './useDockDrag'
 import { useFillMode } from './useFillMode'
 import { useFullscreen } from './useFullscreen'
 import { useLandscapePhone } from './useLandscapePhone'
-
-// Landscape phone mode (see landscapePhone.ts): the row is a sideways row at every width, the
-// player takes what the chat leaves, and the chat is a column that stays mounted and changes
-// width, so opening it never reloads the iframe. Open, it takes about 38% of the row (at least
-// 280px) but never so much that the video falls under Twitch's 400px embed minimum; the
-// handle column beside it is 2.75rem wide. Literal strings, because Tailwind cannot see
-// classes built from pieces (the underscores are spaces inside calc).
-const LANDSCAPE_CHAT_BASE =
-  'min-w-0 grow-0 shrink-0 rounded-lg overflow-hidden flex flex-col transition-[flex-basis,visibility] duration-200 motion-reduce:transition-none'
-const LANDSCAPE_CHAT_OPEN = 'basis-[max(0px,min(max(38%,280px),calc(100%_-_2.75rem_-_400px)))]'
-const LANDSCAPE_CHAT_CLOSED = 'basis-0 invisible'
+import { useFillScope } from './useFillScope'
+import {
+  LANDSCAPE_CHAT_BASE,
+  LANDSCAPE_CHAT_CLOSED,
+  LANDSCAPE_CHAT_OPEN,
+  landscapeHandleLabel,
+} from './landscapeChat'
 
 // Literal class strings, because Tailwind cannot see classes built from pieces.
 // The md-only variants are the fill layout when chat is docked: below the md
@@ -132,12 +128,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
         fullscreen: fullscreen.isFullscreen,
         chatDocked: chatVisible,
       })
-  useLayoutEffect(() => {
-    if (!scope) return
-    const root = document.documentElement
-    root.setAttribute(FILL_ATTRIBUTE, scope)
-    return () => root.removeAttribute(FILL_ATTRIBUTE)
-  }, [scope])
+  useFillScope(scope)
 
   // Esc leaves fill mode. Best effort only: when focus is inside the chat iframe the
   // page never sees the key, which is why every state also has a visible button. The
@@ -276,9 +267,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
             <LandscapeChatHandle
               side={side}
               open={landscapeOpen}
-              label={
-                popout.isOpen ? 'Return chat to the page' : landscapeOpen ? 'Hide chat' : 'Show chat'
-              }
+              label={landscapeHandleLabel(landscapeOpen, popout.isOpen)}
               onToggle={popout.isOpen ? popout.close : () => setLandscapeChatOpen((open) => !open)}
             />
             <div
