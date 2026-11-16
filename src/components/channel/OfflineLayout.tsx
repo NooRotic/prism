@@ -126,7 +126,9 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
 
       {player && (
         <div
-          className="relative min-w-0 aspect-video overflow-hidden rounded-lg border border-[color:var(--border)] [grid-area:player]"
+          data-testid="offline-player"
+          // min-h-[300px]: the Twitch embed will not go below 300px tall; a shorter 16:9 box crops it.
+          className="relative min-w-0 aspect-video min-h-[300px] overflow-hidden rounded-lg border border-[color:var(--border)] [grid-area:player]"
           style={{ backgroundColor: 'var(--bg-card)' }}
         >
           {/* While the video floats the slot holds a panel, never a second player. */}

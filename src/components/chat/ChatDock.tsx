@@ -47,8 +47,10 @@ const ROW_NORMAL = 'w-full max-w-[1600px] mx-auto min-h-[360px]'
 const ROW_FILL_MD = 'md:fixed md:inset-0 md:z-50 md:max-w-none md:mx-0 md:min-h-0 md:bg-[var(--bg)]'
 const ROW_FILL_ALL = 'w-full fixed inset-0 z-50 bg-[var(--bg)]'
 const PLAYER_NORMAL =
-  'w-full md:flex-none relative overflow-hidden rounded-lg border border-[color:var(--border)] aspect-video'
-const PLAYER_FILL_MD = 'md:aspect-auto md:rounded-none md:border-0'
+  'w-full md:flex-none relative overflow-hidden rounded-lg border border-[color:var(--border)] aspect-video min-h-[300px]'
+// min-h-[300px] above: the Twitch embed will not go below 300px tall, so a shorter 16:9 box (170px
+// on a phone in portrait) crops the video and its controls. Fill mode sizes the box to the window.
+const PLAYER_FILL_MD = 'md:aspect-auto md:rounded-none md:border-0 md:min-h-0'
 const PLAYER_FILL_ALL = 'w-full md:flex-none relative overflow-hidden aspect-auto'
 // While the video floats and the chat is docked, the player wrapper stays in the row as an
 // empty, invisible box that still gives the row its height, and the chat is laid over the
