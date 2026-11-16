@@ -44,7 +44,7 @@ final class PlaylistAdmin
     }
 
     /**
-     * @param array{text?:string,state?:string,group?:string,country?:string} $filters
+     * @param array{text?:string,state?:string,group?:string,country?:string,sort?:string} $filters
      * @return array{streams:list<array<string,mixed>>,total:int,counts:array<string,int>,limit:int,offset:int}
      */
     public function list(array $filters, int $limit, int $offset): array

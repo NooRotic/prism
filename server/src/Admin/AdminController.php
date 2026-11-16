@@ -137,7 +137,7 @@ final class AdminController
         return ApiResponse::json(409, ['error' => (string) $result['error'], 'reason' => (string) $result['reason']], self::NO_STORE);
     }
 
-    /** GET /api/admin/streams?text=&state=&group=&country=&limit=&offset= : every stream, every state, paged. */
+    /** GET /api/admin/streams?text=&state=&group=&country=&sort=&limit=&offset= : every stream, every state, paged. */
     private function streams(Request $request): ApiResponse
     {
         if ($request->method !== 'GET') {
@@ -158,6 +158,11 @@ final class AdminController
             return $this->error(400, 'bad_query');
         }
         $filters += ['state' => $state, 'country' => $country];
+        $sort = $request->query['sort'] ?? '';
+        if (!is_string($sort) || !in_array($sort, ['', 'name', 'stars'], true)) {
+            return $this->error(400, 'bad_query');
+        }
+        $filters['sort'] = $sort;
 
         $limit = $request->query['limit'] ?? '50';
         $offset = $request->query['offset'] ?? '0';

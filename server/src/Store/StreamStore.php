@@ -132,9 +132,10 @@ final class StreamStore
 
     /**
      * Every stream, in every state (the owner's view), filtered and paged. Filters: `text` (every word must be in the name;
-     * % and _ mean themselves), `state`, `group` (an exact group name) and `country`. Same order as the visitor list.
+     * % and _ mean themselves), `state`, `group` (an exact group name) and `country`. Same order as the visitor list, unless
+     * `sort` is "stars" (most starred first).
      *
-     * @param array{text?:string,state?:string,group?:string,country?:string} $filters
+     * @param array{text?:string,state?:string,group?:string,country?:string,sort?:string} $filters
      * @return array{rows:list<array<string,mixed>>,total:int}
      */
     public function search(array $filters, int $limit, int $offset): array
@@ -168,8 +169,13 @@ final class StreamStore
         $count->execute($args);
         $limit = max(1, $limit);
         $offset = max(0, $offset);
+        // `sort` = stars puts the most-starred first (ties by name); anything else is the visitor order. Streams nobody starred
+        // count as zero. The subquery keeps the column names unqualified, since `public_id` exists in both tables.
+        $order = ($filters['sort'] ?? '') === 'stars'
+            ? 'COALESCE((SELECT f.n FROM stream_favorites f WHERE f.public_id = streams.public_id), 0) DESC, name ASC, public_id ASC'
+            : 'pinned DESC, name ASC, public_id ASC';
         $page = $this->pdo->prepare(
-            'SELECT ' . self::READ . ' FROM streams' . $clause . " ORDER BY pinned DESC, name ASC, public_id ASC LIMIT {$limit} OFFSET {$offset}",
+            'SELECT ' . self::READ . ' FROM streams' . $clause . " ORDER BY {$order} LIMIT {$limit} OFFSET {$offset}",
         );
         $page->execute($args);
 

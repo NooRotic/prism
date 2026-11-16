@@ -68,6 +68,7 @@ export default function PlaylistScreen() {
   const [query, setQuery] = useState('')
   const [state, setState] = useState<StreamState | ''>('')
   const [country, setCountry] = useState('')
+  const [sort, setSort] = useState<'name' | 'stars'>('name')
   const [offset, setOffset] = useState(0)
   const [pending, setPending] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -93,7 +94,7 @@ export default function PlaylistScreen() {
 
   // The server takes a country as exactly two letters (anything else is a 400): while one letter is typed, no filter yet.
   const countryFilter = country.length === 2 ? country : ''
-  const streams = useAdminResource((signal) => getStreams({ text: query, state, country: countryFilter }, { limit: PAGE_SIZE, offset }, signal), [query, state, countryFilter, offset])
+  const streams = useAdminResource((signal) => getStreams({ text: query, state, country: countryFilter, sort }, { limit: PAGE_SIZE, offset }, signal), [query, state, countryFilter, sort, offset])
 
   // The list stays on screen while it reloads after an action (a table that vanished on every click would be hard to use).
   const [kept, setKept] = useState<AdminStreams | null>(null)
@@ -102,7 +103,7 @@ export default function PlaylistScreen() {
 
   // The preview belongs to the list it was opened on: another page or filter closes it, and so does a reload that no longer
   // lists the stream or lists it as removed (a removed stream has no Play).
-  const listKey = JSON.stringify([query, state, countryFilter, offset])
+  const listKey = JSON.stringify([query, state, countryFilter, sort, offset])
   const previewed = previewing === null ? null : (data?.streams.find((s) => s.publicId === previewing.publicId) ?? null)
   if (previewing !== null && (previewing.listKey !== listKey || (data !== null && (previewed === null || previewed.state === 'removed')))) setPreviewing(null)
 
@@ -240,6 +241,19 @@ export default function PlaylistScreen() {
           className="w-24 rounded border px-3 py-2 text-sm"
           style={INPUT}
         />
+        <select
+          aria-label="Sort"
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value === 'stars' ? 'stars' : 'name')
+            setOffset(0)
+          }}
+          className="rounded border px-3 py-2 text-sm"
+          style={INPUT}
+        >
+          <option value="name">Sort: pinned, then name</option>
+          <option value="stars">Sort: most stars</option>
+        </select>
       </div>
 
       <form aria-label="Add a stream" onSubmit={(event) => void submitAdd(event)} className="flex flex-col gap-2 rounded-lg border p-4" style={CARD}>
