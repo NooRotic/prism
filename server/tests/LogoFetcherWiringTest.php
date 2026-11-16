@@ -22,7 +22,7 @@ final class LogoFetcherWiringTest extends DbTestCase
         $id = StreamUrl::id($url);
         (new StreamStore($this->pdo, $this->clock))->insertIfNew([
             'id' => $id, 'public_id' => StreamUrl::publicId($id), 'url' => $url, 'name' => 'A', 'groups_json' => '["News"]',
-            'kind' => 'hls', 'state' => 'new', 'source' => 't', 'logo_url' => 'https://logos.test/a.png',
+            'kind' => 'hls', 'state' => 'working', 'source' => 't', 'logo_url' => 'https://logos.test/a.png',
         ]);
     }
 

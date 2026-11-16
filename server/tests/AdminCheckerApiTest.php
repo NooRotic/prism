@@ -122,12 +122,13 @@ final class AdminCheckerApiTest extends DbTestCase
 
     public function testApplyAcceptsAnEmptyBodyOrAnEmptyObjectAndAppliesOnce(): void
     {
-        $this->checked('1', 'pass');
-        $this->checked('2', 'pass');
-        $this->checked('3', 'unreachable');
-        $this->checked('4', 'pass');
+        // Listed (working) streams, as when the checker is switched on over a list that is already visible.
+        $this->checked('1', 'pass', ['state' => 'working']);
+        $this->checked('2', 'pass', ['state' => 'working']);
+        $this->checked('3', 'unreachable', ['state' => 'working']);
+        $this->checked('4', 'pass', ['state' => 'working']);
 
-        $first = $this->call('POST', '/api/admin/checker/apply', '{}');
+        $first =$this->call('POST', '/api/admin/checker/apply', '{}');
         $second = $this->call('POST', '/api/admin/checker/apply', '');
 
         $this->assertSame(200, $first->status);

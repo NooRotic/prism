@@ -87,7 +87,7 @@ final class LogoFetcherTest extends DbTestCase
         // added_at orders the fetch queue, so the streams are fetched in the order the test made them.
         $this->store->insertIfNew(array_merge([
             'id' => $id, 'public_id' => StreamUrl::publicId($id), 'url' => $url, 'name' => 'Stream ' . $n, 'groups_json' => '["News"]',
-            'kind' => 'hls', 'state' => 'new', 'source' => 'test', 'logo_url' => $logoUrl,
+            'kind' => 'hls', 'state' => 'working', 'source' => 'test', 'logo_url' => $logoUrl,
             'added_at' => '2026-11-12 03:00:' . str_pad($n, 2, '0', STR_PAD_LEFT),
         ], $extra));
 

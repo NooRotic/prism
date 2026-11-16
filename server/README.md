@@ -46,10 +46,12 @@ Design: [docs/superpowers/specs/2026-11-13-playlist-admin-design.md](../docs/sup
 Design: the same spec, "Piece 2" and "The HLS page". The table comes from `migrations/003_streams.sql` (applied by
 `bin/install.php`: expect `applied 003_streams`). One row per stream, keyed by the SHA-256 of its normalised address
 (scheme and host lower-cased, default port and fragment dropped); the page address uses the first 12 characters
-(`public_id`). **States:** `new` (not checked yet), `working`, `suspect` are shown to visitors; `dead`, `removed`
+(`public_id`). **States:** during the launch only `working` (verified: a check passed) is shown to visitors
+(`StreamStore::LISTED`); `new` (not checked yet, so an owner-added or imported stream waits for its first check) and `suspect`
+(a once-working stream failing its latest check) are kept but hidden like `dead`, `removed`
 (a tombstone, so a re-import cannot bring it back), `unplayable` (an `http://` address: an https page cannot load it, reason
-`http`) and `held` (a port the checker may not use: below 1024 other than 80 and 443, or one browsers refuse; reason `port`)
-are kept but never shown. The stream checker (below) moves streams between `new`, `working`, `suspect`, `dead` and `removed`.
+`http`) and `held` (a port the checker may not use: below 1024 other than 80 and 443, or one browsers refuse; reason `port`).
+Relaxing the launch rule is one line: add `suspect` (and `new`) back to `LISTED`. The stream checker (below) moves streams between `new`, `working`, `suspect`, `dead` and `removed`.
 
 - **`GET /api/streams`** (public, origin allowlist, `ETag`, `Cache-Control: public, max-age=300`, gzip when accepted, 304 on a
   matching `If-None-Match`, 503 `{"error":"not_ready"}` until the first import) answers the visitor snapshot:

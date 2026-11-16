@@ -132,7 +132,7 @@ final class CheckerAdminTest extends DbTestCase
 
         $this->assertSame(['eligible' => 8, 'checked' => 7, 'oldest_result_at' => self::RECENT], $s['progress']);
         $this->assertSame(['host_guard' => 1, 'no_cors' => 1, 'pass' => 2, 'unreachable' => 3], $s['outcome']);
-        $this->assertSame(2, $s['would_hide'], 'the dead one and the no-CORS one are visible now and would disappear; the held one is hidden already, the proven one only becomes suspect');
+        $this->assertSame(1, $s['would_hide'], 'only a verified stream is visible now: the proven one that now fails would disappear; the unchecked, held and failing new ones are hidden already');
         $this->assertSame(['held' => 1, 'new' => 5, 'working' => 2], $s['counts']);
         $this->assertSame([5000, 5000], [$s['budget']['bytes_today'], $s['budget']['first_pass_bytes']]);
         $this->assertSame(['reason' => 'run_guard', 'at' => '2026-11-12 03:00:00'], $s['last_stop']);
@@ -213,7 +213,7 @@ final class CheckerAdminTest extends DbTestCase
 
         $r = $this->admin->apply();
 
-        $this->assertSame(['ok' => true, 'hidden' => 2, 'listed' => 4, 'snapshot' => true], $r);
+        $this->assertSame(['ok' => true, 'hidden' => 1, 'listed' => 2, 'snapshot' => true], $r);
         $states = array_map(fn (array $row): array => [$this->raw($row)['state'], $this->raw($row)['state_reason']], $rows);
         $this->assertSame([
             'good' => ['working', null],
@@ -227,10 +227,10 @@ final class CheckerAdminTest extends DbTestCase
         $this->assertNotNull($this->state->appliedAt());
         $this->assertSame(1, $this->audits('checker.apply'));
         $detail = (string) $this->pdo->query("SELECT detail FROM admin_audit WHERE action = 'checker.apply'")->fetchColumn();
-        $this->assertStringContainsString('hidden=2', $detail);
+        $this->assertStringContainsString('hidden=1', $detail);
         $names = array_map(static fn (array $s): string => $s['n'], json_decode((string) file_get_contents($this->dir . '/streams.json'), true)['streams']);
         sort($names);
-        $this->assertSame(['Stream 1', 'Stream 4', 'Stream 5', 'Stream 6'], $names, 'working, the set-aside new one and the suspect one are listed');
+        $this->assertSame(['Stream 1', 'Stream 5'], $names, 'verified only: the two that passed are listed; the set-aside new one and the suspect one are not');
     }
 
     public function testApplyLeavesTheRecordedResultsAlone(): void
