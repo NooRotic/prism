@@ -112,6 +112,9 @@ export default function VideoJSPlayer({
     // Starts with sound, and starts it ourselves (see `startPlayback`): the `autoplay` attribute cannot fall back to muted.
     const player = videojs(videoEl, {
       controls: true,
+      // A live stream gets Video.js's live seek bar and "LIVE" button. It only has a range to offer when the stream's
+      // playlist keeps a long window (see LIVE_REWIND in the backlog); on a short one it stays a plain "LIVE" badge.
+      liveui: true,
       autoplay: false,
       muted: false,
       fill: true,
