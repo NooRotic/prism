@@ -68,7 +68,7 @@ final class SchemaTest extends DbTestCase
             rmdir($dir);
         }
 
-        $this->assertSame(['004_checker', '005_trusted_hosts'], $applied);
+        $this->assertSame(['004_checker', '005_trusted_hosts', '006_stream_favorites'], $applied);
         $rows = $this->pdo->query('SELECT host, ever_passed FROM streams ORDER BY id')->fetchAll();
         $this->assertSame([['cdn.example', '1'], ['other.test', '0']], array_map(static fn (array $r): array => [$r['host'], (string) $r['ever_passed']], $rows));
     }

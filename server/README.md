@@ -169,6 +169,20 @@ fail, and brings them back if they recover. Migration `004_checker.sql` adds its
   `*/15 * * * * /usr/bin/php8.4-cli /prism-data/bin/check-streams.php` (each stream is due once a day, so the load spreads
   itself). 7. Remove the logo copier's cron line when its work is done.
 
+## Favorites (stars)
+
+Migration `006_stream_favorites`: one counter per stream (`stream_favorites`, keyed by the 12-character public id), **no visitor
+column**. The browser keeps the visitor's own set in localStorage and tells the server only "+1" or "-1".
+
+- `POST /api/favorite` `{"id":"<public id>","on":true|false}` (JSON as plain text, no preflight; 204). 400 for a bad body or id, 404 for a
+  stream that is not on the public list (a hidden stream cannot be inflated), 429 past a **global** 300 per minute (`RateCap`, never per
+  visitor). Un-starring never goes below zero.
+- `GET /api/favorites` -> `{"v":1,"counts":{"<id>":n}}`: only streams on the public list with at least one star, most starred first (at
+  most 5000), `Cache-Control: public, max-age=60`. It is a separate request, so the visitor snapshot is not rewritten on every click.
+- The Playlist admin list rows carry `favorites` (the owner also sees hidden streams' counts).
+- The count is a popularity signal, not a poll: a script can still push a number up, slowly. Clearing a browser's storage and starring
+  again adds another +1. If gaming ever shows up, the next step is a salted, daily-rotating hash per visitor (which would be visitor data).
+
 ## IONOS host notes
 
 - **Which PHP.** The scripts in `bin/` are command line only (they exit unless `PHP_SAPI` is `cli`). On this host the

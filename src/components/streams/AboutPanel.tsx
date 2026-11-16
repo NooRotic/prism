@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Info, Pin, PinOff, X } from 'lucide-react'
+import { Heart, Info, Pin, PinOff, X } from 'lucide-react'
 import { useAutoFold } from '../../hooks/useAutoFold'
 import { regionName } from '../../lib/countries'
 import { usePlaybackLog } from '../../lib/playbackLog'
@@ -12,6 +12,11 @@ interface AboutPanelProps {
   stream: StreamEntry | null
   /** The snapshot's group names; the stream's `groups` index into this list. */
   groups: string[]
+  /** Whether this viewer starred the stream. Leave `onToggleFavorite` out to show no star (a pasted address has none). */
+  favorite?: boolean
+  /** How many visitors starred it; nothing is shown for zero. */
+  favoriteCount?: number
+  onToggleFavorite?: (id: string) => void
 }
 
 const STATE_TEXT: Record<StreamEntry['state'], string> = {
@@ -34,7 +39,7 @@ function sourceHost(url: string): string | null {
  * or focusing inside it starts the thirty seconds again, and a pin keeps it open), and never takes keyboard focus. Names
  * and groups are text. The movement is skipped for a visitor who asked their system for less of it.
  */
-export default function AboutPanel({ stream, groups }: AboutPanelProps) {
+export default function AboutPanel({ stream, groups, favorite = false, favoriteCount = 0, onToggleFavorite }: AboutPanelProps) {
   // While playback is failing or being retried the panel stays open (and opens if folded): it holds the debug output.
   const playback = usePlaybackLog()
   const failing = playback.status === 'retrying' || playback.status === 'failed'
@@ -123,6 +128,27 @@ export default function AboutPanel({ stream, groups }: AboutPanelProps) {
                   <h2 className="leading-tight font-semibold break-words" style={{ fontSize: '1.4em' }}>
                     {stream.name}
                   </h2>
+                  {onToggleFavorite && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleFavorite(stream.id)}
+                      aria-pressed={favorite}
+                      aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+                      className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm focus-visible:outline-2 focus-visible:outline-[var(--accent-green)]"
+                      style={{
+                        borderColor: favorite ? 'var(--accent-twitch)' : 'var(--border-accent)',
+                        color: favorite ? 'var(--accent-twitch)' : 'var(--text-secondary)',
+                      }}
+                    >
+                      <Heart size={15} aria-hidden="true" fill={favorite ? 'currentColor' : 'none'} />
+                      {favorite ? 'Favorite' : 'Add to favorites'}
+                      {favoriteCount > 0 && (
+                        <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }} aria-label={`${favoriteCount} ${favoriteCount === 1 ? 'star' : 'stars'}`}>
+                          {favoriteCount}
+                        </span>
+                      )}
+                    </button>
+                  )}
                   {stream.country !== null && (
                     <p className="mt-1.5 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
                       <CountryFlag code={stream.country} size={24} />

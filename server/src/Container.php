@@ -34,6 +34,7 @@ use Prism\History\Store\AttemptStore;
 use Prism\History\Store\AuditStore;
 use Prism\History\Store\BioLinkStore;
 use Prism\History\Store\ChannelStore;
+use Prism\History\Store\FavoriteStore;
 use Prism\History\Store\JobState;
 use Prism\History\Store\SnapshotStore;
 use Prism\History\Store\StreamStore;
@@ -44,6 +45,7 @@ use Prism\History\Tracker\TrackerClient;
 use Prism\History\Tracker\TtGate;
 use Prism\History\Twitch\TokenValidator;
 use Prism\History\Twitch\TwitchClient;
+use Prism\History\Usage\FavoriteRecorder;
 use Prism\History\Usage\HitRecorder;
 
 /** Builds the object graph from a Config and a database connection. Tests pass a fake transport, clock and sleeper. */
@@ -114,7 +116,20 @@ final class Container
             $config->checkerFirstPassCapBytes(),
         );
 
-        return new Router($config, $visits, $s['channels'], $s['payload'], $s['logger'], $hits, new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit), $playlistAdmin, $checkerAdmin), new StreamsController($config->playlistDataDir()));
+        $favoriteStore = new FavoriteStore($pdo, $s['clock']);
+
+        return new Router(
+            $config,
+            $visits,
+            $s['channels'],
+            $s['payload'],
+            $s['logger'],
+            $hits,
+            new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit), $playlistAdmin, $checkerAdmin),
+            new StreamsController($config->playlistDataDir()),
+            new FavoriteRecorder($favoriteStore, $streams, $cap),
+            $favoriteStore,
+        );
     }
 
     /** The schema migrator over the migrations/ folder that ships next to src/. */

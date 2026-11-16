@@ -5,6 +5,8 @@ import HlsPage from '../HlsPage'
 import { STORAGE_KEYS } from '../../config/storageKeys'
 import { useApp } from '../../contexts/AppContext'
 import { useStreamSnapshot, type StreamSnapshotState } from '../../hooks/useStreamSnapshot'
+import { resetFavoriteCounts } from '../../lib/favoritesApi'
+import { resetFavoritesCache } from '../../lib/favorites'
 import { buildStreamPath } from '../../lib/routes'
 import type { StreamEntry, StreamSnapshot } from '../../lib/streamsApi'
 
@@ -64,13 +66,18 @@ function renderAt(path: string, snapshot: StreamSnapshotState = ready()) {
 }
 
 const playerUrl = () => screen.getByTestId('player-panel').getAttribute('data-url')
-/** The names on the cards in view: the letter tile and the Pinned / Unchecked marks are not part of a name. */
+/**
+ * The names on the cards in view: the letter tile and the Pinned / Unchecked marks are not part of a name. The star buttons
+ * and the Favorites switch (the only buttons here with a pressed state) are not cards.
+ */
 const cardNames = () =>
   within(screen.getByRole('region', { name: /stream list/i }))
     .queryAllByRole('button')
+    .filter((button) => !button.hasAttribute('aria-pressed'))
     .map((button) => {
       const copy = button.cloneNode(true) as HTMLElement
       copy.querySelector('[data-letter-tile]')?.remove()
+      copy.querySelector('[aria-label$="star"], [aria-label$="stars"]')?.remove()
       return (copy.textContent ?? '').replace(/(Pinned|Unchecked)/g, '').trim()
     })
 
@@ -78,6 +85,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   // The page remembers the chosen group in local storage: no test starts with another's choice.
   localStorage.clear()
+  resetFavoritesCache()
+  resetFavoriteCounts()
 })
 
 describe('HlsPage: what plays', () => {
@@ -183,7 +192,7 @@ describe('HlsPage: the list', () => {
     const user = userEvent.setup()
     renderAt('/hls-dash')
 
-    await user.click(screen.getByRole('button', { name: /Beta Two/ }))
+    await user.click(screen.getByRole('button', { name: /^(?!Add |Remove ).*Beta Two/ }))
 
     expect(screen.getByTestId('location')).toHaveTextContent(`/hls-dash/${BETA.id}`)
     expect(playerUrl()).toBe(BETA.url)
@@ -195,7 +204,7 @@ describe('HlsPage: the list', () => {
     await user.click(screen.getByRole('button', { name: /^News/ }))
     await user.type(screen.getByRole('searchbox'), 'two')
 
-    await user.click(screen.getByRole('button', { name: /Beta Two/ }))
+    await user.click(screen.getByRole('button', { name: /^(?!Add |Remove ).*Beta Two/ }))
 
     expect(screen.getByTestId('location')).toHaveTextContent(`/hls-dash/${BETA.id}`)
     expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('two')
@@ -296,7 +305,7 @@ describe('HlsPage: when the server cannot give a list', () => {
     const user = userEvent.setup()
     renderAt('/hls-dash', unavailable)
 
-    await user.click(screen.getByRole('button', { name: /Apple 4K HEVC/ }))
+    await user.click(screen.getByRole('button', { name: /^(?!Add |Remove ).*Apple 4K HEVC/ }))
 
     expect(screen.getByTestId('location')).toHaveTextContent('/hls-dash/apple-4k')
     expect(playerUrl()).toContain('adv_dv_atmos/main.m3u8')
@@ -347,7 +356,7 @@ describe('HlsPage: the rest of the page', () => {
       act(() => void vi.advanceTimersByTime(30_000))
       expect(screen.queryByRole('heading', { name: 'Alpha One', level: 2 })).toBeNull()
 
-      fireEvent.click(screen.getByRole('button', { name: /Beta Two/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^(?!Add |Remove ).*Beta Two/ }))
 
       expect(screen.getByRole('heading', { name: 'Beta Two', level: 2 })).toBeInTheDocument()
     } finally {
@@ -438,5 +447,108 @@ describe('HlsPage: the remembered group', () => {
 
     expect(cardNames()).toHaveLength(4)
     vi.restoreAllMocks()
+  })
+})
+
+describe('HlsPage: favorites', () => {
+  const star = (name: string) => screen.getByRole('button', { name: `Add ${name} to favorites` })
+  const switchButton = () => screen.getByRole('button', { name: /^Favorites/ })
+
+  it('stars a stream, remembers it in this browser and does not change what plays', async () => {
+    const user = userEvent.setup()
+    renderAt('/hls-dash')
+
+    await user.click(star('Beta Two'))
+
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.LOCAL_FAVORITE_STREAMS) ?? '[]')).toEqual([BETA.id])
+    expect(screen.getByRole('button', { name: 'Remove Beta Two from favorites' }).getAttribute('aria-pressed')).toBe('true')
+    expect(playerUrl()).toBe(ALPHA.url)
+    expect(switchButton()).toHaveTextContent('1')
+  })
+
+  it('shows the star total on the card straight after starring', async () => {
+    const user = userEvent.setup()
+    renderAt('/hls-dash')
+
+    await user.click(star('Beta Two'))
+
+    expect(screen.getByLabelText('1 star')).toBeInTheDocument()
+  })
+
+  it('un-stars again', async () => {
+    const user = userEvent.setup()
+    renderAt('/hls-dash')
+    await user.click(star('Beta Two'))
+
+    await user.click(screen.getByRole('button', { name: 'Remove Beta Two from favorites' }))
+
+    expect(localStorage.getItem(STORAGE_KEYS.LOCAL_FAVORITE_STREAMS)).toBeNull()
+    expect(screen.queryByLabelText(/stars?$/)).toBeNull()
+  })
+
+  it('lists only the starred streams while the Favorites switch is on, and all of them again when it is off', async () => {
+    const user = userEvent.setup()
+    renderAt('/hls-dash')
+    await user.click(star('Beta Two'))
+    await user.click(star('Gamma Three'))
+
+    await user.click(switchButton())
+
+    expect(switchButton().getAttribute('aria-pressed')).toBe('true')
+    expect(cardNames()).toEqual(['Beta Two', 'Gamma Three'])
+
+    await user.click(switchButton())
+
+    expect(cardNames()).toHaveLength(4)
+  })
+
+  it('searches inside the favorites', async () => {
+    const user = userEvent.setup()
+    renderAt('/hls-dash')
+    await user.click(star('Beta Two'))
+    await user.click(star('Gamma Three'))
+    await user.click(switchButton())
+
+    await user.type(screen.getByRole('searchbox', { name: /search streams/i }), 'gamma')
+
+    expect(cardNames()).toEqual(['Gamma Three'])
+  })
+
+  it('says so when there are no favorites yet', async () => {
+    const user = userEvent.setup()
+    renderAt('/hls-dash')
+
+    await user.click(switchButton())
+
+    expect(screen.getByRole('status')).toHaveTextContent(/no favorites yet/i)
+    expect(cardNames()).toEqual([])
+  })
+
+  it('keeps stars from an earlier visit', () => {
+    localStorage.setItem(STORAGE_KEYS.LOCAL_FAVORITE_STREAMS, JSON.stringify([GAMMA.id]))
+    resetFavoritesCache()
+
+    renderAt('/hls-dash')
+
+    expect(screen.getByRole('button', { name: 'Remove Gamma Three from favorites' })).toBeInTheDocument()
+    expect(switchButton()).toHaveTextContent('1')
+  })
+})
+
+describe('HlsPage: favorites in the About panel', () => {
+  it('stars the stream that is playing from the About panel, and the card follows', async () => {
+    const user = userEvent.setup()
+    renderAt('/hls-dash')
+
+    await user.click(screen.getByRole('button', { name: 'Add to favorites' }))
+
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.LOCAL_FAVORITE_STREAMS) ?? '[]')).toEqual([ALPHA.id])
+    expect(screen.getByRole('button', { name: 'Remove Alpha One from favorites' })).toBeInTheDocument()
+  })
+
+  it('offers no star for a pasted address', () => {
+    renderAt(`/hls-dash/custom?url=${encodeURIComponent('https://pasted.test/live.m3u8')}`)
+
+    expect(screen.queryByRole('button', { name: /^(Add to|Remove from) favorites$/ })).toBeNull()
   })
 })

@@ -53,13 +53,42 @@ final class PlaylistAdmin
         $counts = $this->store->countsByState();
         ksort($counts);
 
+        $stars = $this->starsFor(array_map(static fn (array $r): string => (string) $r['public_id'], $found['rows']));
+        $streams = array_map(
+            static fn (array $row): array => self::present($row) + ['favorites' => $stars[(string) $row['public_id']] ?? 0],
+            $found['rows'],
+        );
+
         return [
-            'streams' => array_map(self::present(...), $found['rows']),
+            'streams' => $streams,
             'total' => $found['total'],
             'counts' => $counts,
             'limit' => $limit,
             'offset' => $offset,
         ];
+    }
+
+    /**
+     * How many visitors starred each of these streams (zero is left out).
+     *
+     * @param list<string> $publicIds
+     * @return array<string,int>
+     */
+    private function starsFor(array $publicIds): array
+    {
+        if ($publicIds === []) {
+            return [];
+        }
+        $marks = implode(', ', array_fill(0, count($publicIds), '?'));
+        $stmt = $this->pdo->prepare("SELECT public_id, n FROM stream_favorites WHERE public_id IN ({$marks})");
+        $stmt->execute($publicIds);
+
+        $stars = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $stars[(string) $row['public_id']] = (int) $row['n'];
+        }
+
+        return $stars;
     }
 
     /** Adds a stream by the same rules as the import; it is stored with source "manual". */

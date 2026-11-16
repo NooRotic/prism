@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-
 import { useApp } from '../contexts/AppContext'
 import { demoToEntry, getHlsDashDemo } from '../config/demoContent'
 import { STORAGE_KEYS } from '../config/storageKeys'
+import { useFavoriteCounts, useFavoriteIds, useToggleFavorite } from '../hooks/useFavorites'
 import { useStreamSnapshot } from '../hooks/useStreamSnapshot'
 import { buildStreamPath, CUSTOM_STREAM_ID } from '../lib/routes'
 import { filterStreams, groupCounts } from '../lib/streamFilter'
@@ -10,6 +11,7 @@ import { resolveSnapshotStream, resolveStreamSource, type StreamSource } from '.
 import type { StreamEntry } from '../lib/streamsApi'
 import StreamPlayerPanel from '../components/player/StreamPlayerPanel'
 import AboutPanel from '../components/streams/AboutPanel'
+import FavoritesFilter from '../components/streams/FavoritesFilter'
 import GroupPills from '../components/streams/GroupPills'
 import StreamCard from '../components/streams/StreamCard'
 import StreamGrid from '../components/streams/StreamGrid'
@@ -97,6 +99,11 @@ export default function HlsPage() {
   // was saved; what the page shows follows from it and the list that is showing (see `group` below).
   const [groupName, setGroupName] = useState<string | null>(readSavedGroup)
   const playerAnchor = useRef<HTMLDivElement | null>(null)
+  // The viewer's own stars (this browser) and the server's star totals; the filter only changes what the list shows.
+  const favoriteIds = useFavoriteIds()
+  const favoriteCounts = useFavoriteCounts()
+  const toggleFavorite = useToggleFavorite()
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
 
   const demoEntries = useMemo(() => getHlsDashDemo().map(demoToEntry), [])
   // A list with no streams is as good as no list: the page shows the demos instead of an empty box.
@@ -148,7 +155,11 @@ export default function HlsPage() {
   )
   const aboutEntry = useMemo(() => playingEntry ?? (source ? pastedEntry(source) : null), [playingEntry, source])
 
-  const afterSearch = useMemo(() => filterStreams(entries, { text, group: null }), [entries, text])
+  const starred = useMemo(() => entries.filter((entry) => favoriteIds.has(entry.id)), [entries, favoriteIds])
+  const afterSearch = useMemo(
+    () => filterStreams(favoritesOnly ? starred : entries, { text, group: null }),
+    [entries, starred, favoritesOnly, text],
+  )
   const counts = useMemo(() => groupCounts(afterSearch, groupNames.length), [afterSearch, groupNames.length])
   const shown = useMemo(() => filterStreams(afterSearch, { text: '', group }), [afterSearch, group])
 
@@ -160,8 +171,17 @@ export default function HlsPage() {
     [navigate, streamId],
   )
   const renderCard = useCallback(
-    (stream: StreamEntry, selected: boolean) => <StreamCard stream={stream} selected={selected} onSelect={choose} />,
-    [choose],
+    (stream: StreamEntry, selected: boolean) => (
+      <StreamCard
+        stream={stream}
+        selected={selected}
+        onSelect={choose}
+        favorite={favoriteIds.has(stream.id)}
+        favoriteCount={favoriteCounts[stream.id] ?? 0}
+        onToggleFavorite={toggleFavorite}
+      />
+    ),
+    [choose, favoriteIds, favoriteCounts, toggleFavorite],
   )
 
   // Links made while the paste box sent streams to this page (`/hls-dash?url=...`) still work: the custom path plays them.
@@ -187,7 +207,13 @@ export default function HlsPage() {
             <StreamNotFound streamId={streamId} hasUrl={searchParams.has('url')} />
           )}
         </div>
-        <AboutPanel stream={aboutEntry} groups={groupNames} />
+        <AboutPanel
+          stream={aboutEntry}
+          groups={groupNames}
+          favorite={aboutEntry !== null && favoriteIds.has(aboutEntry.id)}
+          favoriteCount={aboutEntry ? (favoriteCounts[aboutEntry.id] ?? 0) : 0}
+          onToggleFavorite={playingEntry ? toggleFavorite : undefined}
+        />
       </div>
 
       <section aria-labelledby="hls-list-heading" className="mt-8 flex flex-col gap-3">
@@ -216,6 +242,12 @@ export default function HlsPage() {
         ) : (
           <>
             <StreamSearch value={text} onChange={setText} />
+            <FavoritesFilter active={favoritesOnly} count={starred.length} onToggle={() => setFavoritesOnly((on) => !on)} />
+            {favoritesOnly && starred.length === 0 && (
+              <p role="status" className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                No favorites yet. Tap the heart on a stream to keep it here.
+              </p>
+            )}
             <GroupPills groups={groupNames} counts={counts} total={afterSearch.length} selected={group} onSelect={selectGroup} />
             <StreamGrid streams={shown} selectedId={playingEntry?.id ?? null} onSelect={choose} renderCard={renderCard} />
           </>

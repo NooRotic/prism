@@ -112,7 +112,7 @@ final class AdminScriptsTest extends DbTestCase
 
         [$code, $out] = $this->script('install.php', [], $config);
         $this->assertSame(0, $code);
-        $this->assertSame("applied 001_schema\napplied 002_admin\napplied 003_streams\napplied 004_checker\napplied 005_trusted_hosts\n", $out);
+        $this->assertSame("applied 001_schema\napplied 002_admin\napplied 003_streams\napplied 004_checker\napplied 005_trusted_hosts\napplied 006_stream_favorites\n", $out);
         $this->assertContains('channels', $this->tables());
         $this->assertContains('tt_gate', $this->tables());
 

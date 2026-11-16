@@ -330,3 +330,30 @@ describe('AboutPanel', () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe('AboutPanel and favorites', () => {
+  it('has no star button for a stream it was given nothing to star it with (a pasted address)', () => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} />)
+
+    expect(screen.queryByRole('button', { name: /favorites/i })).toBeNull()
+  })
+
+  it('stars the stream it describes', () => {
+    const onToggleFavorite = vi.fn()
+    render(<AboutPanel stream={stream()} groups={GROUPS} onToggleFavorite={onToggleFavorite} />)
+
+    const button = screen.getByRole('button', { name: 'Add to favorites' })
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(button)
+
+    expect(onToggleFavorite).toHaveBeenCalledWith('0123456789ab')
+  })
+
+  it('says when it is starred and how many visitors starred it', () => {
+    render(<AboutPanel stream={stream()} groups={GROUPS} favorite favoriteCount={7} onToggleFavorite={() => {}} />)
+
+    const button = screen.getByRole('button', { name: 'Remove from favorites' })
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByLabelText('7 stars')).toHaveTextContent('7')
+  })
+})

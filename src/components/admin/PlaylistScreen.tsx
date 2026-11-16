@@ -308,6 +308,7 @@ export default function PlaylistScreen() {
                     <th className="py-1 pr-3 font-normal">Country</th>
                     <th className="py-1 pr-3 font-normal">Groups</th>
                     <th className="py-1 pr-3 font-normal">Source</th>
+                    <th className="py-1 pr-3 text-right font-normal">Stars</th>
                     <th className="py-1 font-normal" />
                   </tr>
                 </thead>
@@ -316,7 +317,7 @@ export default function PlaylistScreen() {
                     <Fragment key={s.publicId}>
                       {editing?.publicId === s.publicId ? (
                         <tr>
-                          <td colSpan={6} className="py-2">
+                          <td colSpan={7} className="py-2">
                             <div className="flex flex-wrap items-center gap-2">
                               <input type="text" aria-label={`Name of ${s.name}`} value={editing.name} maxLength={200} onChange={(event) => setEditing({ ...editing, name: event.target.value })} className="min-w-0 flex-[2] rounded border px-2 py-1 text-sm" style={INPUT} />
                               <input type="text" aria-label={`Groups of ${s.name}`} value={editing.groups} maxLength={200} onChange={(event) => setEditing({ ...editing, groups: event.target.value })} className="min-w-0 flex-[2] rounded border px-2 py-1 text-sm" style={INPUT} />
@@ -351,6 +352,7 @@ export default function PlaylistScreen() {
                           <td className="py-1 pr-3">{s.country ? regionName(s.country) : '–'}</td>
                           <td className="py-1 pr-3">{s.groups.join(', ')}</td>
                           <td className="py-1 pr-3">{s.source}</td>
+                          <td className="py-1 pr-3 text-right font-mono">{s.favorites > 0 ? s.favorites : '–'}</td>
                           <td className="py-1 text-right whitespace-nowrap">
                             {s.state !== 'removed' && (
                               <span className="inline-flex flex-wrap justify-end gap-1">
@@ -382,7 +384,7 @@ export default function PlaylistScreen() {
                       )}
                       {previewed?.publicId === s.publicId && (
                         <tr>
-                          <td colSpan={6} className="pb-2">
+                          <td colSpan={7} className="pb-2">
                             <StreamPreview stream={s} onClose={() => setPreviewing(null)} />
                           </td>
                         </tr>

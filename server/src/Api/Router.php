@@ -9,6 +9,8 @@ use Prism\History\ChannelPayload;
 use Prism\History\Config;
 use Prism\History\Logger;
 use Prism\History\Store\ChannelStore;
+use Prism\History\Store\FavoriteStore;
+use Prism\History\Usage\FavoriteRecorder;
 use Prism\History\Usage\HitRecorder;
 use Prism\History\VisitResult;
 use Prism\History\VisitService;
@@ -36,6 +38,8 @@ final class Router
         private HitRecorder $hits,
         private AdminController $admin,
         private StreamsController $streams,
+        private FavoriteRecorder $favoriteRecorder,
+        private FavoriteStore $favorites,
     ) {
     }
 
@@ -78,6 +82,8 @@ final class Router
             '/api/channel' => $request->method === 'GET' ? $this->channel($request) : $this->notAllowed('GET, OPTIONS'),
             '/api/hit' => $request->method === 'POST' ? $this->hit($request) : $this->notAllowed('POST, OPTIONS'),
             '/api/streams' => $this->streams->handle($request), // answers its own 405: GET and OPTIONS only
+            '/api/favorite' => $request->method === 'POST' ? $this->favorite($request) : $this->notAllowed('POST, OPTIONS'),
+            '/api/favorites' => $request->method === 'GET' ? $this->favoriteCounts() : $this->notAllowed('GET, OPTIONS'),
             default => ApiResponse::json(404, ['error' => 'not_found'], self::NO_STORE),
         });
     }
@@ -119,6 +125,33 @@ final class Router
             HitRecorder::BAD_SECTION => ApiResponse::json(400, ['error' => 'bad_section'], self::NO_STORE),
             default => ApiResponse::json(429, ['error' => 'busy'], self::NO_STORE + ['Retry-After' => '60']),
         };
+    }
+
+    /** One star or un-star for a listed stream. JSON sent as plain text (no preflight); nothing about the sender is kept. */
+    private function favorite(Request $request): ApiResponse
+    {
+        if (strlen($request->body) > self::MAX_BODY_BYTES) {
+            return ApiResponse::json(413, ['error' => 'too_large'], self::NO_STORE);
+        }
+        $data = json_decode($request->body, true);
+        if (!is_array($data) || !isset($data['id']) || !is_string($data['id']) || !isset($data['on']) || !is_bool($data['on'])) {
+            return ApiResponse::json(400, ['error' => 'bad_request'], self::NO_STORE);
+        }
+
+        return match ($this->favoriteRecorder->record($data['id'], $data['on'])) {
+            FavoriteRecorder::OK => new ApiResponse(204, self::NO_STORE, ''),
+            FavoriteRecorder::BAD_ID => ApiResponse::json(400, ['error' => 'bad_id'], self::NO_STORE),
+            FavoriteRecorder::NOT_LISTED => ApiResponse::json(404, ['error' => 'not_found'], self::NO_STORE),
+            default => ApiResponse::json(429, ['error' => 'busy'], self::NO_STORE + ['Retry-After' => '60']),
+        };
+    }
+
+    /** The star counts above zero for the streams on the public list: {"v":1,"counts":{"<id>":n}}. Cached for a minute. */
+    private function favoriteCounts(): ApiResponse
+    {
+        $counts = $this->favorites->listedCounts();
+
+        return ApiResponse::json(200, ['v' => 1, 'counts' => (object) $counts], ['Cache-Control' => 'public, max-age=60']);
     }
 
     private function channel(Request $request): ApiResponse
