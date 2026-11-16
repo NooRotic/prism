@@ -22,8 +22,11 @@ use Throwable;
  */
 final class StreamStore
 {
-    /** The states a visitor may see. */
-    public const LISTED = ['new', 'working', 'suspect'];
+    /**
+     * The states a visitor may see. Verified only, for the launch: a stream is listed once a check has passed, and a
+     * stream not yet checked (new) or failing its latest check (suspect) is kept as a row but hidden.
+     */
+    public const LISTED = ['working'];
 
     /** Every state a stream can be in (the column's ENUM). */
     public const STATES = ['new', 'working', 'suspect', 'dead', 'removed', 'unplayable', 'held'];

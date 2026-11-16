@@ -86,23 +86,23 @@ final class StreamStoreTest extends DbTestCase
 
     public function testListedExcludesUnlistedStatesAndOrdersPinnedFirst(): void
     {
-        $this->store->insertIfNew($this->row('1', ['name' => 'banana']));
+        $this->store->insertIfNew($this->row('1', ['name' => 'banana', 'state' => 'working']));
         $this->store->insertIfNew($this->row('2', ['name' => 'Apple', 'state' => 'working']));
-        $this->store->insertIfNew($this->row('3', ['name' => 'cherry', 'state' => 'suspect']));
         $this->store->insertIfNew($this->row('4', ['name' => 'zebra', 'pinned' => 1, 'state' => 'working']));
-        $this->store->insertIfNew($this->row('5', ['name' => 'Yak', 'pinned' => 1]));
-        foreach (['dead', 'removed', 'unplayable', 'held'] as $i => $state) {
+        $this->store->insertIfNew($this->row('5', ['name' => 'Yak', 'pinned' => 1, 'state' => 'working']));
+        // Verified only: not yet checked (new) and failing its latest check (suspect) are kept but hidden, like the rest.
+        foreach (['new', 'suspect', 'dead', 'removed', 'unplayable', 'held'] as $i => $state) {
             $this->store->insertIfNew($this->row('x' . $i, ['name' => 'hidden ' . $state, 'state' => $state]));
         }
 
         $names = array_map(static fn (array $r): string => $r['name'], $this->store->listed());
 
-        $this->assertSame(['Yak', 'zebra', 'Apple', 'banana', 'cherry'], $names, 'pinned first, then by name ignoring case');
+        $this->assertSame(['Yak', 'zebra', 'Apple', 'banana'], $names, 'pinned first, then by name ignoring case; only verified streams');
     }
 
     public function testListedRowsCarryTheFieldsTheSnapshotNeeds(): void
     {
-        $this->store->insertIfNew($this->row('1', ['country' => 'us', 'pinned' => 1, 'is_default' => 1, 'logo_file' => 'abcdef012345.png']));
+        $this->store->insertIfNew($this->row('1', ['state' => 'working', 'country' => 'us', 'pinned' => 1, 'is_default' => 1, 'logo_file' => 'abcdef012345.png']));
 
         $r = $this->store->listed()[0];
 
@@ -124,7 +124,7 @@ final class StreamStoreTest extends DbTestCase
     public function testSetDefaultKeepsExactlyOne(): void
     {
         $a = $this->row('1', ['state' => 'working']);
-        $b = $this->row('2');
+        $b = $this->row('2', ['state' => 'working']);
         $gone = $this->row('3', ['state' => 'removed']);
         foreach ([$a, $b, $gone] as $r) {
             $this->store->insertIfNew($r);
@@ -148,7 +148,7 @@ final class StreamStoreTest extends DbTestCase
 
     public function testSetDefaultWorksInsideACallersTransaction(): void
     {
-        $a = $this->row('1');
+        $a = $this->row('1', ['state' => 'working']);
         $this->store->insertIfNew($a);
 
         $this->pdo->beginTransaction();
@@ -176,12 +176,14 @@ final class StreamStoreTest extends DbTestCase
 
     public function testLogoQueueSkipsDoneAndExhaustedRows(): void
     {
-        $this->store->insertIfNew($this->row('1', ['logo_url' => 'https://logos.test/1.png']));
-        $this->store->insertIfNew($this->row('2', ['logo_url' => 'https://logos.test/2.png', 'logo_file' => 'abcdef012345.png']));
-        $this->store->insertIfNew($this->row('3', ['logo_url' => 'https://logos.test/3.png', 'logo_tries' => 3]));
-        $this->store->insertIfNew($this->row('4'));
+        $this->store->insertIfNew($this->row('1', ['logo_url' => 'https://logos.test/1.png', 'state' => 'working']));
+        $this->store->insertIfNew($this->row('2', ['logo_url' => 'https://logos.test/2.png', 'logo_file' => 'abcdef012345.png', 'state' => 'working']));
+        $this->store->insertIfNew($this->row('3', ['logo_url' => 'https://logos.test/3.png', 'logo_tries' => 3, 'state' => 'working']));
+        $this->store->insertIfNew($this->row('4', ['state' => 'working']));
         $this->store->insertIfNew($this->row('5', ['logo_url' => 'https://logos.test/5.png', 'logo_tries' => 2, 'state' => 'working']));
         $this->store->insertIfNew($this->row('6', ['logo_url' => 'https://logos.test/6.png', 'state' => 'held']));
+        // Not yet verified, so not listed and not worth a logo fetch yet.
+        $this->store->insertIfNew($this->row('7', ['logo_url' => 'https://logos.test/7.png']));
 
         $queue = $this->store->withLogoToFetch(10);
 
@@ -192,7 +194,7 @@ final class StreamStoreTest extends DbTestCase
 
     public function testRecordLogoStoresAFileOrAddsATry(): void
     {
-        $row = $this->row('1', ['logo_url' => 'https://logos.test/1.png']);
+        $row = $this->row('1', ['logo_url' => 'https://logos.test/1.png', 'state' => 'working']);
         $this->store->insertIfNew($row);
 
         $this->store->recordLogo($row['id'], null);
@@ -232,7 +234,7 @@ final class StreamStoreTest extends DbTestCase
 
     public function testRowsComeBackWithPhpTypes(): void
     {
-        $this->store->insertIfNew($this->row('1', ['pinned' => 1]));
+        $this->store->insertIfNew($this->row('1', ['pinned' => 1, 'state' => 'working']));
 
         $r = $this->store->listed()[0];
 

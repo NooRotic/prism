@@ -266,11 +266,11 @@ M3U;
         $this->assertSame(0, $code, $err);
         $values = self::keyValues($out);
         $this->assertSame(['3', '5'], [$values['inserted'], $values['demos']]);
-        $this->assertStringContainsString("snapshot streams=7\n", $out, 'five demos and two listed streams (Alpha, Beta); the held one is not listed');
+        $this->assertStringContainsString("snapshot streams=5\n", $out, 'only the five demos (working) are listed; Alpha and Beta wait for a check, and the held one is not listed');
         $this->assertSame('8', (string) $this->pdo->query('SELECT COUNT(*) FROM streams')->fetchColumn());
         $this->assertSame(['first-run'], $this->pdo->query("SELECT DISTINCT source FROM streams WHERE source <> 'demo'")->fetchAll(PDO::FETCH_COLUMN));
         $snapshot = json_decode((string) file_get_contents($dir . '/data/streams.json'), true);
-        $this->assertCount(7, $snapshot['streams']);
+        $this->assertCount(5, $snapshot['streams']);
         $this->assertNotNull($snapshot['default']);
 
         [$code2, $out2] = $this->script('import-playlist.php', [$file], $config);
