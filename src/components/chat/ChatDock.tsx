@@ -342,14 +342,15 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
             {/* Chat */}
             <div
               data-testid="chat-panel"
-              className={`w-full md:flex-none rounded-lg overflow-hidden flex flex-col${
+              // Stacked below md the panel has no fixed height, so its minimum is what the chat gets:
+              // a tall one (60dvh) so the chat is usable, not a 300px strip.
+              className={`w-full md:flex-none min-h-[300px] max-md:min-h-[60dvh] rounded-lg overflow-hidden flex flex-col${
                 floating ? ` ${CHAT_FLOATING}` : ''
               }`}
               style={{
                 // Shrinkable: player% + the 8px handle + chat% is 8px over the row,
                 // which a full-window row would clip off-screen.
                 flex: `0 1 ${chatPercent}`,
-                minHeight: '300px',
                 backgroundColor: 'var(--bg-card)',
                 border: '1px solid var(--border)',
               }}
@@ -388,19 +389,23 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
                   Pop-up blocked. Allow pop-ups for this site to use the chat window.
                 </p>
               )}
-              <div className="flex-1 min-h-0">
-                {channel ? (
-                  <ScaledChat scale={chatScale.scale}>
-                    <ChatSource channel={channel} />
-                  </ScaledChat>
-                ) : (
-                  <div
-                    className="flex items-center justify-center w-full h-full"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    <span className="text-sm">No channel</span>
-                  </div>
-                )}
+              {/* The chat fills an absolutely placed box: a percentage height on the iframe would
+                  resolve to auto here (the panel has no fixed height) and shrink it to 150px. */}
+              <div className="relative flex-1 min-h-0">
+                <div className="absolute inset-0">
+                  {channel ? (
+                    <ScaledChat scale={chatScale.scale}>
+                      <ChatSource channel={channel} />
+                    </ScaledChat>
+                  ) : (
+                    <div
+                      className="flex items-center justify-center w-full h-full"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      <span className="text-sm">No channel</span>
+                    </div>
+                  )}
+                </div>
               </div>
               {/* Along the bottom edge, under the chat: drag down for a taller chat. Its slot is
                   `false` otherwise, so the chat above keeps its place and is not reloaded. */}
