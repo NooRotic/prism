@@ -97,6 +97,20 @@
   }
 }
 
+/* A window narrower than Tailwind's md breakpoint (a phone in portrait): the rail would take 56px
+   of a 390px screen, so it is hidden and the gutter it reserves is zeroed. The theme breakpoint, not
+   a pixel width, so it switches on with the md: classes of the stacked layout (see the fill-hide
+   rule above). !important because ChannelRail sets the two variables inline on :root. */
+@media (width < theme(--breakpoint-md)) {
+  .narrow-hide {
+    display: none !important;
+  }
+  :root {
+    --rail-reserve-left: 0px !important;
+    --rail-reserve-right: 0px !important;
+  }
+}
+
 /* A phone held sideways (or any window this short). The query repeats LANDSCAPE_PHONE_QUERY
    from components/chat/landscapePhone.ts, which a test pins to this file. The rail is hidden
    on every route, and the page-edge width it reserves is zeroed so a player page does not
