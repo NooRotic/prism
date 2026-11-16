@@ -14,11 +14,18 @@ on demand, and the follow rail out of the way.
 ## Goals
 
 - In landscape on a phone, the player page is the video filling the screen, nothing else.
-- The chat slides in and out beside the video on a tap (and a swipe on its handle).
+- The chat slides in and out beside the video on a tap on its handle; a swipe back toward the
+  edge also closes it. A swipe never opens it: the closed handle is flush against the screen
+  edge, where the Android and iOS back gesture starts (review finding, 2026-11-16).
 - The follow rail is hidden in that state.
 - Rotating back to portrait restores today's layout untouched.
 
 ## Non-goals / anti-goals
+
+- **Not covered: the offline-channel layout.** A signed-in viewer on a channel that is not
+  live gets `OfflineLayout`, not `ChatDock`, so this mode never runs there: rotating gives the
+  stacked layout (with the rail hidden by the global CSS rule). Extending it is its own design
+  decision; left for the owner (found in the final review, 2026-11-16).
 
 - No change to portrait, tablets, or desktop behaviour or to their saved settings.
 - Nothing is ever drawn over the video. Twitch pauses an embed that anything covers (the
