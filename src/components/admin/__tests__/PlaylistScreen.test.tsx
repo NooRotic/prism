@@ -119,7 +119,7 @@ describe('PlaylistScreen: reading', () => {
     renderScreen()
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading')
-    expect(api.getStreams).toHaveBeenCalledWith({ text: '', state: '', country: '' }, { limit: 50, offset: 0 }, expect.anything())
+    expect(api.getStreams).toHaveBeenCalledWith({ text: '', state: '', country: '', sort: 'name' }, { limit: 50, offset: 0 }, expect.anything())
   })
 
   it('lists each stream with its state, country, groups and source, and shows only the host of its address', async () => {
@@ -209,14 +209,14 @@ describe('PlaylistScreen: filters and pages', () => {
     expect(api.getStreams).not.toHaveBeenCalled()
     await act(async () => void vi.advanceTimersByTime(300))
     expect(api.getStreams).toHaveBeenCalledTimes(1)
-    expect(api.getStreams).toHaveBeenLastCalledWith({ text: 'beta', state: '', country: '' }, { limit: 50, offset: 0 }, expect.anything())
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: 'beta', state: '', country: '', sort: 'name' }, { limit: 50, offset: 0 }, expect.anything())
 
     fireEvent.change(screen.getByRole('combobox', { name: 'State' }), { target: { value: 'held' } })
-    expect(api.getStreams).toHaveBeenLastCalledWith({ text: 'beta', state: 'held', country: '' }, { limit: 50, offset: 0 }, expect.anything())
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: 'beta', state: 'held', country: '', sort: 'name' }, { limit: 50, offset: 0 }, expect.anything())
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Country' }), { target: { value: 'GB1' } })
     expect((screen.getByRole('textbox', { name: 'Country' }) as HTMLInputElement).value).toBe('gb')
-    expect(api.getStreams).toHaveBeenLastCalledWith({ text: 'beta', state: 'held', country: 'gb' }, { limit: 50, offset: 0 }, expect.anything())
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: 'beta', state: 'held', country: 'gb', sort: 'name' }, { limit: 50, offset: 0 }, expect.anything())
   })
 
   it('asks for a country only once it has two letters, so typing one letter never makes the server answer an error', async () => {
@@ -231,12 +231,24 @@ describe('PlaylistScreen: filters and pages', () => {
     expect(await table()).toBeInTheDocument()
 
     fireEvent.change(country, { target: { value: 'gb' } })
-    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: 'gb' }, { limit: 50, offset: 0 }, expect.anything())
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: 'gb', sort: 'name' }, { limit: 50, offset: 0 }, expect.anything())
 
     fireEvent.change(country, { target: { value: 'g' } })
-    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: '' }, { limit: 50, offset: 0 }, expect.anything())
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: '', sort: 'name' }, { limit: 50, offset: 0 }, expect.anything())
     expect(api.getStreams).not.toHaveBeenCalledWith(expect.objectContaining({ country: 'g' }), expect.anything(), expect.anything())
     expect((country as HTMLInputElement).value).toBe('g')
+  })
+
+  it('sorts by most stars on request and goes back to the first page when the sort changes', async () => {
+    renderScreen()
+    await table()
+    api.getStreams.mockClear()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), { target: { value: 'stars' } })
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: '', sort: 'stars' }, { limit: 50, offset: 0 }, expect.anything())
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), { target: { value: 'name' } })
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: '', sort: 'name' }, { limit: 50, offset: 0 }, expect.anything())
   })
 
   it('offers every state to filter by', async () => {
@@ -257,15 +269,15 @@ describe('PlaylistScreen: filters and pages', () => {
     expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'Next page' }))
-    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: '' }, { limit: 50, offset: 50 }, expect.anything())
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: '', sort: 'name' }, { limit: 50, offset: 50 }, expect.anything())
     api.getStreams.mockResolvedValue(page([BETA], { total: 120, offset: 50 }))
     await user.click(screen.getByRole('button', { name: 'Next page' }))
-    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: '' }, { limit: 50, offset: 100 }, expect.anything())
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: '', country: '', sort: 'name' }, { limit: 50, offset: 100 }, expect.anything())
     await screen.findByText(/Showing 101–101 of 120 streams/)
     expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled()
 
     fireEvent.change(screen.getByRole('combobox', { name: 'State' }), { target: { value: 'new' } })
-    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: 'new', country: '' }, { limit: 50, offset: 0 }, expect.anything())
+    expect(api.getStreams).toHaveBeenLastCalledWith({ text: '', state: 'new', country: '', sort: 'name' }, { limit: 50, offset: 0 }, expect.anything())
   })
 })
 

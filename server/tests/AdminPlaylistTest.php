@@ -210,9 +210,28 @@ final class AdminPlaylistTest extends DbTestCase
         $this->assertEqualsCanonicalizing([$starred => 3, $quiet => 0, $hidden => 1], $byId);
     }
 
+    public function testListCanBeSortedByStars(): void
+    {
+        $this->stream('Alpha News', ['state' => 'working', 'pinned' => 1]);
+        $some = $this->stream('Beta Sports', ['state' => 'working']);
+        $most = $this->stream('Gamma', ['state' => 'dead']); // hidden streams sort by stars too
+        $this->stream('Delta', ['state' => 'working']);
+        $favorites = new \Prism\History\Store\FavoriteStore($this->pdo, $this->clock);
+        $favorites->add($most);
+        $favorites->add($most);
+        $favorites->add($some);
+
+        $this->assertSame(['Gamma', 'Beta Sports', 'Alpha News', 'Delta'], $this->listed(['sort' => 'stars']), 'most stars first; ties by name, pinned does not matter');
+        $this->assertSame(['Alpha News', 'Beta Sports', 'Delta', 'Gamma'], $this->listed(['sort' => 'name']));
+        $this->assertSame(['Alpha News', 'Beta Sports', 'Delta', 'Gamma'], $this->listed([]), 'no sort is the visitor order');
+        $this->assertSame(['Beta Sports'], $this->listed(['sort' => 'stars', 'limit' => '1', 'offset' => '1']), 'it pages');
+        $this->assertSame(['Gamma'], $this->listed(['sort' => 'stars', 'state' => 'dead']), 'it combines with the filters');
+    }
+
     public function testListQueryMustBeValid(): void
     {
         $bad = [
+            ['sort' => 'newest'],
             ['text' => str_repeat('a', 101)], ['state' => 'bogus'], ['country' => 'USA'], ['country' => 'u'], ['group' => str_repeat('g', 41)],
             ['limit' => '0'], ['limit' => '201'], ['limit' => 'abc'], ['offset' => '-1'], ['offset' => 'abc'], ['limit' => '1.5'], ['text' => "bad\x00text"],
         ];

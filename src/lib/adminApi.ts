@@ -371,6 +371,8 @@ export interface StreamFilters {
   state: StreamState | ''
   /** A lower-case two-letter flag code, or ''. */
   country: string
+  /** `stars` lists the most-starred streams first; absent or `name` is the visitor order. */
+  sort?: 'name' | 'stars'
 }
 
 const parseStreams = (json: unknown): AdminStreams => {
@@ -412,6 +414,7 @@ export const getStreams = (filters: StreamFilters, page: { limit: number; offset
   if (filters.text) query.set('text', filters.text)
   if (filters.state) query.set('state', filters.state)
   if (filters.country) query.set('country', filters.country)
+  if (filters.sort === 'stars') query.set('sort', 'stars')
   query.set('limit', String(page.limit))
   query.set('offset', String(page.offset))
   return read(`/api/admin/streams?${query.toString()}`, parseStreams, signal)
