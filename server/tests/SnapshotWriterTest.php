@@ -50,7 +50,7 @@ final class SnapshotWriterTest extends DbTestCase
         $id = StreamUrl::id($url);
         $this->store->insertIfNew(array_merge([
             'id' => $id, 'public_id' => StreamUrl::publicId($id), 'url' => $url, 'name' => $name,
-            'groups_json' => '["News"]', 'kind' => 'hls', 'state' => 'new', 'source' => 'test',
+            'groups_json' => '["News"]', 'kind' => 'hls', 'state' => 'working', 'source' => 'test',
         ], $extra));
 
         return StreamUrl::publicId($id);
@@ -83,26 +83,24 @@ final class SnapshotWriterTest extends DbTestCase
             $s['streams'][0],
         );
         $this->assertSame(['i', 'n', 'g', 'c', 'l', 'k', 'p', 's', 'u'], array_keys($s['streams'][1]));
-        $this->assertSame([null, null, 'dash', 0, 'new'], [$s['streams'][1]['c'], $s['streams'][1]['l'], $s['streams'][1]['k'], $s['streams'][1]['p'], $s['streams'][1]['s']]);
-        $this->assertSame(2, $result['streams']);
+        $this->assertSame([null, null, 'dash', 0, 'working'], [$s['streams'][1]['c'], $s['streams'][1]['l'], $s['streams'][1]['k'], $s['streams'][1]['p'], $s['streams'][1]['s']]);        $this->assertSame(2, $result['streams']);
         $this->assertSame(filesize($this->dir . '/streams.json'), $result['bytes']);
         $this->assertSame(filesize($this->dir . '/streams.json.gz'), $result['gzipped']);
     }
 
     public function testOnlyListedStatesAreIncluded(): void
     {
-        $this->add('1', 'new one');
         $this->add('2', 'working one', ['state' => 'working']);
-        $this->add('3', 'suspect one', ['state' => 'suspect']);
-        foreach (['held', 'unplayable', 'dead', 'removed'] as $i => $state) {
+        // Verified only: a stream not yet checked, or failing its latest check, is hidden like the other states.
+        foreach (['new', 'suspect', 'held', 'unplayable', 'dead', 'removed'] as $i => $state) {
             $this->add('x' . $i, 'hidden ' . $state, ['state' => $state]);
         }
 
-        $this->assertSame(3, $this->writer()->write()['streams']);
+        $this->assertSame(1, $this->writer()->write()['streams']);
 
         $names = array_column($this->snapshot()['streams'], 'n');
-        $this->assertEqualsCanonicalizing(['new one', 'working one', 'suspect one'], $names);
-        $this->assertSame([], array_diff(array_column($this->snapshot()['streams'], 's'), ['new', 'working', 'suspect']));
+        $this->assertSame(['working one'], $names);
+        $this->assertSame(['working'], array_column($this->snapshot()['streams'], 's'));
     }
 
     public function testPinnedFirstThenNameIgnoringCase(): void

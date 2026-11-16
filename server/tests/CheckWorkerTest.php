@@ -186,7 +186,7 @@ final class CheckWorkerTest extends DbTestCase
         $this->assertSame(['working', null], [$this->raw($deadGood)['state'], $this->raw($deadGood)['state_reason']]);
         $names = array_map(static fn (array $s): string => $s['n'], json_decode((string) file_get_contents($this->snapshotFile()), true)['streams']);
         sort($names);
-        $this->assertSame(['Stream 1', 'Stream 3', 'Stream 4'], $names, 'working, suspect and the recovered stream are listed; the dead one is not');
+        $this->assertSame(['Stream 1', 'Stream 4'], $names, 'verified only: the new stream that passed and the recovered one are listed; the suspect and the dead one are not');
     }
 
     public function testTheSnapshotIsNotRewrittenWhenNoStreamChangedBetweenListedAndHidden(): void

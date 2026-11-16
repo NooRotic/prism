@@ -248,7 +248,7 @@ final class AdminPlaylistTest extends DbTestCase
         $body = $this->json($response);
         $this->assertTrue($body['ok']);
         $this->assertTrue($body['snapshot']);
-        $this->assertSame(['new', null], [$body['state'], $body['state_reason']], 'a normal address is listed, as unchecked');
+        $this->assertSame(['new', null], [$body['state'], $body['state_reason']], 'a normal address is kept as unchecked, and listed once a check has passed');
         $this->assertSame(StreamUrl::publicId(StreamUrl::id('https://example.com/Live/A.m3u8')), $body['public_id']);
 
         $row = $this->row($body['public_id']);
@@ -258,7 +258,7 @@ final class AdminPlaylistTest extends DbTestCase
         $audit = $this->audit();
         $this->assertSame(['stream.add', '<b>My stream</b>', 'public_id=' . $body['public_id']], [$audit['action'], $audit['target'], $audit['detail']]);
         $this->assertSame(1, $this->rows('admin_audit'));
-        $this->assertSame(['<b>My stream</b>'], array_column($this->snapshot()['streams'], 'n'), 'the visitor list has it at once');
+        $this->assertSame([], array_column($this->snapshot()['streams'], 'n'), 'verified only: the visitor list has it once a check has passed, not at once');
     }
 
     public function testAddKnownAddressIsAlreadyKnown(): void
