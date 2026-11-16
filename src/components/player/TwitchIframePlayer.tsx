@@ -74,8 +74,7 @@ export default function TwitchIframePlayer({
       ref={iframeRef}
       src={embedUrl}
       title="Twitch Player"
-      className="w-full h-full border-0"
-      style={{ minHeight: 300 }}
+      className="w-full h-full border-0 min-h-[300px] max-md:pointer-coarse:min-h-0"
       allowFullScreen
       allow="autoplay; encrypted-media; fullscreen"
       onLoad={handleLoad}
