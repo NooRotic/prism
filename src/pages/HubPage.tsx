@@ -2,6 +2,7 @@ import { PrismMark } from '../components/brand/PrismMark'
 import { SmartUrlInput } from '../components/search/SmartUrlInput'
 import { ProtocolCard } from '../components/grid/ProtocolCard'
 import { FavoritesCard } from '../components/grid/FavoritesCard'
+import { CountedNote } from '../components/ui/CountedNote'
 import { getDemoByProtocol, getHlsDashDemo } from '../config/demoContent'
 
 export default function HubPage() {
@@ -73,6 +74,8 @@ export default function HubPage() {
         <span style={{ color: 'var(--accent-hls)' }}>HLS/DASH</span> URL to play instantly.
         Connect Twitch for full channel exploration.
       </p>
+
+      <CountedNote />
     </div>
   )
 }

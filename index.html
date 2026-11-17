@@ -36,6 +36,31 @@
         }
       }(window.location))
     </script>
+    <!-- Matomo -->
+    <script>
+      // Visit counting with the owner's own Matomo (stats.pollardjr.com, site 4): no cookies, and only on the address in the list,
+      // so a local build or any other host does nothing. A visitor who sends Do Not Track or Global Privacy Control is not counted
+      // and no request is made. It adds the class "counted" to <html>, which shows the one-line note (.counted-note in index.css).
+      // Tests: src/lib/__tests__/matomoBlock.test.ts.
+      (function () {
+        var sites = { 'prism.nooroticx.tv': '4' };
+        if (!Object.prototype.hasOwnProperty.call(sites, location.hostname)) return;
+        var dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+        if (dnt === '1' || dnt === 'yes' || navigator.globalPrivacyControl === true) return;
+        document.documentElement.classList.add('counted');
+        var _paq = window._paq = window._paq || [];
+        _paq.push(['disableCookies']);
+        _paq.push(['setDoNotTrack', true]);
+        _paq.push(['trackPageView']);
+        _paq.push(['enableLinkTracking']);
+        var u = 'https://stats.pollardjr.com/';
+        _paq.push(['setTrackerUrl', u + 'matomo.php']);
+        _paq.push(['setSiteId', sites[location.hostname]]);
+        var d = document, g = d.createElement('script'), s = d.getElementsByTagName('script')[0];
+        g.async = true; g.src = u + 'matomo.js'; s.parentNode.insertBefore(g, s);
+      })();
+    </script>
+    <!-- End Matomo -->
   </head>
   <body>
     <div id="root"></div>
