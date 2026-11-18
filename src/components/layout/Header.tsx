@@ -74,7 +74,10 @@ export function Header() {
       <div
         data-header-bar
         data-section={current ?? 'none'}
-        className="relative flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:px-6"
+        // One row at every width: below 640 px the gaps tighten, the wordmark hides and the mark shrinks (measured
+        // 2026-11-18: 491 px of content at 360 px before that). If it still does not fit, the tab strip scrolls inside
+        // itself; the page never scrolls sideways.
+        className="relative flex min-h-14 flex-nowrap items-center gap-x-1 px-3 py-2 max-[359px]:px-2 sm:gap-x-3 sm:px-6"
         // The current section's colour along the bottom of the bar says there is more underneath.
         style={{ boxShadow: `inset 0 -2px 0 ${currentColor}` }}
       >
@@ -83,19 +86,19 @@ export function Header() {
           aria-label="Return to home"
           className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80"
         >
-          <PrismMark variant="icon" hover className="h-8 w-16 shrink-0" />
+          <PrismMark variant="icon" hover className="h-5 w-10 shrink-0 sm:h-8 sm:w-16" />
           <h1
-            // Up to 800 px the open paste box needs the wordmark's room.
-            className={`font-heading text-lg select-none ${pasteOpen ? 'max-[800px]:hidden' : ''}`}
+            // Only the mark below 640 px; up to 800 px the open paste box needs the wordmark's room too.
+            className={`hidden font-heading text-lg select-none sm:inline ${pasteOpen ? 'max-[800px]:hidden' : ''}`}
             style={{ color: 'var(--accent-green)', letterSpacing: '0.15em' }}
           >
             PRISM
           </h1>
         </Link>
         <SectionTabs current={current} row={row} onPress={pressRow} />
-        <div className="flex-1" />
+        <div className="min-w-0 flex-1" />
 
-      <div data-header-actions className="flex items-center gap-3">
+      <div data-header-actions className="flex shrink-0 items-center gap-1 sm:gap-3">
         {showHeaderInput && (
           <PasteToggle
             open={pasteOpen}
