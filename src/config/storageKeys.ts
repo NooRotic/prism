@@ -25,6 +25,14 @@ export const STORAGE_KEYS = {
   LOCAL_INTROS_SEEN: 'prism_intros_seen',
   /** Prefix for per-category YouTube cache entries (e.g. prism_yt_cache_popular). */
   LOCAL_YOUTUBE_CACHE_PREFIX: 'prism_yt_cache_',
+  /** Catch up: the owner's imported YouTube subscriptions (JSON array of `{ id, title }`). */
+  LOCAL_CATCHUP_SUBSCRIPTIONS: 'prism_catchup_subscriptions',
+  /** Catch up: Watch Later video ids the owner pasted (JSON array of strings). */
+  LOCAL_CATCHUP_WATCH_LATER: 'prism_catchup_watch_later',
+  /** Catch up: video ids watched in PRISM, newest first, used as Mix seeds (JSON array, max 10). */
+  LOCAL_CATCHUP_WATCHED: 'prism_catchup_watched',
+  /** Catch up: the subscription lane, cached for 30 minutes (JSON `{ at, videos }`). */
+  LOCAL_CATCHUP_LANE_CACHE: 'prism_catchup_lane_s',
   /** Channel rail edge: 'left' or 'right'. */
   LOCAL_RAIL_POSITION: 'prism_rail_position',
   /** Chat dock state: JSON `{ side: 'left' | 'right', hidden: boolean }`. */
