@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "PRISM helper",
+  "version": "0.1.0",
+  "description": "Sends your Twitch recommended channels and your YouTube Watch Later list from the page you are signed in to, into PRISM.",
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.twitch.tv/*", "https://www.youtube.com/playlist*"],
+      "js": ["handoff.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import ProtocolPage from '../ProtocolPage'
 import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import { clearRecommended, setRecommended } from '../../lib/recommendedStore'
 
 vi.mock('../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../hooks/useTwitchAuth', () => ({ useTwitchAuth: vi.fn() }))
@@ -82,4 +83,25 @@ describe('ProtocolPage on the Twitch protocol', () => {
 
   // The HLS / DASH page is HlsPage now, not a ProtocolPage: its "no connect card, no Twitch dashboard" case moved to
   // HlsPage.test.tsx ("is not the Twitch page").
+})
+
+describe('ProtocolPage: Twitch recommended row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearRecommended()
+  })
+
+  it('shows the imported recommended channels on the Twitch page', () => {
+    setRecommended(['ogre_jpg'])
+    setAuth({ signedIn: false })
+    renderPage('twitch')
+    expect(screen.getByRole('link', { name: 'ogre_jpg' })).toBeInTheDocument()
+  })
+
+  it('shows no recommended row on the YouTube page', () => {
+    setRecommended(['ogre_jpg'])
+    setAuth({ signedIn: false })
+    renderPage('youtube')
+    expect(screen.queryByRole('link', { name: 'ogre_jpg' })).not.toBeInTheDocument()
+  })
 })

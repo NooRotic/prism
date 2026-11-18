@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { useState } from 'react'
 import { DemoGrid } from '../components/grid/DemoGrid'
 import { YouTubeGrid } from '../components/grid/YouTubeGrid'
+import RecommendedRow from '../components/channel/RecommendedRow'
 import { SmartUrlInput } from '../components/search/SmartUrlInput'
 import SignedOutCard from '../components/dashboard/SignedOutCard'
 import TwitchDashboard from '../components/dashboard/TwitchDashboard'
@@ -221,6 +222,8 @@ export default function ProtocolPage({ protocol }: ProtocolPageProps) {
             </Link>
           )}
         </div>
+
+        {protocol === 'twitch' && <RecommendedRow />}
 
         {/* Content — YouTube uses live API data, a signed-in Twitch viewer gets their
             dashboard, and everything else uses static demo entries (a signed-out
