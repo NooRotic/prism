@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  getAccount,
   getSubscriptions,
   getWatchedSeeds,
   getWatchLater,
   readSLaneCache,
   recordWatched,
+  setAccount,
   setSubscriptions,
   setWatchLater,
   writeSLaneCache,
@@ -69,5 +71,20 @@ describe('recordWatched only remembers real video ids', () => {
     expect(getWatchedSeeds(5)).toEqual([])
     recordWatched('dQw4w9WgXcQ')
     expect(getWatchedSeeds(5)).toEqual(['dQw4w9WgXcQ'])
+  })
+})
+
+describe('import account record', () => {
+  it('round-trips which account the subscriptions came from', () => {
+    expect(getAccount()).toBeNull()
+    setAccount({ title: 'NooRotic', thumbnailUrl: 'https://img/d.jpg', importedAt: 1700000000000 })
+    expect(getAccount()).toEqual({ title: 'NooRotic', thumbnailUrl: 'https://img/d.jpg', importedAt: 1700000000000 })
+  })
+
+  it('treats a damaged record as no record', () => {
+    localStorage.setItem('prism_catchup_account', '{"title":5}')
+    expect(getAccount()).toBeNull()
+    localStorage.setItem('prism_catchup_account', 'nope')
+    expect(getAccount()).toBeNull()
   })
 })

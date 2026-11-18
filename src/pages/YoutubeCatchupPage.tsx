@@ -30,6 +30,11 @@ export default function YoutubeCatchupPage() {
         <p className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
           {catchup.subscriptionCount} subscriptions, {catchup.watchLaterCount} Watch Later videos
         </p>
+        {catchup.account && (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {`Subscriptions ${catchup.account.title ? `from ${catchup.account.title}, ` : ''}imported ${new Date(catchup.account.importedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

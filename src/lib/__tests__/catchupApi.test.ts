@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { CatchupApiError, describeVideos, fetchSubscriptionLane, listSubscriptions } from '../catchupApi'
+import { CatchupApiError, describeVideos, fetchSubscriptionLane, getMyChannel, listSubscriptions } from '../catchupApi'
 import { readSLaneCache, writeSLaneCache } from '../catchupStore'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
@@ -173,5 +173,23 @@ describe('fetchSubscriptionLane when forced', () => {
     const lane = await fetchSubscriptionLane([{ id: ch(0), title: 'c0' }], { force: true })
     expect(fetchMock).toHaveBeenCalled()
     expect(lane.map((v) => v.id)).toEqual(['fresh000000'])
+  })
+})
+
+describe('getMyChannel', () => {
+  it("reads the signed-in owner's channel title and picture with the bearer token", async () => {
+    fetchMock.mockResolvedValueOnce(
+      json({ items: [{ snippet: { title: 'NooRotic', thumbnails: { default: { url: 'https://img/d.jpg' }, medium: { url: 'https://img/m.jpg' } } } }] }),
+    )
+    expect(await getMyChannel('tok')).toEqual({ title: 'NooRotic', thumbnailUrl: 'https://img/d.jpg' })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(urlOf(url)).toContain('channels?')
+    expect(urlOf(url)).toContain('mine=true')
+    expect(init).toMatchObject({ headers: { Authorization: 'Bearer tok' } })
+  })
+
+  it('returns null when the account has no channel', async () => {
+    fetchMock.mockResolvedValueOnce(json({ items: [] }))
+    expect(await getMyChannel('tok')).toBeNull()
   })
 })

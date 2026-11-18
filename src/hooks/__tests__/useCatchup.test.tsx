@@ -1,14 +1,14 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { CatchupVideo } from '../../lib/catchup'
-import { setSubscriptions, getSubscriptions, getWatchLater, setWatchLater, recordWatched } from '../../lib/catchupStore'
-import { CatchupApiError, describeVideos, fetchSubscriptionLane, listSubscriptions } from '../../lib/catchupApi'
+import { setSubscriptions, getSubscriptions, getWatchLater, setWatchLater, recordWatched, getAccount } from '../../lib/catchupStore'
+import { CatchupApiError, describeVideos, fetchSubscriptionLane, getMyChannel, listSubscriptions } from '../../lib/catchupApi'
 import { fetchRelatedLane } from '../../lib/mixRelated'
 import { GoogleAuthError, requestYoutubeReadToken } from '../../lib/googleYoutubeAuth'
 import { useCatchup } from '../useCatchup'
 
 vi.mock('../../lib/catchupApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/catchupApi')>()
-  return { ...actual, fetchSubscriptionLane: vi.fn(), describeVideos: vi.fn(), listSubscriptions: vi.fn() }
+  return { ...actual, fetchSubscriptionLane: vi.fn(), describeVideos: vi.fn(), listSubscriptions: vi.fn(), getMyChannel: vi.fn() }
 })
 vi.mock('../../lib/mixRelated', () => ({ fetchRelatedLane: vi.fn() }))
 vi.mock('../../lib/googleYoutubeAuth', async (importOriginal) => {
@@ -233,5 +233,48 @@ describe('useCatchup: import in progress', () => {
       await first
     })
     expect(result.current.importing).toBe(false)
+  })
+})
+
+describe('useCatchup: which account the import came from', () => {
+  it('records the channel name, picture and time during the same import', async () => {
+    vi.mocked(requestYoutubeReadToken).mockResolvedValue('tok')
+    vi.mocked(listSubscriptions).mockResolvedValue([{ id: 'UCnew', title: 'New' }])
+    vi.mocked(getMyChannel).mockResolvedValue({ title: 'NooRotic', thumbnailUrl: 'https://img/d.jpg' })
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.account).toBeNull()
+    await act(async () => {
+      await result.current.importSubscriptions()
+    })
+    expect(vi.mocked(getMyChannel)).toHaveBeenCalledWith('tok')
+    expect(result.current.account).toMatchObject({ title: 'NooRotic', thumbnailUrl: 'https://img/d.jpg' })
+    expect(getAccount()).toMatchObject({ title: 'NooRotic' })
+    expect(typeof getAccount()!.importedAt).toBe('number')
+  })
+
+  it('still imports the subscriptions when the channel lookup fails', async () => {
+    vi.mocked(requestYoutubeReadToken).mockResolvedValue('tok')
+    vi.mocked(listSubscriptions).mockResolvedValue([{ id: 'UCnew', title: 'New' }])
+    vi.mocked(getMyChannel).mockRejectedValue(new Error('boom'))
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await act(async () => {
+      await result.current.importSubscriptions()
+    })
+    expect(getSubscriptions()).toEqual([{ id: 'UCnew', title: 'New' }])
+    expect(result.current.account).toMatchObject({ title: '' })
+  })
+
+  it('keeps the old record when the sign-in is declined', async () => {
+    localStorage.setItem('prism_catchup_account', JSON.stringify({ title: 'Old', thumbnailUrl: '', importedAt: 5 }))
+    vi.mocked(requestYoutubeReadToken).mockRejectedValue(new GoogleAuthError('closed', 'closed'))
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await act(async () => {
+      await result.current.importSubscriptions()
+    })
+    expect(getAccount()).toEqual({ title: 'Old', thumbnailUrl: '', importedAt: 5 })
+    expect(result.current.account).toMatchObject({ title: 'Old' })
   })
 })
