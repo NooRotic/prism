@@ -81,7 +81,8 @@ export function useCatchup(): CatchupState {
     await Promise.all([
       land('S', subs.length ? fetchSubscriptionLane(subs) : Promise.resolve([])),
       land('W', later.length ? describeVideos(later) : Promise.resolve([])),
-      land('R', seeds.length ? fetchRelatedLane(seeds) : Promise.resolve([]), GENERIC.R),
+      // Only complain about an empty related lane when there were recent videos to look it up from.
+      land('R', seeds.length ? fetchRelatedLane(seeds) : Promise.resolve([]), seeds.length ? GENERIC.R : undefined),
     ])
     if (mine === run.current) setStatus('ready')
   }, [])
