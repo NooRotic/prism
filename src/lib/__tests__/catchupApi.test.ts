@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { CatchupApiError, describeVideos, fetchSubscriptionLane, listSubscriptions } from '../catchupApi'
-import { writeSLaneCache } from '../catchupStore'
+import { readSLaneCache, writeSLaneCache } from '../catchupStore'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 const ch = (n: number) => `UC${String(n).padStart(22, '0')}`
@@ -102,5 +102,62 @@ describe('fetchSubscriptionLane', () => {
     route({ [`UU${'0'.repeat(21)}0`]: () => json({ error: { errors: [{ reason: 'quotaExceeded' }] } }, 403) })
     await expect(fetchSubscriptionLane(channels)).rejects.toMatchObject({ name: 'CatchupApiError', status: 403 })
     await expect(fetchSubscriptionLane(channels)).rejects.toBeInstanceOf(CatchupApiError)
+  })
+})
+
+describe('fetchSubscriptionLane failures that are not "this channel is gone"', () => {
+  const channels = [0, 1, 2].map((n) => ({ id: ch(n), title: `c${n}` }))
+  const ok = (list: string) => json({ items: [{ contentDetails: { videoId: `vid-${list.slice(-2)}` } }] })
+
+  function routeWith(playlist: (list: string) => Response) {
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const u = new URL(urlOf(input))
+      if (u.pathname.endsWith('/playlistItems')) return playlist(u.searchParams.get('playlistId')!)
+      return json({ items: u.searchParams.get('id')!.split(',').map((id) => videoItem(id)) })
+    })
+  }
+
+  it('throws, and caches nothing, when every channel fails with a server error', async () => {
+    routeWith(() => json({ error: { errors: [{ reason: 'backendError' }] } }, 500))
+    await expect(fetchSubscriptionLane(channels)).rejects.toBeInstanceOf(CatchupApiError)
+    expect(readSLaneCache()).toBeNull()
+  })
+
+  it('throws a "noKey" error when the API key is missing', async () => {
+    vi.stubEnv('VITE_YOUTUBE_API_KEY', '')
+    await expect(fetchSubscriptionLane(channels)).rejects.toMatchObject({ reason: 'noKey' })
+    expect(readSLaneCache()).toBeNull()
+  })
+
+  it('throws when the network is down (fetch rejects)', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    await expect(fetchSubscriptionLane(channels)).rejects.toBeDefined()
+    expect(readSLaneCache()).toBeNull()
+  })
+
+  it('returns what it got but does not cache the lane when only some channels failed', async () => {
+    routeWith((list) => (list.endsWith('01') ? json({}, 500) : ok(list)))
+    const lane = await fetchSubscriptionLane(channels)
+    expect(lane).toHaveLength(2)
+    expect(readSLaneCache()).toBeNull()
+  })
+})
+
+describe('describeVideos keeps unplayable videos out', () => {
+  const item = (id: string, snippet: Record<string, unknown>, contentDetails: Record<string, unknown> = {}) => ({
+    id,
+    snippet: { title: id, channelTitle: 'c', publishedAt: '2026-01-01T00:00:00Z', thumbnails: {}, ...snippet },
+    contentDetails: { duration: 'PT1M', ...contentDetails },
+    status: { embeddable: true },
+  })
+
+  it('drops a scheduled premiere (it has a length, but is not playable yet)', async () => {
+    fetchMock.mockResolvedValue(json({ items: [item('premiere0001', { liveBroadcastContent: 'upcoming' }), item('normalvideo1', { liveBroadcastContent: 'none' })] }))
+    expect((await describeVideos(['premiere0001', 'normalvideo1'])).map((v) => v.id)).toEqual(['normalvideo1'])
+  })
+
+  it('drops an age-restricted video (the embed refuses it)', async () => {
+    fetchMock.mockResolvedValue(json({ items: [item('agerestrict1', {}, { contentRating: { ytRating: 'ytAgeRestricted' } }), item('normalvideo1', {})] }))
+    expect((await describeVideos(['agerestrict1', 'normalvideo1'])).map((v) => v.id)).toEqual(['normalvideo1'])
   })
 })

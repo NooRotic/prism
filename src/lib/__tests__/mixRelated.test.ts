@@ -95,3 +95,12 @@ describe('fetchRelatedLane', () => {
     expect(cued).toEqual([])
   })
 })
+
+describe('fetchMixIds when the IFrame API never finishes loading', () => {
+  it('gives up with [] inside the same time budget instead of waiting forever', async () => {
+    delete (window as unknown as { YT?: unknown }).YT
+    const p = fetchMixIds('seedvideo01', 3000)
+    await vi.advanceTimersByTimeAsync(3100)
+    expect(await p).toEqual([])
+  })
+})

@@ -64,6 +64,9 @@ export async function describeVideos(ids: string[]): Promise<CatchupVideo[]> {
       const durationSec = parseDuration(it.contentDetails?.duration ?? '')
       // Not embeddable, or live/upcoming (no length yet): it cannot be played from the queue.
       if (it.status?.embeddable === false || durationSec === 0) continue
+      // A scheduled premiere has a length but is not playable yet; an age-restricted video refuses to play in an embed.
+      const live = it.snippet?.liveBroadcastContent
+      if ((live && live !== 'none') || it.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted') continue
       found.set(it.id, {
         id: it.id,
         title: it.snippet.title,
@@ -105,22 +108,28 @@ export async function fetchSubscriptionLane(
   const perChannel = opts.perChannel ?? 5
   const cap = opts.cap ?? 100
 
-  const perList = await pool(channels, POOL_SIZE, async (c) => {
+  // A channel that is gone (no uploads playlist, 404) is skipped. Any other failure is remembered: if every
+  // channel failed the lane throws (an empty lane would hide a missing key or a dead network), and a lane built
+  // while some channels failed is returned but not cached, so the next refresh tries them again.
+  const perList = await pool(channels, POOL_SIZE, async (c): Promise<{ ids: string[]; failure?: unknown }> => {
     const list = uploadsPlaylistId(c.id)
-    if (!list) return [] as string[]
+    if (!list) return { ids: [] }
     try {
       const data = await call('playlistItems', { part: 'contentDetails', playlistId: list, maxResults: String(perChannel) })
-      return (data.items ?? []).map((i: { contentDetails: { videoId: string } }) => i.contentDetails.videoId) as string[]
+      return { ids: (data.items ?? []).map((i: { contentDetails: { videoId: string } }) => i.contentDetails.videoId) }
     } catch (err) {
       if (err instanceof CatchupApiError && err.status === 403 && err.reason === 'quotaExceeded') throw err
-      return []
+      if (err instanceof CatchupApiError && err.status === 404) return { ids: [] }
+      return { ids: [], failure: err }
     }
   })
+  const failures = perList.filter((r) => r.failure !== undefined)
+  if (failures.length > 0 && failures.length === channels.length) throw failures[0].failure
 
-  const ids = [...new Set(perList.flat())]
+  const ids = [...new Set(perList.flatMap((r) => r.ids))]
   const videos = (await describeVideos(ids))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, cap)
-  writeSLaneCache(videos)
+  if (failures.length === 0) writeSLaneCache(videos)
   return videos
 }

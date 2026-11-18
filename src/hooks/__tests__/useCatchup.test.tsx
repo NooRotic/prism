@@ -112,3 +112,34 @@ describe('useCatchup', () => {
     expect(result.current.queue.map((v) => v.id)).toEqual(['aaaaaaaaaaa'])
   })
 })
+
+describe('useCatchup: a slow lane does not hold the others back', () => {
+  it('shows the subscription videos while the related lane is still loading', async () => {
+    setSubscriptions([{ id: 'UCa', title: 'A' }])
+    recordWatched('seedvideo01')
+    mS.mockResolvedValue([vid('s1')])
+    mR.mockReturnValue(new Promise(() => {}))
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.queue.map((v) => v.id)).toEqual(['s1']))
+    expect(result.current.status).toBe('loading')
+  })
+})
+
+describe('useCatchup: failures say what is wrong', () => {
+  it('says the API key is missing when a lane fails for that reason', async () => {
+    setSubscriptions([{ id: 'UCa', title: 'A' }])
+    mS.mockRejectedValue(new CatchupApiError('no key', 0, 'noKey'))
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.notices.join(' ')).toMatch(/API key/i)
+  })
+
+  it('blames the quota, not the paste, when Watch Later runs out of quota', async () => {
+    setWatchLater(['w1w1w1w1w1w'])
+    mW.mockRejectedValue(new CatchupApiError('quota', 403, 'quotaExceeded'))
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.notices.join(' ')).toMatch(/quota/i)
+    expect(result.current.notices.join(' ')).not.toMatch(/pasted/i)
+  })
+})
