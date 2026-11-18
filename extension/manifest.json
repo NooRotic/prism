@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "PRISM helper (spike)",
+  "version": "0.0.1",
+  "description": "Throwaway spike: reads your Twitch recommended channels and your YouTube Watch Later list from the page you are already signed in to, so PRISM can use them.",
+  "content_scripts": [
+    {
+      "matches": ["https://www.twitch.tv/*", "https://www.youtube.com/playlist*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
