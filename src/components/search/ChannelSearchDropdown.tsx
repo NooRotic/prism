@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, X, Radio } from 'lucide-react'
 import { searchChannels } from '../../lib/twitchApi'
@@ -13,9 +13,11 @@ interface SearchResult extends TwitchChannel {
 interface ChannelSearchDropdownProps {
   open: boolean
   onClose: () => void
+  /** The button that opens it: a mousedown there is not "outside" (its own click toggles it shut). */
+  anchorRef?: RefObject<HTMLElement | null>
 }
 
-export default function ChannelSearchDropdown({ open, onClose }: ChannelSearchDropdownProps) {
+export default function ChannelSearchDropdown({ open, onClose, anchorRef }: ChannelSearchDropdownProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -36,13 +38,15 @@ export default function ChannelSearchDropdown({ open, onClose }: ChannelSearchDr
   useEffect(() => {
     if (!open) return
     function handleMouseDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      if (anchorRef?.current?.contains(target)) return
+      if (containerRef.current && !containerRef.current.contains(target)) {
         onClose()
       }
     }
     document.addEventListener('mousedown', handleMouseDown)
     return () => document.removeEventListener('mousedown', handleMouseDown)
-  }, [open, onClose])
+  }, [open, onClose, anchorRef])
 
   // Debounced search
   const doSearch = useCallback(async (q: string) => {
@@ -104,7 +108,7 @@ export default function ChannelSearchDropdown({ open, onClose }: ChannelSearchDr
   return (
     <div
       ref={containerRef}
-      className="absolute top-full mt-1 right-0 z-50 w-80 rounded-lg overflow-hidden shadow-lg shadow-black/40"
+      className="absolute top-full mt-1 left-0 z-50 w-80 max-w-[calc(100vw-1.5rem)] rounded-lg overflow-hidden shadow-lg shadow-black/40"
       style={{
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border)',
