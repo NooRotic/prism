@@ -88,8 +88,9 @@ export function Header() {
         >
           <PrismMark variant="icon" hover className="h-5 w-10 shrink-0 sm:h-8 sm:w-16" />
           <h1
-            // Only the mark below 640 px; up to 800 px the open paste box needs the wordmark's room too.
-            className={`hidden font-heading text-lg select-none sm:inline ${pasteOpen ? 'max-[800px]:hidden' : ''}`}
+            // Only the mark below 768 px (at 640 px the wordmark clipped the tabs); up to 800 px the open paste box needs
+            // the wordmark's room too.
+            className={`hidden font-heading text-lg select-none md:inline ${pasteOpen ? 'max-[800px]:hidden' : ''}`}
             style={{ color: 'var(--accent-green)', letterSpacing: '0.15em' }}
           >
             PRISM

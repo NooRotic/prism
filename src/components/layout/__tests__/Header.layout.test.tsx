@@ -47,10 +47,13 @@ describe('Header layout', () => {
     expect(tabs).toContain('overflow-x-auto')
   })
 
-  it('shows only the mark below 640 px, a smaller one', () => {
+  // Measured 2026-11-18: at 640 px the wordmark and the full tab labels together clipped HLS/DASH to "HLS/D"; the tabs
+  // win, so the wordmark waits until 768 px.
+  it('shows the wordmark only from 768 px, and a smaller mark below 640 px', () => {
     const { container } = renderHeader()
 
-    expect(classesOf(screen.getByText('PRISM'))).toEqual(expect.arrayContaining(['hidden', 'sm:inline']))
+    expect(classesOf(screen.getByText('PRISM'))).toEqual(expect.arrayContaining(['hidden', 'md:inline']))
+    expect(classesOf(screen.getByText('PRISM'))).not.toContain('sm:inline')
     const mark = container.querySelector('a[aria-label="Return to home"] > :first-child')
     expect(classesOf(mark)).toEqual(expect.arrayContaining(['w-10', 'sm:w-16']))
   })
