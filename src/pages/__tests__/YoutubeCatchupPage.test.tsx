@@ -26,6 +26,8 @@ const state = (over: Partial<CatchupState> = {}): CatchupState => ({
   watchLaterCount: 3,
   importSubscriptions: vi.fn(async () => {}),
   savePastedWatchLater: vi.fn(async () => {}),
+  clearWatchLater: vi.fn(async () => {}),
+  importing: false,
   refresh: vi.fn(async () => {}),
   ...over,
 })
@@ -111,5 +113,31 @@ describe('YoutubeCatchupPage on a site without a Google client id', () => {
     renderPage(state())
     expect(screen.queryByText(/VITE_YOUTUBE_CLIENT_ID/)).not.toBeInTheDocument()
     expect(screen.getByText(/not available on this site/i)).toBeInTheDocument()
+  })
+})
+
+describe('YoutubeCatchupPage controls', () => {
+  it('Refresh forces a fresh look at the subscriptions', () => {
+    const s = state()
+    renderPage(s)
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(s.refresh).toHaveBeenCalledWith({ force: true })
+  })
+
+  it('disables Refresh while loading', () => {
+    renderPage(state({ status: 'loading' }))
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled()
+  })
+
+  it('shows importing and disables the import button while Google is open', () => {
+    renderPage(state({ importing: true }))
+    expect(screen.getByRole('button', { name: /Importing/ })).toBeDisabled()
+  })
+
+  it('clears the saved Watch Later list on request', () => {
+    const s = state()
+    renderPage(s)
+    fireEvent.click(screen.getByRole('button', { name: /Clear Watch Later/ }))
+    expect(s.clearWatchLater).toHaveBeenCalledTimes(1)
   })
 })

@@ -60,3 +60,14 @@ describe('catchupStore', () => {
     spy.mockRestore()
   })
 })
+
+describe('recordWatched only remembers real video ids', () => {
+  it('ignores an address that is not a video id', () => {
+    recordWatched('not-a-video-id-at-all')
+    recordWatched('nope')
+    recordWatched('')
+    expect(getWatchedSeeds(5)).toEqual([])
+    recordWatched('dQw4w9WgXcQ')
+    expect(getWatchedSeeds(5)).toEqual(['dQw4w9WgXcQ'])
+  })
+})

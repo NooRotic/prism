@@ -101,9 +101,10 @@ async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>)
  */
 export async function fetchSubscriptionLane(
   channels: StoredChannel[],
-  opts: { perChannel?: number; cap?: number } = {},
+  opts: { perChannel?: number; cap?: number; force?: boolean } = {},
 ): Promise<CatchupVideo[]> {
-  const cached = readSLaneCache()
+  // `force` is the Refresh button: skip the 30-minute cache and ask YouTube again.
+  const cached = opts.force ? null : readSLaneCache()
   if (cached) return cached
   const perChannel = opts.perChannel ?? 5
   const cap = opts.cap ?? 100

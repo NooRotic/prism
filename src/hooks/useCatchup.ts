@@ -13,15 +13,19 @@ import { fetchRelatedLane } from '../lib/mixRelated'
 
 export interface CatchupState {
   queue: CatchupVideo[]
-  /** 'loading' until every lane has finished, though the queue fills in as each lane lands. */
-  status: 'idle' | 'loading' | 'ready'
+  /** 'loading' until every lane has finished, though the queue fills in as each lane lands. Starts as 'loading' so the first paint is not the empty state. */
+  status: 'loading' | 'ready'
   /** Plain-language reasons a lane is missing or a button did nothing. */
   notices: string[]
   subscriptionCount: number
   watchLaterCount: number
+  /** True while Google's sign-in window or the subscription read is in progress. */
+  importing: boolean
   importSubscriptions(): Promise<void>
   savePastedWatchLater(text: string): Promise<void>
-  refresh(): Promise<void>
+  clearWatchLater(): Promise<void>
+  /** `force` skips the 30-minute subscription cache (the Refresh button). */
+  refresh(opts?: { force?: boolean }): Promise<void>
 }
 
 const LANE_NAME: Record<Lane, string> = { S: 'Subscriptions', W: 'Watch Later', R: 'Related' }
@@ -48,15 +52,18 @@ const NO_NOTICES: Record<Lane, string | null> = { S: null, W: null, R: null }
 /** Loads the three lanes (subscriptions, Watch Later, related) and blends them 2 : 1 : 1. */
 export function useCatchup(): CatchupState {
   const [lanes, setLanes] = useState(EMPTY_LANES)
-  const [status, setStatus] = useState<CatchupState['status']>('idle')
+  const [status, setStatus] = useState<CatchupState['status']>('loading')
   const [laneNotices, setLaneNotices] = useState(NO_NOTICES)
   const [actionNotices, setActionNotices] = useState<string[]>([])
   const [counts, setCounts] = useState(() => ({ subs: getSubscriptions().length, later: getWatchLater().length }))
   // A newer refresh wins: an older one finishing late must not overwrite it.
   const run = useRef(0)
+  const [importing, setImporting] = useState(false)
+  const importingRef = useRef(false)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (opts?: { force?: boolean }) => {
     const mine = ++run.current
+    if (opts?.force) setActionNotices([])
     const subs = getSubscriptions()
     const later = getWatchLater()
     const seeds = getWatchedSeeds()
@@ -79,7 +86,7 @@ export function useCatchup(): CatchupState {
     }
 
     await Promise.all([
-      land('S', subs.length ? fetchSubscriptionLane(subs) : Promise.resolve([])),
+      land('S', subs.length ? fetchSubscriptionLane(subs, { force: opts?.force }) : Promise.resolve([])),
       land('W', later.length ? describeVideos(later) : Promise.resolve([])),
       // Only complain about an empty related lane when there were recent videos to look it up from.
       land('R', seeds.length ? fetchRelatedLane(seeds) : Promise.resolve([]), seeds.length ? GENERIC.R : undefined),
@@ -98,6 +105,9 @@ export function useCatchup(): CatchupState {
   )
 
   const importSubscriptions = useCallback(async () => {
+    if (importingRef.current) return
+    importingRef.current = true
+    setImporting(true)
     setActionNotices([])
     try {
       const token = await requestYoutubeReadToken()
@@ -115,17 +125,33 @@ export function useCatchup(): CatchupState {
           : 'Could not read your subscriptions from YouTube.',
       ])
       return
+    } finally {
+      importingRef.current = false
+      setImporting(false)
     }
     await refresh()
   }, [refresh])
 
   const savePastedWatchLater = useCallback(
     async (text: string) => {
-      setWatchLater(parseVideoIds(text))
+      const ids = parseVideoIds(text)
+      if (ids.length === 0) {
+        // Pasted titles carry no links; replacing the saved list with nothing would silently wipe it.
+        setActionNotices(['No video links found in what you pasted, so your saved Watch Later list was not changed.'])
+        return
+      }
+      setWatchLater(ids)
+      setActionNotices([`Saved ${ids.length} Watch Later video${ids.length === 1 ? '' : 's'}.`])
       await refresh()
     },
     [refresh],
   )
+
+  const clearWatchLater = useCallback(async () => {
+    setWatchLater([])
+    setActionNotices(['Watch Later list cleared.'])
+    await refresh()
+  }, [refresh])
 
   return {
     queue,
@@ -133,8 +159,10 @@ export function useCatchup(): CatchupState {
     notices,
     subscriptionCount: counts.subs,
     watchLaterCount: counts.later,
+    importing,
     importSubscriptions,
     savePastedWatchLater,
+    clearWatchLater,
     refresh,
   }
 }
