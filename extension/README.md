@@ -20,7 +20,8 @@ After editing `content.js`, click the reload arrow on the extension's card and r
 
 ## What was found on 2026-11-18 (owner's signed-in Chrome)
 
-- Twitch home: 6 recommended channels in the side bar plus a shelf. The shelf is a carousel that keeps only about 3 cards in the page at a time, so expect about 9 unique channels in total.
+- Twitch: the side bar's "Live Channels" shows 6 recommended channels until "Show More" is pressed, then 10 (the script presses it). The home page shelf (home page only, not /directory) is a carousel that keeps about 3 cards in the page at a time, so expect about 13 unique channels from the home page and 10 from any other page.
+- Watch Later (owner's run): 546 unique video ids, all valid 11-character ids.
 - Watch Later: 100 unique video links in the page on load; more after scrolling (the script scrolls).
 - The reader was checked against the live pages by running its functions in the page; the extension itself had not been loaded when this was written.
 

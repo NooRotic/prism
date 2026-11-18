@@ -30,7 +30,18 @@ function unique(list) {
   return [...new Set(list)]
 }
 
-function twitchRecommended() {
+/** The side bar shows 6 recommended channels until "Show More" is pressed (10 after one press); press it until it is gone. */
+async function expandLiveChannels() {
+  for (let i = 0; i < 6; i++) {
+    const more = document.querySelector('.side-nav-section[aria-label="Live Channels"] button[data-a-target="side-nav-show-more-button"]')
+    if (!more) return
+    more.click()
+    await new Promise((r) => setTimeout(r, 1200))
+  }
+}
+
+async function twitchRecommended() {
+  await expandLiveChannels()
   const side = [...document.querySelectorAll('.side-nav-section[aria-label="Live Channels"] a[href^="/"]')]
     .map(channelLogin)
     .filter(Boolean)
@@ -76,7 +87,7 @@ function isWatchLaterPage() {
 
 async function collect() {
   if (location.hostname === 'www.twitch.tv') {
-    const t = twitchRecommended()
+    const t = await twitchRecommended()
     return { source: 'twitch-recommended', count: t.all.length, items: t.all, detail: t, at: new Date().toISOString() }
   }
   if (isWatchLaterPage()) {
