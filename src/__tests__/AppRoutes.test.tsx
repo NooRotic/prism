@@ -11,6 +11,7 @@ vi.mock('../pages/ProtocolPage', () => ({
 vi.mock('../pages/TwitchPlayerPage', () => ({ default: () => <div>twitch player page</div> }))
 vi.mock('../pages/YoutubePlayerPage', () => ({ default: () => <div>youtube player page</div> }))
 vi.mock('../pages/YoutubeCatchupPage', () => ({ default: () => <div>catchup page</div> }))
+vi.mock('../pages/ImportPage', () => ({ default: () => <div>import page</div> }))
 vi.mock('../pages/HlsPage', () => ({ default: () => <div>hls page</div> }))
 vi.mock('../pages/ChatPopoutPage', () => ({ default: () => <div>chat pop-out page</div> }))
 vi.mock('../pages/AdminPage', () => ({ default: () => <div>admin page</div> }))
@@ -53,6 +54,7 @@ describe('AppRoutes: the pages that exist', () => {
     ['/hls-dash/', 'hls page'],
     ['/twitch/streamer', 'twitch player page'],
     ['/youtube/abc', 'youtube player page'],
+    ['/import', 'import page'],
     ['/youtube/catchup', 'catchup page'],
     ['/hls-dash/some-stream', 'hls page'],
     ['/hls-dash/custom', 'hls page'],

@@ -1,15 +1,19 @@
-import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 import { parseImportFragment } from '../extensionImport'
+import handoffSource from '../../../extension/handoff.js?raw'
 
-// The extension's own script is a classic (non-module) file so Chrome can load it as a content script;
-// the tests load it the same way, which also pins the format PRISM has to understand.
-const handoff = createRequire(import.meta.url)('../../../extension/handoff.js') as {
+interface Handoff {
   buildFragment(kind: string, items: string[]): string | null
   importUrl(kind: string, items: string[], dev?: boolean): string | null
   isPrismImportUrl(url: string): boolean
   ORIGINS: { prod: string; dev: string }
 }
+
+// The extension's own script is a classic (non-module) file so Chrome can load it as a content script. The tests
+// run its source as one too, which also pins the format PRISM has to understand.
+const mod = { exports: {} as Handoff }
+new Function('module', handoffSource)(mod)
+const handoff = mod.exports
 
 const id = (n: number) => `video${String(n).padStart(6, '0')}`
 

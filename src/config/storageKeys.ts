@@ -25,6 +25,8 @@ export const STORAGE_KEYS = {
   LOCAL_INTROS_SEEN: 'prism_intros_seen',
   /** Prefix for per-category YouTube cache entries (e.g. prism_yt_cache_popular). */
   LOCAL_YOUTUBE_CACHE_PREFIX: 'prism_yt_cache_',
+  /** Twitch's recommended channels the owner sent from the PRISM helper extension (JSON `{ logins, importedAt }`). */
+  LOCAL_TWITCH_RECOMMENDED: 'prism_twitch_recommended',
   /** Catch up: the owner's imported YouTube subscriptions (JSON array of `{ id, title }`). */
   LOCAL_CATCHUP_SUBSCRIPTIONS: 'prism_catchup_subscriptions',
   /** Catch up: which account the last subscription import came from (JSON `{ title, thumbnailUrl, importedAt }`). */
