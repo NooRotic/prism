@@ -9,7 +9,7 @@ import { useYoutubeAccount } from '../../hooks/useYoutubeAccount'
 import { nextRow, type RowId } from '../../lib/headerRow'
 import { SECTIONS, sectionForPath, showsHeaderPaste } from '../../lib/headerSections'
 import { PrismMark } from '../brand/PrismMark'
-import { SmartUrlInput } from '../search/SmartUrlInput'
+import { PasteToggle } from './PasteToggle'
 import { AccountsPill } from './AccountsPill'
 import { AccountsRow } from './AccountsRow'
 import { FoldingRow } from './FoldingRow'
@@ -53,9 +53,13 @@ export function Header() {
   const [shownRow, setShownRow] = useState<RowId | null>(null)
   if (row.state.open !== null && row.state.open !== shownRow) setShownRow(row.state.open)
 
-  // Only show SmartUrlInput in header when the page has none of its own: the hub has one, and the Twitch and YouTube
-  // listings have it in their sidebar. /hls-dash is not one of them any more (it is a player page with no sidebar).
+  // The paste box only where the page has none of its own (the hub has one, and the Twitch and YouTube listings have
+  // it in their sidebar), behind a link icon. Like Browse, it belongs to the page it was opened on. Its suggestion
+  // list goes into a slot in the header's flow, so it pushes the page down instead of covering a player.
   const showHeaderInput = showsHeaderPaste(pathname)
+  const [pasteOpenOn, setPasteOpenOn] = useState<string | null>(null)
+  const pasteOpen = showHeaderInput && pasteOpenOn === pathname
+  const [pasteList, setPasteList] = useState<HTMLDivElement | null>(null)
 
   return (
     <header
@@ -81,7 +85,8 @@ export function Header() {
         >
           <PrismMark variant="icon" hover className="h-8 w-16 shrink-0" />
           <h1
-            className="font-heading text-lg select-none"
+            // Up to 800 px the open paste box needs the wordmark's room.
+            className={`font-heading text-lg select-none ${pasteOpen ? 'max-[800px]:hidden' : ''}`}
             style={{ color: 'var(--accent-green)', letterSpacing: '0.15em' }}
           >
             PRISM
@@ -91,11 +96,12 @@ export function Header() {
         <div className="flex-1" />
 
       <div data-header-actions className="flex items-center gap-3">
-        {/* On a phone the paste box takes what the buttons leave (it cannot shrink on its own); from 640 px up it is its own size. */}
         {showHeaderInput && (
-          <div className="min-w-0 flex-1 sm:flex-none">
-            <SmartUrlInput />
-          </div>
+          <PasteToggle
+            open={pasteOpen}
+            onOpenChange={(open) => setPasteOpenOn(open ? pathname : null)}
+            listContainer={pasteList}
+          />
         )}
 
         {/* Debug toggle lives here, not over the player: anything drawn on top
@@ -119,6 +125,8 @@ export function Header() {
         <AccountsPill expanded={row.state.open === 'accounts'} onPress={(trigger) => pressRow('accounts', trigger)} />
       </div>
       </div>
+
+      <div id="header-paste-list" ref={setPasteList} className="max-h-64 overflow-y-auto px-3 sm:px-6" />
 
       <FoldingRow open={row.state.open !== null} row={row} rowRef={rowRef}>
         {shownRow === 'accounts' && <AccountsRow showDebugToggle={!wide} />}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Search, X } from 'lucide-react'
 import { useApp, type SearchEntry } from '../../contexts/AppContext'
@@ -21,7 +22,19 @@ function hasUrlChars(text: string): boolean {
   return /[.:/]/.test(text)
 }
 
-export function SmartUrlInput() {
+/** Only the header passes these; with none, the box behaves exactly as it always has (the hub, the listing pages). */
+export interface SmartUrlInputProps {
+  /** Draw the suggestion list here (a slot in the header's flow) instead of over the page under the box. Mousedowns
+   *  inside it count as inside the box. */
+  listContainer?: HTMLElement | null
+  /** Turning true empties the box and focuses it. */
+  active?: boolean
+  /** The box is finished with: after any submit (a page, the Category panel, a played URL, a quick link, a
+   *  suggestion), on Esc, or when focus leaves it while it is empty. */
+  onDone?: () => void
+}
+
+export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputProps = {}) {
   const navigate = useNavigate()
   const { state, dispatch } = useApp()
   const [inputValue, setInputValue] = useState(state.search.query)
@@ -29,6 +42,18 @@ export function SmartUrlInput() {
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // The header opens the box empty each time, and takes its list away when it closes the box.
+  const [wasActive, setWasActive] = useState(active)
+  if (active !== wasActive) {
+    setWasActive(active)
+    setSelectedIndex(-1)
+    if (active) setInputValue('')
+    else setIsOpen(false)
+  }
+  useEffect(() => {
+    if (active) inputRef.current?.focus()
+  }, [active])
 
   // Sync local history from localStorage into app state on mount
   useEffect(() => {
@@ -38,19 +63,22 @@ export function SmartUrlInput() {
     }
   }, [dispatch])
 
-  // Click-outside detection
+  // Click-outside detection. A list drawn elsewhere (the header's slot) counts as inside: otherwise picking a
+  // suggestion would close the list before the click lands.
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node
+      if (listContainer?.contains(target)) return
       if (
         containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
+        !containerRef.current.contains(target)
       ) {
         setIsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleMouseDown)
     return () => document.removeEventListener('mousedown', handleMouseDown)
-  }, [])
+  }, [listContainer])
 
   // Real-time URL detection
   const detection = useMemo(() => {
@@ -93,6 +121,7 @@ export function SmartUrlInput() {
           dispatch({ type: 'OPEN_CATEGORY_PANEL', category: query })
           setIsOpen(false)
           inputRef.current?.blur()
+          onDone?.()
           return
         }
         // Single word = treat as Twitch channel name → route to /twitch/:channel
@@ -104,6 +133,7 @@ export function SmartUrlInput() {
         setIsOpen(false)
         setSelectedIndex(-1)
         inputRef.current?.blur()
+        onDone?.()
         return
       }
 
@@ -140,8 +170,9 @@ export function SmartUrlInput() {
       setIsOpen(false)
       setSelectedIndex(-1)
       inputRef.current?.blur()
+      onDone?.()
     },
-    [inputValue, dispatch, navigate],
+    [inputValue, dispatch, navigate, onDone],
   )
 
   const handleSelectSuggestion = useCallback(
@@ -157,8 +188,9 @@ export function SmartUrlInput() {
       dispatch({ type: 'OPEN_CATEGORY_PANEL', category: gameName })
       setIsOpen(false)
       inputRef.current?.blur()
+      onDone?.()
     },
-    [dispatch],
+    [dispatch, onDone],
   )
 
   const handleKeyDown = useCallback(
@@ -167,6 +199,7 @@ export function SmartUrlInput() {
         setIsOpen(false)
         setSelectedIndex(-1)
         inputRef.current?.blur()
+        onDone?.()
         return
       }
 
@@ -195,7 +228,7 @@ export function SmartUrlInput() {
         }
       }
     },
-    [filteredHistory, selectedIndex, handleSubmit, handleSelectSuggestion],
+    [filteredHistory, selectedIndex, handleSubmit, handleSelectSuggestion, onDone],
   )
 
   const handleClear = useCallback(() => {
@@ -226,6 +259,9 @@ export function SmartUrlInput() {
             if (!isOpen) setIsOpen(true)
           }}
           onFocus={() => setIsOpen(true)}
+          onBlur={() => {
+            if (!inputValue.trim()) onDone?.()
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Paste URL or type channel name..."
           className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
@@ -275,27 +311,37 @@ export function SmartUrlInput() {
           base bg-card color so the dropdown reads as a solid textured
           panel instead of a translucent card with content bleeding
           through from underneath. */}
-      {showDropdown && (
-        <div className="brushed-metal absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-lg border border-[var(--border)] shadow-lg shadow-black/40">
-          {/* Quick links only when input is empty */}
-          {!inputValue.trim() && (
-            <QuickLinks onSelect={handleQuickLinkSelect} />
-          )}
-
-          {/* Divider between sections */}
-          {!inputValue.trim() && state.search.history.length > 0 && (
-            <div className="mx-3 border-t border-[var(--border)]" />
-          )}
-
-          {/* Search suggestions */}
-          <SearchSuggestions
-            history={state.search.history}
-            filterText={inputValue}
-            onSelect={handleSelectSuggestion}
-            selectedIndex={selectedIndex}
-          />
-        </div>
-      )}
+      {showDropdown && (listContainer ? createPortal(dropdown(true), listContainer) : dropdown(false))}
     </div>
   )
+
+  // In the header the list goes into a slot in the page flow (it pushes the page down: a list drawn over a Twitch
+  // player pauses it); elsewhere it hangs under the box, over the page.
+  function dropdown(inFlow: boolean) {
+    return (
+      <div
+        className={`brushed-metal overflow-hidden rounded-lg border border-[var(--border)] shadow-lg shadow-black/40 ${
+          inFlow ? 'my-1.5' : 'absolute top-full right-0 left-0 z-50 mt-1'
+        }`}
+      >
+        {/* Quick links only when input is empty */}
+        {!inputValue.trim() && (
+          <QuickLinks onSelect={handleQuickLinkSelect} />
+        )}
+
+        {/* Divider between sections */}
+        {!inputValue.trim() && state.search.history.length > 0 && (
+          <div className="mx-3 border-t border-[var(--border)]" />
+        )}
+
+        {/* Search suggestions */}
+        <SearchSuggestions
+          history={state.search.history}
+          filterText={inputValue}
+          onSelect={handleSelectSuggestion}
+          selectedIndex={selectedIndex}
+        />
+      </div>
+    )
+  }
 }
