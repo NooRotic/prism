@@ -117,7 +117,18 @@ describe('Header: the folding row', () => {
     expect(document.querySelectorAll('[data-nav-trigger]')).toHaveLength(1)
   })
 
-  it.todo('closes Following when Accounts replaces the Twitch row')
+  it('closes Following when Accounts replaces the Twitch row', async () => {
+    signIn(true)
+    renderAt('/hls-dash')
+    await userEvent.click(screen.getByRole('button', { name: 'Twitch tools' }))
+    await userEvent.click(within(row()).getByRole('button', { name: 'Following' }))
+    expect(screen.getByTestId('nav-panel')).toHaveTextContent('following')
+
+    await userEvent.click(screen.getByRole('button', { name: /^Accounts:/ }))
+
+    expect(screen.getByTestId('nav-panel')).toHaveTextContent('none')
+    expect(within(row()).getByRole('region', { name: 'Twitch' })).toBeInTheDocument()
+  })
 
   it('shows Catch up in the YouTube row', async () => {
     renderAt('/hls-dash')

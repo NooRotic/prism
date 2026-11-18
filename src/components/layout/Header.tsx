@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react'
-import { LogIn, LogOut, Settings } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useApp } from '../../contexts/AppContext'
 import { useHeaderHeight } from '../../hooks/useHeaderHeight'
 import { useHeaderRow } from '../../hooks/useHeaderRow'
-import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { useYoutubeAccount } from '../../hooks/useYoutubeAccount'
 import { nextRow, type RowId } from '../../lib/headerRow'
 import { SECTIONS, sectionForPath, showsHeaderPaste } from '../../lib/headerSections'
 import { PrismMark } from '../brand/PrismMark'
 import { SmartUrlInput } from '../search/SmartUrlInput'
+import { AccountsPill } from './AccountsPill'
+import { AccountsRow } from './AccountsRow'
 import { FoldingRow } from './FoldingRow'
 import { SectionTabs } from './SectionTabs'
 import { TwitchTools } from './TwitchTools'
@@ -17,9 +19,9 @@ import { TwitchTools } from './TwitchTools'
 const ROW_ITEM_STYLE = { fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.05em' } as const
 
 export function Header() {
-  const { isAuthenticated, login, logout } = useTwitchAuth()
   const { state, dispatch } = useApp()
   const debugMode = state.player.debugMode
+  const wide = useMediaQuery('(min-width: 640px)')
   const { pathname } = useLocation()
   const current = sectionForPath(pathname)
   const currentColor = SECTIONS.find((s) => s.id === current)?.color ?? 'transparent'
@@ -98,59 +100,28 @@ export function Header() {
 
         {/* Debug toggle lives here, not over the player: anything drawn on top
             of the Twitch embed makes its visibility check fail and disables
-            autoplay. */}
-        <button
-          type="button"
-          onClick={() => dispatch({ type: 'TOGGLE_DEBUG' })}
-          className="p-1.5 rounded-md transition-colors duration-150 hover:bg-white/10"
-          style={{ color: debugMode ? 'var(--accent-green)' : 'var(--text-muted)' }}
-          title="Toggle debug overlay"
-          aria-label="Toggle debug overlay"
-          aria-pressed={debugMode}
-        >
-          <Settings size={16} />
-        </button>
-
-        {isAuthenticated ? (
+            autoplay. Below 640 px there is no room in the bar: it moves into the
+            Accounts row (only ever one of the two exists). */}
+        {wide && (
           <button
             type="button"
-            onClick={logout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-200 hover:scale-[1.02]"
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border)',
-              color: 'var(--text-secondary)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.75rem',
-              letterSpacing: '0.05em',
-            }}
+            onClick={() => dispatch({ type: 'TOGGLE_DEBUG' })}
+            className="p-1.5 rounded-md transition-colors duration-150 hover:bg-white/10"
+            style={{ color: debugMode ? 'var(--accent-green)' : 'var(--text-muted)' }}
+            title="Toggle debug overlay"
+            aria-label="Toggle debug overlay"
+            aria-pressed={debugMode}
           >
-            <LogOut size={13} />
-            logout
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={login}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-md transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent-twitch), #7b2ff2)',
-              color: '#fff',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              letterSpacing: '0.05em',
-              boxShadow: '0 0 20px var(--accent-twitch-glow)',
-            }}
-          >
-            <LogIn size={13} />
-            connect twitch
+            <Settings size={16} />
           </button>
         )}
+
+        <AccountsPill expanded={row.state.open === 'accounts'} onPress={(trigger) => pressRow('accounts', trigger)} />
       </div>
       </div>
 
       <FoldingRow open={row.state.open !== null} row={row} rowRef={rowRef}>
+        {shownRow === 'accounts' && <AccountsRow showDebugToggle={!wide} />}
         {shownRow === 'twitch' && <TwitchTools browseOpen={browseOpen} onBrowseOpenChange={setBrowseOpen} />}
         {shownRow === 'youtube' && (
           <Link
