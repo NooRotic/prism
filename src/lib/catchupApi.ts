@@ -5,13 +5,13 @@ const BASE = 'https://www.googleapis.com/youtube/v3'
 const POOL_SIZE = 6
 
 export class CatchupApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public reason?: string,
-  ) {
+  status: number
+  reason?: string
+  constructor(message: string, status: number, reason?: string) {
     super(message)
     this.name = 'CatchupApiError'
+    this.status = status
+    this.reason = reason
   }
 }
 

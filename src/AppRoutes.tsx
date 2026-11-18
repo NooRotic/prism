@@ -5,6 +5,7 @@ import ProtocolPage from './pages/ProtocolPage'
 import TwitchPlayerPage from './pages/TwitchPlayerPage'
 import YoutubePlayerPage from './pages/YoutubePlayerPage'
 import HlsPage from './pages/HlsPage'
+import YoutubeCatchupPage from './pages/YoutubeCatchupPage'
 import ChatPopoutPage from './pages/ChatPopoutPage'
 import NotFoundPage from './pages/NotFoundPage'
 
@@ -40,6 +41,7 @@ export default function AppRoutes({ layout }: AppRoutesProps) {
         <Route path="twitch" element={<ProtocolPage protocol="twitch" />} />
         <Route path="twitch/:channel" element={<TwitchPlayerPage />} />
         <Route path="youtube" element={<ProtocolPage protocol="youtube" />} />
+        <Route path="youtube/catchup" element={<YoutubeCatchupPage />} />
         <Route path="youtube/:videoId" element={<YoutubePlayerPage />} />
         {/* One route for both /hls-dash and /hls-dash/:streamId, so choosing a stream from the list does not
             remount the page (what was typed in the search box and the scrolled list stay as they were). */}

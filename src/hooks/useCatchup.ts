@@ -69,7 +69,7 @@ export function useCatchup(): CatchupState {
   }, [])
 
   useEffect(() => {
-    void refresh()
+    void refresh() // eslint-disable-line react-hooks/set-state-in-effect -- async load of the lanes on mount
   }, [refresh])
 
   const importSubscriptions = useCallback(async () => {

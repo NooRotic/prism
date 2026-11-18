@@ -211,6 +211,15 @@ export default function ProtocolPage({ protocol }: ProtocolPageProps) {
           <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
             {meta.description}
           </span>
+          {protocol === 'youtube' && (
+            <Link
+              to="/youtube/catchup"
+              className="ml-auto rounded px-3 py-1 text-xs font-mono uppercase tracking-wider"
+              style={{ border: '1px solid var(--accent-youtube)', color: 'var(--accent-youtube)' }}
+            >
+              Catch up
+            </Link>
+          )}
         </div>
 
         {/* Content — YouTube uses live API data, a signed-in Twitch viewer gets their
