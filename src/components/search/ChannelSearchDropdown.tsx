@@ -108,7 +108,9 @@ export default function ChannelSearchDropdown({ open, onClose, anchorRef }: Chan
   return (
     <div
       ref={containerRef}
-      className="absolute top-full mt-1 left-0 z-50 w-80 max-w-[calc(100vw-1.5rem)] rounded-lg overflow-hidden shadow-lg shadow-black/40"
+      // From 640 px it hangs from the Browse button; below that from the header's row (the nearest positioned
+      // ancestor then), inset from both edges, since a 320 px panel hung from the button would run off a phone.
+      className="absolute top-full mt-1 z-50 max-sm:inset-x-3 max-sm:w-auto sm:left-0 sm:w-80 rounded-lg overflow-hidden shadow-lg shadow-black/40"
       style={{
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border)',

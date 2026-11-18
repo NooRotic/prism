@@ -34,6 +34,8 @@ export function Header() {
 
   // Browse belongs to the page it was opened on: changing page closes it, with no effect to run.
   const [browseOpenOn, setBrowseOpenOn] = useState<string | null>(null)
+  // Leaving the page forgets it, so coming Back does not re-open it by itself.
+  if (browseOpenOn !== null && browseOpenOn !== pathname) setBrowseOpenOn(null)
   const browseOpen = browseOpenOn === pathname
   const setBrowseOpen = (open: boolean) => setBrowseOpenOn(open ? pathname : null)
 
@@ -58,6 +60,7 @@ export function Header() {
   // list goes into a slot in the header's flow, so it pushes the page down instead of covering a player.
   const showHeaderInput = showsHeaderPaste(pathname)
   const [pasteOpenOn, setPasteOpenOn] = useState<string | null>(null)
+  if (pasteOpenOn !== null && pasteOpenOn !== pathname) setPasteOpenOn(null)
   const pasteOpen = showHeaderInput && pasteOpenOn === pathname
   const [pasteList, setPasteList] = useState<HTMLDivElement | null>(null)
 

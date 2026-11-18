@@ -41,22 +41,26 @@ export function useHeaderRow(
   holds: HeaderRowHolds,
 ): HeaderRow {
   const [state, setState] = useState<RowState>(ROW_CLOSED)
-  const [focusInside, setFocusInside] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const trigger = useRef<HTMLElement | null>(null)
+  // Focus inside the row holds it only while the viewer is using the keyboard: a mouse click leaves focus on the button
+  // it hit, and that must not stop the next click outside from folding the row.
+  const focusInside = useRef(false)
+  const usingKeyboard = useRef(false)
 
   // The listeners below read the latest values without re-subscribing.
   const holdsRef = useRef(holds)
-  const heldRef = useRef(false)
   const stateRef = useRef(state)
   useLayoutEffect(() => {
     holdsRef.current = holds
-    heldRef.current = holds.navPanelOpen || holds.browseOpen || holds.importing || focusInside
     stateRef.current = state
   })
 
+  // Worked out when an event arrives, never cached: whether anything is holding the row open right now.
   const send = useCallback((event: RowEvent) => {
-    setState((s) => nextRow(s, event, heldRef.current))
+    const h = holdsRef.current
+    const held = h.navPanelOpen || h.browseOpen || h.importing || (focusInside.current && usingKeyboard.current)
+    setState((s) => nextRow(s, event, held))
   }, [])
 
   const clearTimer = useCallback(() => {
@@ -104,13 +108,16 @@ export function useHeaderRow(
     [clearTimer, send],
   )
 
-  // Focus inside the row holds it open (a keyboard user working its buttons).
+  // Focus inside the row holds it open, but only for a keyboard user working its buttons (see `send`). Which input the
+  // viewer is using is noted in the capture phase, before any other listener acts on the event.
   useEffect(() => {
     const el = rowRef.current
     if (!el) return
-    const onIn = () => setFocusInside(true)
+    const onIn = () => {
+      focusInside.current = true
+    }
     const onOut = (e: FocusEvent) => {
-      if (!el.contains(e.relatedTarget as Node | null)) setFocusInside(false)
+      if (!el.contains(e.relatedTarget as Node | null)) focusInside.current = false
     }
     el.addEventListener('focusin', onIn)
     el.addEventListener('focusout', onOut)
@@ -120,18 +127,36 @@ export function useHeaderRow(
     }
   }, [rowRef])
 
-  // Esc: an open slide-down panel or Browse takes it first (they close themselves); otherwise the row folds and focus
-  // goes back to the button that opened it.
+  useEffect(() => {
+    const onKeyInput = () => {
+      usingKeyboard.current = true
+    }
+    const onPointerInput = () => {
+      usingKeyboard.current = false
+    }
+    document.addEventListener('keydown', onKeyInput, true)
+    document.addEventListener('pointerdown', onPointerInput, true)
+    return () => {
+      document.removeEventListener('keydown', onKeyInput, true)
+      document.removeEventListener('pointerdown', onPointerInput, true)
+    }
+  }, [])
+
+  // Esc goes to the innermost open thing first: an open slide-down panel, Browse or the paste box closes itself, and
+  // only the next Esc folds the row (focus then goes back to the button that opened it). Read in the capture phase,
+  // before those inner handlers run: in a real browser React applies their close between its own handler and a
+  // bubble-phase document listener, which would then see nothing open and fold the row on the same key press.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (holdsRef.current.navPanelOpen || holdsRef.current.browseOpen) return
+      if (e.target instanceof Element && e.target.closest('[data-paste-box]')) return
       if (stateRef.current.open === null) return
       send({ type: 'dismiss' })
       trigger.current?.focus()
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
   }, [send])
 
   // A click outside the header folds the row. A click into a player never reaches the document (it lands in an

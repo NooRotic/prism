@@ -15,8 +15,10 @@ interface FoldingRowProps {
  * It clips its content while it unfolds, then lets drop-downs (Browse) hang out of it once it has settled open.
  */
 export function FoldingRow({ open, row, rowRef, children }: FoldingRowProps) {
-  // Set when a fold or unfold finishes, so a re-open clips again until it has settled.
+  // Set when an unfold finishes. Closing clears it at once (a fold can be cut short by a re-open, or never finish when
+  // fill mode hides the header), so a re-open always clips until it has settled.
   const [settledOpen, setSettledOpen] = useState(false)
+  if (!open && settledOpen) setSettledOpen(false)
   const overflowVisible = open && settledOpen
   return (
     <div
@@ -33,7 +35,8 @@ export function FoldingRow({ open, row, rowRef, children }: FoldingRowProps) {
     >
       <div className={`min-h-0 ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}>
         <div
-          className="flex min-h-10 flex-wrap items-center gap-1 px-3 py-1.5 sm:px-6"
+          data-row-content
+          className="relative flex min-h-10 flex-wrap items-center gap-1 px-3 py-1.5 sm:px-6"
           style={{ background: 'rgba(10, 10, 15, 0.9)', borderTop: '1px solid var(--border)' }}
         >
           {children}

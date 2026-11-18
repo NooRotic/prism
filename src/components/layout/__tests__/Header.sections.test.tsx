@@ -155,6 +155,24 @@ describe('Header: the folding row', () => {
     expect(screen.queryByPlaceholderText('Search Twitch channels...')).not.toBeInTheDocument()
   })
 
+  // On a phone the Browse button sits about 200 px in, and the 320 px dropdown hung from it would run off the right edge
+  // and make the page scroll sideways: below 640 px it hangs from the row instead, inset from both edges.
+  it('hangs the Browse dropdown from the row below 640 px, never off the screen', async () => {
+    signIn(true)
+    renderAt('/hls-dash')
+    await userEvent.click(screen.getByRole('button', { name: 'Twitch tools' }))
+    const browse = within(row()).getByRole('button', { name: 'Browse' })
+    await userEvent.click(browse)
+
+    const panel = screen.getByPlaceholderText('Search Twitch channels...').closest('.absolute') as HTMLElement
+    const classes = panel.className.split(/\s+/)
+    expect(classes).toEqual(expect.arrayContaining(['max-sm:inset-x-3', 'max-sm:w-auto', 'sm:w-80']))
+    const wrapper = browse.parentElement as HTMLElement
+    expect(wrapper.className.split(/\s+/)).toContain('sm:relative')
+    expect(wrapper.className.split(/\s+/)).not.toContain('relative')
+    expect((row().querySelector('[data-row-content]') as HTMLElement).className.split(/\s+/)).toContain('relative')
+  })
+
   it('anchors the Browse dropdown on the left, so it stays on screen in a left-aligned row', async () => {
     signIn(true)
     renderAt('/hls-dash')
