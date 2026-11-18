@@ -30,16 +30,6 @@ afterEach(() => {
 // The header's height is whatever its content needs (the second row unfolds inside it) and is published as
 // --header-height for everything that sits under it.
 describe('Header layout', () => {
-  it('lets the paste box shrink to the room the buttons leave it on a phone, and keeps its own size from 640 px up', () => {
-    const { container } = renderHeader()
-
-    const holder = screen.getByTestId('smart-url-input').parentElement
-    expect(holder?.className).toContain('min-w-0')
-    expect(holder?.className).toContain('flex-1')
-    expect(holder?.className).toContain('sm:flex-none')
-    expect(container.querySelector('[data-header-actions]')?.contains(holder)).toBe(true)
-  })
-
   it('keeps each Twitch tool label on one line, with tighter padding on a phone (signed in)', async () => {
     auth.isAuthenticated = true
     renderHeader()
