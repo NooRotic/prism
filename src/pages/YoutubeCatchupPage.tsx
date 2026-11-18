@@ -47,7 +47,9 @@ export default function YoutubeCatchupPage() {
         </button>
         {!configured && (
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Set VITE_YOUTUBE_CLIENT_ID in .env to turn this on.
+            {import.meta.env.DEV
+              ? 'Set VITE_YOUTUBE_CLIENT_ID in .env to turn this on.'
+              : 'Subscription import is not available on this site.'}
           </span>
         )}
       </div>

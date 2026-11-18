@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { blend, parseVideoIds, type CatchupVideo } from '../lib/catchup'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { blend, parseVideoIds, type CatchupVideo, type Lane } from '../lib/catchup'
 import { CatchupApiError, describeVideos, fetchSubscriptionLane, listSubscriptions } from '../lib/catchupApi'
 import {
   getSubscriptions,
@@ -13,6 +13,7 @@ import { fetchRelatedLane } from '../lib/mixRelated'
 
 export interface CatchupState {
   queue: CatchupVideo[]
+  /** 'loading' until every lane has finished, though the queue fills in as each lane lands. */
   status: 'idle' | 'loading' | 'ready'
   /** Plain-language reasons a lane is missing or a button did nothing. */
   notices: string[]
@@ -23,13 +24,32 @@ export interface CatchupState {
   refresh(): Promise<void>
 }
 
-const isQuota = (e: unknown) => e instanceof CatchupApiError && e.status === 403 && e.reason === 'quotaExceeded'
+const LANE_NAME: Record<Lane, string> = { S: 'Subscriptions', W: 'Watch Later', R: 'Related' }
+const GENERIC: Record<Lane, string> = {
+  S: 'Subscriptions: could not load the latest uploads.',
+  W: 'Watch Later: could not load your pasted videos.',
+  R: 'Related: no suggestions came back for your recent videos.',
+}
+
+/** What to tell the owner when a lane failed: the cause when we know it, otherwise a plain per-lane line. */
+function failureNotice(lane: Lane, err: unknown): string {
+  if (err instanceof CatchupApiError) {
+    if (err.reason === 'noKey') return 'YouTube API key is not set for this build, so videos cannot be loaded.'
+    if (err.status === 403 && err.reason === 'quotaExceeded') {
+      return `${LANE_NAME[lane]}: YouTube's daily quota is used up. Try again tomorrow.`
+    }
+  }
+  return GENERIC[lane]
+}
+
+const EMPTY_LANES: Record<Lane, CatchupVideo[]> = { S: [], W: [], R: [] }
+const NO_NOTICES: Record<Lane, string | null> = { S: null, W: null, R: null }
 
 /** Loads the three lanes (subscriptions, Watch Later, related) and blends them 2 : 1 : 1. */
 export function useCatchup(): CatchupState {
-  const [queue, setQueue] = useState<CatchupVideo[]>([])
+  const [lanes, setLanes] = useState(EMPTY_LANES)
   const [status, setStatus] = useState<CatchupState['status']>('idle')
-  const [laneNotices, setLaneNotices] = useState<string[]>([])
+  const [laneNotices, setLaneNotices] = useState(NO_NOTICES)
   const [actionNotices, setActionNotices] = useState<string[]>([])
   const [counts, setCounts] = useState(() => ({ subs: getSubscriptions().length, later: getWatchLater().length }))
   // A newer refresh wins: an older one finishing late must not overwrite it.
@@ -41,36 +61,40 @@ export function useCatchup(): CatchupState {
     const later = getWatchLater()
     const seeds = getWatchedSeeds()
     setCounts({ subs: subs.length, later: later.length })
+    setLanes(EMPTY_LANES)
+    setLaneNotices(NO_NOTICES)
     setStatus('loading')
 
-    const [s, w, r] = await Promise.allSettled([
-      subs.length ? fetchSubscriptionLane(subs) : Promise.resolve<CatchupVideo[]>([]),
-      later.length ? describeVideos(later) : Promise.resolve<CatchupVideo[]>([]),
-      seeds.length ? fetchRelatedLane(seeds) : Promise.resolve<CatchupVideo[]>([]),
+    // Each lane publishes as soon as it lands, so a slow Mix never holds back the subscriptions.
+    const land = async (lane: Lane, work: Promise<CatchupVideo[]>, emptyNotice?: string) => {
+      try {
+        const videos = await work
+        if (mine !== run.current) return
+        setLanes((l) => ({ ...l, [lane]: videos }))
+        if (videos.length === 0 && emptyNotice) setLaneNotices((n) => ({ ...n, [lane]: emptyNotice }))
+      } catch (err) {
+        if (mine !== run.current) return
+        setLaneNotices((n) => ({ ...n, [lane]: failureNotice(lane, err) }))
+      }
+    }
+
+    await Promise.all([
+      land('S', subs.length ? fetchSubscriptionLane(subs) : Promise.resolve([])),
+      land('W', later.length ? describeVideos(later) : Promise.resolve([])),
+      land('R', seeds.length ? fetchRelatedLane(seeds) : Promise.resolve([]), GENERIC.R),
     ])
-    if (mine !== run.current) return
-
-    const notices: string[] = []
-    if (s.status === 'rejected') {
-      notices.push(
-        isQuota(s.reason)
-          ? "Subscriptions: YouTube's daily quota is used up. Try again tomorrow."
-          : 'Subscriptions: could not load the latest uploads.',
-      )
-    }
-    if (w.status === 'rejected') notices.push('Watch Later: could not load your pasted videos.')
-    if (r.status === 'rejected' || (r.status === 'fulfilled' && seeds.length > 0 && r.value.length === 0)) {
-      notices.push('Related: no suggestions came back for your recent videos.')
-    }
-
-    setQueue(blend(s.status === 'fulfilled' ? s.value : [], w.status === 'fulfilled' ? w.value : [], r.status === 'fulfilled' ? r.value : []))
-    setLaneNotices(notices)
-    setStatus('ready')
+    if (mine === run.current) setStatus('ready')
   }, [])
 
   useEffect(() => {
-    void refresh() // eslint-disable-line react-hooks/set-state-in-effect -- async load of the lanes on mount
+    void refresh()
   }, [refresh])
+
+  const queue = useMemo(() => blend(lanes.S, lanes.W, lanes.R), [lanes])
+  const notices = useMemo(
+    () => [...new Set([...actionNotices, ...(['S', 'W', 'R'] as Lane[]).flatMap((l) => (laneNotices[l] ? [laneNotices[l]!] : []))])],
+    [actionNotices, laneNotices],
+  )
 
   const importSubscriptions = useCallback(async () => {
     setActionNotices([])
@@ -105,7 +129,7 @@ export function useCatchup(): CatchupState {
   return {
     queue,
     status,
-    notices: [...actionNotices, ...laneNotices],
+    notices,
     subscriptionCount: counts.subs,
     watchLaterCount: counts.later,
     importSubscriptions,

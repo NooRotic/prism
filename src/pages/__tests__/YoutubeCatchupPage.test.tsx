@@ -101,3 +101,15 @@ describe('YoutubeCatchupPage', () => {
     )
   })
 })
+
+describe('YoutubeCatchupPage on a site without a Google client id', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('does not show developer instructions to visitors of a production build', () => {
+    vi.stubEnv('DEV', false)
+    vi.mocked(isGoogleAuthConfigured).mockReturnValue(false)
+    renderPage(state())
+    expect(screen.queryByText(/VITE_YOUTUBE_CLIENT_ID/)).not.toBeInTheDocument()
+    expect(screen.getByText(/not available on this site/i)).toBeInTheDocument()
+  })
+})

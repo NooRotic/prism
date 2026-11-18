@@ -16,7 +16,16 @@ const MAX_DESCRIBED = 50
 
 /** The ids of a seed video's Mix, without the seed. Resolves [] if YouTube gives nothing before the timeout. */
 export async function fetchMixIds(seedVideoId: string, timeoutMs = 8000): Promise<string[]> {
-  const YT = await loadYouTubeIframeApi()
+  // The API script can be blocked without ever erroring, so loading it shares the same time budget.
+  let loadTimer: ReturnType<typeof setTimeout> | undefined
+  const YT = await Promise.race([
+    loadYouTubeIframeApi(),
+    new Promise<null>((r) => {
+      loadTimer = setTimeout(() => r(null), timeoutMs)
+    }),
+  ])
+  clearTimeout(loadTimer)
+  if (!YT) return []
   return new Promise<string[]>((resolve) => {
     const host = document.createElement('div')
     host.style.cssText = 'position:fixed;left:-9999px;top:0;width:200px;height:200px;pointer-events:none'
