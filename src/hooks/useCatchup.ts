@@ -1,18 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { blend, parseVideoIds, type CatchupVideo, type Lane } from '../lib/catchup'
-import { CatchupApiError, describeVideos, fetchSubscriptionLane, getMyChannel, listSubscriptions } from '../lib/catchupApi'
-import {
-  getAccount,
-  getSubscriptions,
-  getWatchedSeeds,
-  getWatchLater,
-  setAccount,
-  setSubscriptions,
-  setWatchLater,
-  type StoredAccount,
-} from '../lib/catchupStore'
-import { GoogleAuthError, requestYoutubeReadToken } from '../lib/googleYoutubeAuth'
+import { CatchupApiError, describeVideos, fetchSubscriptionLane } from '../lib/catchupApi'
+import { getAccount, getSubscriptions, getWatchedSeeds, getWatchLater, setWatchLater, type StoredAccount } from '../lib/catchupStore'
 import { fetchRelatedLane } from '../lib/mixRelated'
+import { getYoutubeImportSnapshot, importYoutubeSubscriptions, subscribeYoutubeImport } from '../lib/youtubeImport'
 
 export interface CatchupState {
   queue: CatchupVideo[]
@@ -63,9 +54,15 @@ export function useCatchup(): CatchupState {
   const [counts, setCounts] = useState(() => ({ subs: getSubscriptions().length, later: getWatchLater().length }))
   // A newer refresh wins: an older one finishing late must not overwrite it.
   const run = useRef(0)
-  const [importing, setImporting] = useState(false)
-  const [account, setAccountState] = useState<StoredAccount | null>(() => getAccount())
-  const importingRef = useRef(false)
+  // The import is shared with the header (lib/youtubeImport): "importing" and the account follow it, whichever started it.
+  const { importing, revision } = useSyncExternalStore(subscribeYoutubeImport, getYoutubeImportSnapshot, getYoutubeImportSnapshot)
+  const account = useMemo<StoredAccount | null>(() => {
+    void revision
+    return getAccount()
+  }, [revision])
+  // One refresh per import: our own import refreshes below; an import started elsewhere refreshes from the effect.
+  const lastSeenRevision = useRef(revision)
+  const selfImport = useRef(false)
 
   const refresh = useCallback(async (opts?: { force?: boolean }) => {
     const mine = ++run.current
@@ -110,42 +107,27 @@ export function useCatchup(): CatchupState {
     [actionNotices, laneNotices],
   )
 
+  // An import started elsewhere (the header, another tab): refresh once. Our own import is skipped here and refreshes
+  // itself, whichever of the two runs first.
+  useEffect(() => {
+    if (revision === lastSeenRevision.current) return
+    lastSeenRevision.current = revision
+    if (selfImport.current) return
+    void refresh()
+  }, [revision, refresh])
+
   const importSubscriptions = useCallback(async () => {
-    if (importingRef.current) return
-    importingRef.current = true
-    setImporting(true)
+    if (getYoutubeImportSnapshot().importing) return
     setActionNotices([])
-    try {
-      const token = await requestYoutubeReadToken()
-      const channels = await listSubscriptions(token)
-      // Same one-time token: note whose subscriptions these are. A failed lookup must not lose the import.
-      let mine: Awaited<ReturnType<typeof getMyChannel>> = null
-      try {
-        mine = await getMyChannel(token)
-      } catch {
-        mine = null
-      }
-      setSubscriptions(channels)
-      const record: StoredAccount = { title: mine?.title ?? '', thumbnailUrl: mine?.thumbnailUrl ?? '', importedAt: Date.now() }
-      setAccount(record)
-      setAccountState(record)
-    } catch (err) {
-      setActionNotices([
-        err instanceof GoogleAuthError
-          ? err.reason === 'closed'
-            ? 'The Google sign-in window was closed, so nothing was imported.'
-            : err.reason === 'denied'
-              ? 'Google did not allow the sign-in, so nothing was imported.'
-              : err.reason === 'unconfigured'
-                ? 'Google sign-in is not set up for this build.'
-                : 'Could not reach Google sign-in.'
-          : 'Could not read your subscriptions from YouTube.',
-      ])
+    selfImport.current = true
+    const result = await importYoutubeSubscriptions()
+    selfImport.current = false
+    if (result.status === 'failed') {
+      setActionNotices([result.message])
       return
-    } finally {
-      importingRef.current = false
-      setImporting(false)
     }
+    if (result.status === 'busy') return
+    lastSeenRevision.current = getYoutubeImportSnapshot().revision
     await refresh()
   }, [refresh])
 
