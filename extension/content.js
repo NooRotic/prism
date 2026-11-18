@@ -1,8 +1,8 @@
-// SPIKE (throwaway): reads two lists out of pages the owner is already signed in to.
+// Reads two lists out of pages the owner is already signed in to and hands them to PRISM (see handoff.js).
 //   twitch.tv                       -> the recommended live channels (side bar "Live Channels" and the home shelf "Live channels we think you'll like")
 //   youtube.com/playlist?list=WL    -> the Watch Later video ids (the Data API cannot read this list)
-// A small button at the bottom right copies the result as JSON. Nothing is sent anywhere yet.
-// Keeping any of this needs a design doc first (backlog item 19).
+// A small panel at the bottom right: "Send to PRISM" opens PRISM's /import page with the list (Shift sends it to
+// the local dev site instead), "copy" puts the list on the clipboard as JSON. Design: docs/superpowers/specs/2026-11-18-prism-extension-design.md
 
 const SELECTORS_NOTE = 'Twitch and YouTube change their markup: if a count drops to 0, the selectors in content.js are the first suspect.'
 
@@ -97,35 +97,59 @@ async function collect() {
   return null
 }
 
-function addButton() {
-  if (document.getElementById('prism-helper-spike')) return
-  const b = document.createElement('button')
-  b.id = 'prism-helper-spike'
-  b.textContent = 'PRISM: copy my list'
-  b.title = SELECTORS_NOTE
+function styleButton(b, primary) {
   b.style.cssText =
-    'position:fixed;right:16px;bottom:16px;z-index:2147483647;padding:8px 12px;border-radius:6px;' +
-    'border:1px solid #39ff14;background:#111;color:#39ff14;font:12px monospace;cursor:pointer'
-  b.addEventListener('click', async () => {
-    b.disabled = true
-    b.textContent = 'PRISM: reading…'
-    try {
-      const result = await collect()
-      if (!result) {
-        b.textContent = 'PRISM: nothing to read here'
-      } else {
-        await navigator.clipboard.writeText(JSON.stringify(result, null, 2))
-        b.textContent = `PRISM: copied ${result.count}`
-      }
-    } catch (err) {
-      b.textContent = 'PRISM: failed (see console)'
-      console.error('[PRISM helper]', err)
-    } finally {
-      b.disabled = false
-      setTimeout(() => (b.textContent = 'PRISM: copy my list'), 4000)
-    }
-  })
-  document.body.appendChild(b)
+    'padding:8px 12px;border-radius:6px;font:12px monospace;cursor:pointer;border:1px solid #39ff14;' +
+    (primary ? 'background:#39ff14;color:#111;' : 'background:#111;color:#39ff14;')
 }
 
-addButton()
+/** Read the list, then run `use(result)`; shows progress on the button and always restores its label. */
+function wire(button, label, use) {
+  button.textContent = label
+  button.addEventListener('click', async (event) => {
+    button.disabled = true
+    button.textContent = 'reading…'
+    try {
+      const result = await collect()
+      if (!result) button.textContent = 'nothing to read here'
+      else if (result.count === 0) button.textContent = 'found 0 (page layout changed?)'
+      else button.textContent = await use(result, event)
+    } catch (err) {
+      button.textContent = 'failed (see console)'
+      console.error('[PRISM helper]', err)
+    } finally {
+      button.disabled = false
+      setTimeout(() => (button.textContent = label), 4000)
+    }
+  })
+}
+
+function addPanel() {
+  if (document.getElementById('prism-helper')) return
+  const panel = document.createElement('div')
+  panel.id = 'prism-helper'
+  panel.title = SELECTORS_NOTE
+  panel.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2147483647;display:flex;gap:6px'
+
+  const send = document.createElement('button')
+  styleButton(send, true)
+  wire(send, 'Send to PRISM', async (result, event) => {
+    const kind = result.source === 'twitch-recommended' ? 'twitch-recommended' : 'watch-later'
+    const url = PrismHandoff.importUrl(kind, result.items, event.shiftKey)
+    if (!url) return 'nothing valid to send'
+    await chrome.runtime.sendMessage({ type: 'open', url })
+    return `sent ${result.count}`
+  })
+
+  const copy = document.createElement('button')
+  styleButton(copy, false)
+  wire(copy, 'copy', async (result) => {
+    await navigator.clipboard.writeText(JSON.stringify(result, null, 2))
+    return `copied ${result.count}`
+  })
+
+  panel.append(send, copy)
+  document.body.appendChild(panel)
+}
+
+addPanel()

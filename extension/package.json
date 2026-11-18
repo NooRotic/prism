@@ -1,0 +1,6 @@
+{
+  "name": "prism-helper-extension",
+  "private": true,
+  "type": "commonjs",
+  "description": "Marks these files as classic scripts for Node (the tests load handoff.js); Chrome ignores this file."
+}
