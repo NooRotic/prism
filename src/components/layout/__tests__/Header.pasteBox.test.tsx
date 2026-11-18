@@ -33,9 +33,14 @@ vi.mock('../../search/SmartUrlInput', async () => {
 function GoElsewhere() {
   const navigate = useNavigate()
   return (
-    <button type="button" onClick={() => navigate('/hls-dash/elsewhere')}>
-      go elsewhere
-    </button>
+    <>
+      <button type="button" onClick={() => navigate('/hls-dash/elsewhere')}>
+        go elsewhere
+      </button>
+      <button type="button" onClick={() => navigate(-1)}>
+        go back
+      </button>
+    </>
   )
 }
 
@@ -97,10 +102,25 @@ describe('Header: opening the paste box', () => {
     renderHeaderAt('/hls-dash')
     await userEvent.click(icon())
 
-    act(() => box.props?.onDone?.())
+    act(() => box.props?.onDone?.('escape'))
 
     expect(box.props?.active).toBe(false)
     expect(icon()).toHaveFocus()
+  })
+
+  // Focus leaving an empty box is the viewer clicking somewhere else: taking focus back to the icon would swallow
+  // that click (a field on the page, the player).
+  it('just closes, leaving focus alone, when focus left an empty box', async () => {
+    renderHeaderAt('/hls-dash')
+    await userEvent.click(icon())
+    const elsewhere = screen.getByRole('button', { name: 'go back' })
+    elsewhere.focus()
+
+    act(() => box.props?.onDone?.('blur'))
+
+    expect(box.props?.active).toBe(false)
+    expect(icon()).not.toHaveFocus()
+    expect(elsewhere).toHaveFocus()
   })
 
   it('closes when the page changes, even with text typed', async () => {
@@ -114,10 +134,22 @@ describe('Header: opening the paste box', () => {
     expect(icon()).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('stays closed when the viewer comes back to the page it was open on', async () => {
+    renderHeaderAt('/hls-dash')
+    await userEvent.click(icon())
+    await userEvent.type(screen.getByTestId('smart-url-input'), 'half a link')
+    await userEvent.click(screen.getByRole('button', { name: 'go elsewhere' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'go back' }))
+
+    expect(box.props?.active).toBe(false)
+    expect(icon()).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('keeps the box mounted however often it opens', async () => {
     renderHeaderAt('/hls-dash')
     await userEvent.click(icon())
-    act(() => box.props?.onDone?.())
+    act(() => box.props?.onDone?.('escape'))
     await userEvent.click(icon())
 
     expect(box.mounts).toBe(1)

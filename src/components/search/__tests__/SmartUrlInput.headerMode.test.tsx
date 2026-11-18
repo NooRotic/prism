@@ -80,14 +80,14 @@ describe('SmartUrlInput in the header', () => {
     await userEvent.click(within(screen.getByTestId('slot')).getByRole('button', { name: 'Just Chatting' }))
 
     expect(screen.getByTestId('nav-panel')).toHaveTextContent('category')
-    expect(onDone).toHaveBeenCalled()
+    expect(onDone).toHaveBeenCalledWith('submit')
   })
 
   it('calls onDone on Esc', async () => {
     const { setActive, onDone } = renderHarness(false)
     setActive(true)
     await userEvent.keyboard('{Escape}')
-    expect(onDone).toHaveBeenCalled()
+    expect(onDone).toHaveBeenCalledWith('escape')
   })
 
   it('calls onDone when focus leaves it empty, not when it holds text', async () => {
@@ -100,7 +100,7 @@ describe('SmartUrlInput in the header', () => {
     await userEvent.click(input())
     await userEvent.clear(input())
     await userEvent.click(screen.getByRole('button', { name: 'elsewhere' }))
-    expect(onDone).toHaveBeenCalled()
+    expect(onDone).toHaveBeenCalledWith('blur')
   })
 
   it('takes its list away when it stops being active', () => {

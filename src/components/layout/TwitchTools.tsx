@@ -84,7 +84,8 @@ export function TwitchTools({ browseOpen, onBrowseOpenChange }: TwitchToolsProps
           </button>
         )
       })}
-      <div className="relative">
+      {/* Positioned only from 640 px: below that Browse's dropdown hangs from the whole row (see ChannelSearchDropdown). */}
+      <div className="sm:relative">
         <button
           ref={browseButton}
           type="button"

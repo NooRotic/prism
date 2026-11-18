@@ -1,6 +1,6 @@
 import { Link2, X } from 'lucide-react'
 import { useRef } from 'react'
-import { SmartUrlInput } from '../search/SmartUrlInput'
+import { SmartUrlInput, type SmartUrlDoneReason } from '../search/SmartUrlInput'
 
 interface PasteToggleProps {
   open: boolean
@@ -16,9 +16,11 @@ interface PasteToggleProps {
  */
 export function PasteToggle({ open, onOpenChange, listContainer }: PasteToggleProps) {
   const iconRef = useRef<HTMLButtonElement | null>(null)
-  const close = () => {
+  // Focus goes back to the icon after Esc, the ✕ or a submit. When focus left an empty box, the viewer clicked
+  // somewhere else: moving focus here would swallow that click, so the box just closes.
+  const close = (reason: SmartUrlDoneReason = 'escape') => {
     onOpenChange(false)
-    iconRef.current?.focus()
+    if (reason !== 'blur') iconRef.current?.focus()
   }
 
   return (
@@ -36,7 +38,7 @@ export function PasteToggle({ open, onOpenChange, listContainer }: PasteTogglePr
         </div>
         <button
           type="button"
-          onClick={close}
+          onClick={() => close('escape')}
           aria-label="Close the paste box"
           className="shrink-0 rounded-md p-1.5 transition-colors duration-150 hover:bg-white/10 sm:hidden"
           style={{ color: 'var(--text-muted)' }}

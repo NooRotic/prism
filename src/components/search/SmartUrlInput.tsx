@@ -30,9 +30,12 @@ export interface SmartUrlInputProps {
   /** Turning true empties the box and focuses it. */
   active?: boolean
   /** The box is finished with: after any submit (a page, the Category panel, a played URL, a quick link, a
-   *  suggestion), on Esc, or when focus leaves it while it is empty. */
-  onDone?: () => void
+   *  suggestion), on Esc, or when focus leaves it while it is empty (`blur`: the viewer clicked somewhere else, so
+   *  focus must stay where they put it). May be called twice for one close (a quick link also blurs the box). */
+  onDone?: (reason: SmartUrlDoneReason) => void
 }
+
+export type SmartUrlDoneReason = 'submit' | 'escape' | 'blur'
 
 export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputProps = {}) {
   const navigate = useNavigate()
@@ -121,7 +124,7 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
           dispatch({ type: 'OPEN_CATEGORY_PANEL', category: query })
           setIsOpen(false)
           inputRef.current?.blur()
-          onDone?.()
+          onDone?.('submit')
           return
         }
         // Single word = treat as Twitch channel name → route to /twitch/:channel
@@ -133,7 +136,7 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
         setIsOpen(false)
         setSelectedIndex(-1)
         inputRef.current?.blur()
-        onDone?.()
+        onDone?.('submit')
         return
       }
 
@@ -170,7 +173,7 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
       setIsOpen(false)
       setSelectedIndex(-1)
       inputRef.current?.blur()
-      onDone?.()
+      onDone?.('submit')
     },
     [inputValue, dispatch, navigate, onDone],
   )
@@ -188,7 +191,7 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
       dispatch({ type: 'OPEN_CATEGORY_PANEL', category: gameName })
       setIsOpen(false)
       inputRef.current?.blur()
-      onDone?.()
+      onDone?.('submit')
     },
     [dispatch, onDone],
   )
@@ -199,7 +202,7 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
         setIsOpen(false)
         setSelectedIndex(-1)
         inputRef.current?.blur()
-        onDone?.()
+        onDone?.('escape')
         return
       }
 
@@ -260,7 +263,7 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
           }}
           onFocus={() => setIsOpen(true)}
           onBlur={() => {
-            if (!inputValue.trim()) onDone?.()
+            if (!inputValue.trim()) onDone?.('blur')
           }}
           onKeyDown={handleKeyDown}
           placeholder="Paste URL or type channel name..."
