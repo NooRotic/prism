@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { blend, parseVideoIds, type CatchupVideo, type Lane } from '../lib/catchup'
-import { CatchupApiError, describeVideos, fetchSubscriptionLane, listSubscriptions } from '../lib/catchupApi'
+import { CatchupApiError, describeVideos, fetchSubscriptionLane, getMyChannel, listSubscriptions } from '../lib/catchupApi'
 import {
+  getAccount,
   getSubscriptions,
   getWatchedSeeds,
   getWatchLater,
+  setAccount,
   setSubscriptions,
   setWatchLater,
+  type StoredAccount,
 } from '../lib/catchupStore'
 import { GoogleAuthError, requestYoutubeReadToken } from '../lib/googleYoutubeAuth'
 import { fetchRelatedLane } from '../lib/mixRelated'
@@ -19,6 +22,8 @@ export interface CatchupState {
   notices: string[]
   subscriptionCount: number
   watchLaterCount: number
+  /** Which Google account the subscriptions were last imported from, or null before the first import. */
+  account: StoredAccount | null
   /** True while Google's sign-in window or the subscription read is in progress. */
   importing: boolean
   importSubscriptions(): Promise<void>
@@ -59,6 +64,7 @@ export function useCatchup(): CatchupState {
   // A newer refresh wins: an older one finishing late must not overwrite it.
   const run = useRef(0)
   const [importing, setImporting] = useState(false)
+  const [account, setAccountState] = useState<StoredAccount | null>(() => getAccount())
   const importingRef = useRef(false)
 
   const refresh = useCallback(async (opts?: { force?: boolean }) => {
@@ -111,7 +117,18 @@ export function useCatchup(): CatchupState {
     setActionNotices([])
     try {
       const token = await requestYoutubeReadToken()
-      setSubscriptions(await listSubscriptions(token))
+      const channels = await listSubscriptions(token)
+      // Same one-time token: note whose subscriptions these are. A failed lookup must not lose the import.
+      let mine: Awaited<ReturnType<typeof getMyChannel>> = null
+      try {
+        mine = await getMyChannel(token)
+      } catch {
+        mine = null
+      }
+      setSubscriptions(channels)
+      const record: StoredAccount = { title: mine?.title ?? '', thumbnailUrl: mine?.thumbnailUrl ?? '', importedAt: Date.now() }
+      setAccount(record)
+      setAccountState(record)
     } catch (err) {
       setActionNotices([
         err instanceof GoogleAuthError
@@ -159,6 +176,7 @@ export function useCatchup(): CatchupState {
     notices,
     subscriptionCount: counts.subs,
     watchLaterCount: counts.later,
+    account,
     importing,
     importSubscriptions,
     savePastedWatchLater,

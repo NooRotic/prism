@@ -32,6 +32,24 @@ function readList<T>(key: string): T[] {
   return Array.isArray(v) ? (v as T[]) : []
 }
 
+export interface StoredAccount {
+  title: string
+  thumbnailUrl: string
+  /** When the subscriptions were imported (ms since epoch). */
+  importedAt: number
+}
+
+/** Which account the stored subscriptions came from; null before the first import or if the record is damaged. */
+export function getAccount(): StoredAccount | null {
+  const a = readJson<Partial<StoredAccount> | null>(STORAGE_KEYS.LOCAL_CATCHUP_ACCOUNT, null)
+  if (!a || typeof a.title !== 'string' || typeof a.thumbnailUrl !== 'string' || typeof a.importedAt !== 'number') return null
+  return { title: a.title, thumbnailUrl: a.thumbnailUrl, importedAt: a.importedAt }
+}
+
+export function setAccount(account: StoredAccount): void {
+  writeJson(STORAGE_KEYS.LOCAL_CATCHUP_ACCOUNT, account)
+}
+
 export function getSubscriptions(): StoredChannel[] {
   return readList<StoredChannel>(STORAGE_KEYS.LOCAL_CATCHUP_SUBSCRIPTIONS)
 }

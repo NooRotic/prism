@@ -55,6 +55,14 @@ export async function listSubscriptions(accessToken: string): Promise<StoredChan
   return out
 }
 
+/** The signed-in owner's own channel (name and picture), so PRISM can say which account an import came from. 1 quota unit. */
+export async function getMyChannel(accessToken: string): Promise<{ title: string; thumbnailUrl: string } | null> {
+  const data = await call('channels', { part: 'snippet', mine: 'true' }, accessToken)
+  const s = data.items?.[0]?.snippet
+  if (!s) return null
+  return { title: s.title, thumbnailUrl: s.thumbnails?.default?.url ?? s.thumbnails?.medium?.url ?? '' }
+}
+
 /** Titles, thumbnails and length for video ids; only videos that can play in the embed. 1 quota unit per 50. */
 export async function describeVideos(ids: string[]): Promise<CatchupVideo[]> {
   const found = new Map<string, CatchupVideo>()

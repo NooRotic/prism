@@ -28,6 +28,7 @@ const state = (over: Partial<CatchupState> = {}): CatchupState => ({
   savePastedWatchLater: vi.fn(async () => {}),
   clearWatchLater: vi.fn(async () => {}),
   importing: false,
+  account: null,
   refresh: vi.fn(async () => {}),
   ...over,
 })
@@ -139,5 +140,17 @@ describe('YoutubeCatchupPage controls', () => {
     renderPage(s)
     fireEvent.click(screen.getByRole('button', { name: /Clear Watch Later/ }))
     expect(s.clearWatchLater).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('YoutubeCatchupPage account line', () => {
+  it('says which account the subscriptions came from, and when', () => {
+    renderPage(state({ account: { title: 'NooRotic', thumbnailUrl: '', importedAt: Date.UTC(2026, 10, 18, 12) } }))
+    expect(screen.getByText(/Subscriptions from NooRotic, imported/)).toBeInTheDocument()
+  })
+
+  it('shows no account line before the first import', () => {
+    renderPage(state())
+    expect(screen.queryByText(/Subscriptions from/)).not.toBeInTheDocument()
   })
 })

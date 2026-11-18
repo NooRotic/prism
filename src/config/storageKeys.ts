@@ -27,6 +27,8 @@ export const STORAGE_KEYS = {
   LOCAL_YOUTUBE_CACHE_PREFIX: 'prism_yt_cache_',
   /** Catch up: the owner's imported YouTube subscriptions (JSON array of `{ id, title }`). */
   LOCAL_CATCHUP_SUBSCRIPTIONS: 'prism_catchup_subscriptions',
+  /** Catch up: which account the last subscription import came from (JSON `{ title, thumbnailUrl, importedAt }`). */
+  LOCAL_CATCHUP_ACCOUNT: 'prism_catchup_account',
   /** Catch up: Watch Later video ids the owner pasted (JSON array of strings). */
   LOCAL_CATCHUP_WATCH_LATER: 'prism_catchup_watch_later',
   /** Catch up: video ids watched in PRISM, newest first, used as Mix seeds (JSON array, max 10). */
