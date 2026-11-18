@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppProvider } from '../../../contexts/AppContext'
@@ -20,74 +21,93 @@ function renderHeader() {
   )
 }
 
+const bar = (container: HTMLElement) => container.querySelector('[data-header-bar]') as HTMLElement
+const classesOf = (el: Element | null) => (el?.getAttribute('class') ?? '').split(/\s+/)
+
 afterEach(() => {
   auth.isAuthenticated = false
 })
 
-// A phone is about 375 px wide. The logo, the nav (signed in), the paste box, the debug toggle and the sign-in button do not
-// fit one row there, and the page used to scroll sideways. Below 640 px the header wraps onto a second row (the actions);
-// it takes the height of its content, and publishes it as --header-height for everything that sits under it.
-describe('Header on a narrow screen', () => {
-  it.each([[false], [true]])('wraps onto a second row of its own (signed in: %s)', (signedIn) => {
-    auth.isAuthenticated = signedIn
+// Folded, the header is one row at every width (measured 2026-11-18: 491 px of content at 360 px before compacting),
+// 56 px tall, and never makes the page scroll sideways (the bug the old header had on a phone).
+describe('Header layout', () => {
+  it('keeps the folded header on one row at every width', () => {
     const { container } = renderHeader()
 
-    const header = screen.getByRole('banner')
-    expect(header.className).toContain('flex-wrap')
-    expect(header.className).toContain('min-h-14')
-    expect(header.className).not.toContain('h-(--header-height)')
-    const actions = container.querySelector('[data-header-actions]')
-    expect(actions?.className).toContain('w-full')
-    expect(actions?.className).toContain('sm:w-auto')
-    expect(actions?.contains(screen.getByTestId('smart-url-input'))).toBe(true)
+    expect(classesOf(bar(container))).toContain('flex-nowrap')
+    expect(classesOf(bar(container))).not.toContain('flex-wrap')
+    expect(classesOf(bar(container))).toContain('min-h-14')
   })
 
-  it('lets the paste box shrink to the room the buttons leave it on a phone, and keeps its own size from 640 px up', () => {
+  it('lets the tab strip shrink and scroll inside itself rather than push the page sideways', () => {
+    renderHeader()
+
+    const tabs = classesOf(screen.getByRole('navigation', { name: 'Sections' }))
+    expect(tabs).toContain('min-w-0')
+    expect(tabs).toContain('overflow-x-auto')
+  })
+
+  // Measured 2026-11-18: at 640 px the wordmark and the full tab labels together clipped HLS/DASH to "HLS/D"; the tabs
+  // win, so the wordmark waits until 768 px.
+  it('shows the wordmark only from 768 px, and a smaller mark below 640 px', () => {
     const { container } = renderHeader()
 
-    const holder = screen.getByTestId('smart-url-input').parentElement
-    expect(holder?.className).toContain('min-w-0')
-    expect(holder?.className).toContain('flex-1')
-    expect(holder?.className).toContain('sm:flex-none')
-    expect(container.querySelector('[data-header-actions]')?.contains(holder)).toBe(true)
+    expect(classesOf(screen.getByText('PRISM'))).toEqual(expect.arrayContaining(['hidden', 'md:inline']))
+    expect(classesOf(screen.getByText('PRISM'))).not.toContain('sm:inline')
+    const mark = container.querySelector('a[aria-label="Return to home"] > :first-child')
+    expect(classesOf(mark)).toEqual(expect.arrayContaining(['w-10', 'sm:w-16']))
   })
 
-  it('keeps each nav label on one line, with tighter padding on a phone (signed in)', () => {
+  it('shortens HLS/DASH to HLS below 640 px', () => {
+    renderHeader()
+
+    const link = screen.getByRole('link', { name: 'HLS/DASH' })
+    expect(classesOf(within(link).getByText('HLS/DASH'))).toEqual(expect.arrayContaining(['hidden', 'sm:inline']))
+    expect(classesOf(within(link).getByText('HLS'))).toContain('sm:hidden')
+  })
+
+  it('trades the Sign in text and the empty dots for a person icon below 440 px', () => {
+    renderHeader()
+
+    const pill = screen.getByRole('button', { name: /^Accounts:/ })
+    expect(classesOf(within(pill).getByText('Sign in'))).toContain('max-[439px]:hidden')
+    expect(classesOf(pill.querySelector('[data-accounts-badges]'))).toContain('max-[439px]:hidden')
+    expect(classesOf(pill.querySelector('[data-accounts-icon]'))).toContain('min-[440px]:hidden')
+  })
+
+  it('keeps the two account badges at every width once something is connected', () => {
     auth.isAuthenticated = true
     renderHeader()
 
-    const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    const buttons = Array.from(nav.querySelectorAll('button'))
-    expect(buttons.map((button) => button.textContent)).toEqual(['Following', 'Your Stats', 'Browse'])
-    for (const button of buttons) {
-      expect(button.className).toContain('whitespace-nowrap')
-      expect(button.className).toContain('px-2')
-      expect(button.className).toContain('sm:px-3')
-    }
+    const pill = screen.getByRole('button', { name: /^Accounts:/ })
+    expect(classesOf(pill.querySelector('[data-accounts-badges]'))).not.toContain('max-[439px]:hidden')
+    expect(pill.querySelector('[data-accounts-icon]')).toBeNull()
   })
 
   it('keeps the smaller side padding on a phone and the roomy one from 640 px up', () => {
-    renderHeader()
-
-    const header = screen.getByRole('banner')
-    expect(header.className).toContain('px-3')
-    expect(header.className).toContain('sm:px-6')
-  })
-
-  it('stays 56 px tall on a wide screen: the vertical padding is trimmed so the paste box does not make it taller', () => {
-    renderHeader()
-
-    const header = screen.getByRole('banner')
-    expect(header.className).toMatch(/(^| )py-2( |$)/)
-    expect(header.className).not.toContain('py-3')
-  })
-
-  it('lets the logo and the nav wrap onto two rows on a very narrow screen', () => {
-    auth.isAuthenticated = true
     const { container } = renderHeader()
 
-    const brand = container.querySelector('[data-header-brand]')
-    expect(brand?.className).toContain('flex-wrap')
-    expect(brand?.querySelector('nav')).not.toBeNull()
+    expect(classesOf(bar(container))).toEqual(expect.arrayContaining(['px-3', 'sm:px-6']))
+  })
+
+  it('keeps the bar 56 px tall: trimmed vertical padding and a 56 px floor', () => {
+    const { container } = renderHeader()
+
+    expect(classesOf(bar(container))).toContain('py-2')
+    expect(classesOf(bar(container))).not.toContain('py-3')
+    expect(classesOf(bar(container))).toContain('min-h-14')
+  })
+
+  it('keeps each Twitch tool label on one line, with tighter padding on a phone (signed in)', async () => {
+    auth.isAuthenticated = true
+    renderHeader()
+    await userEvent.click(screen.getByRole('button', { name: 'Twitch tools' }))
+
+    const row = document.getElementById('header-row') as HTMLElement
+    const buttons = within(row).getAllByRole('button')
+    expect(buttons.map((button) => button.textContent)).toEqual(['Following', 'Your Stats', 'Browse'])
+    for (const button of buttons) {
+      expect(classesOf(button)).toEqual(expect.arrayContaining(['whitespace-nowrap', 'px-2', 'sm:px-3']))
+    }
   })
 })

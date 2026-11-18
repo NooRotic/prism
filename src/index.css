@@ -317,3 +317,21 @@ html.counted .counted-note {
   background: rgba(57, 255, 20, 0.2);
   color: var(--text-primary);
 }
+
+/* ─── The header's folding second row (FoldingRow) ───
+   It unfolds from 0 to its own height in the page flow, so the header grows and the page moves down (never covered).
+   Grid rows animate to "whatever the content needs". Reduced motion keeps a 1 ms transition so the end of it still
+   fires (FoldingRow waits for it before letting drop-downs hang out of the row). */
+.header-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 180ms ease;
+}
+.header-fold[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+@media (prefers-reduced-motion: reduce) {
+  .header-fold {
+    transition-duration: 1ms;
+  }
+}

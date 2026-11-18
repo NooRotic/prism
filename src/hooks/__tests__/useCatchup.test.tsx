@@ -4,6 +4,7 @@ import { setSubscriptions, getSubscriptions, getWatchLater, setWatchLater, recor
 import { CatchupApiError, describeVideos, fetchSubscriptionLane, getMyChannel, listSubscriptions } from '../../lib/catchupApi'
 import { fetchRelatedLane } from '../../lib/mixRelated'
 import { GoogleAuthError, requestYoutubeReadToken } from '../../lib/googleYoutubeAuth'
+import { importYoutubeSubscriptions } from '../../lib/youtubeImport'
 import { useCatchup } from '../useCatchup'
 
 vi.mock('../../lib/catchupApi', async (importOriginal) => {
@@ -276,5 +277,29 @@ describe('useCatchup: which account the import came from', () => {
     })
     expect(getAccount()).toEqual({ title: 'Old', thumbnailUrl: '', importedAt: 5 })
     expect(result.current.account).toMatchObject({ title: 'Old' })
+  })
+})
+
+describe('useCatchup: an import started elsewhere', () => {
+  it('refreshes once', async () => {
+    setSubscriptions([{ id: 'UCold', title: 'Old' }])
+    vi.mocked(requestYoutubeReadToken).mockResolvedValue('tok')
+    vi.mocked(listSubscriptions).mockResolvedValue([{ id: 'UCnew', title: 'New' }])
+    vi.mocked(getMyChannel).mockResolvedValue({ title: 'NooRotic', thumbnailUrl: '' })
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    const before = mS.mock.calls.length
+
+    await act(async () => {
+      await importYoutubeSubscriptions()
+    })
+
+    await waitFor(() => expect(mS.mock.calls.length).toBe(before + 1))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20))
+    })
+    expect(mS.mock.calls.length).toBe(before + 1)
+    expect(result.current.subscriptionCount).toBe(1)
+    expect(result.current.account?.title).toBe('NooRotic')
   })
 })
