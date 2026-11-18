@@ -143,3 +143,13 @@ describe('useCatchup: failures say what is wrong', () => {
     expect(result.current.notices.join(' ')).not.toMatch(/pasted/i)
   })
 })
+
+describe('useCatchup: no recent videos to start the related lane from', () => {
+  it('says nothing about related videos, since none were looked for', async () => {
+    setSubscriptions([{ id: 'UCa', title: 'A' }])
+    mS.mockResolvedValue([vid('s1')])
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.notices).toEqual([])
+  })
+})
