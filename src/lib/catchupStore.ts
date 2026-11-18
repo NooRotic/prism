@@ -56,6 +56,8 @@ export function setWatchLater(ids: string[]): void {
 
 /** Remember a video the owner played in PRISM: newest first, no repeats, at most 10. */
 export function recordWatched(videoId: string): void {
+  // The player route takes any text, so a typo or a deleted address must not become a related-lane seed.
+  if (!/^[\w-]{11}$/.test(videoId)) return
   const next = [videoId, ...readList<string>(STORAGE_KEYS.LOCAL_CATCHUP_WATCHED).filter((id) => id !== videoId)]
   writeJson(STORAGE_KEYS.LOCAL_CATCHUP_WATCHED, next.slice(0, WATCHED_MAX))
 }

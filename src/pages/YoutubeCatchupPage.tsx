@@ -37,12 +37,18 @@ export default function YoutubeCatchupPage() {
           type="button"
           className="rounded px-3 py-1.5 text-sm"
           style={buttonStyle()}
-          disabled={!configured}
+          disabled={!configured || catchup.importing}
           onClick={() => void catchup.importSubscriptions()}
         >
-          Import my subscriptions
+          {catchup.importing ? 'Importing…' : 'Import my subscriptions'}
         </button>
-        <button type="button" className="rounded px-3 py-1.5 text-sm" style={buttonStyle()} onClick={() => void catchup.refresh()}>
+        <button
+          type="button"
+          className="rounded px-3 py-1.5 text-sm"
+          style={buttonStyle()}
+          disabled={catchup.status === 'loading'}
+          onClick={() => void catchup.refresh({ force: true })}
+        >
           Refresh
         </button>
         {!configured && (
@@ -75,14 +81,24 @@ export default function YoutubeCatchupPage() {
           className="rounded p-2 text-sm font-mono"
           style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
         />
-        <button
-          type="button"
-          className="self-start rounded px-3 py-1.5 text-sm"
-          style={buttonStyle()}
-          onClick={() => void catchup.savePastedWatchLater(pasted)}
-        >
-          Save pasted videos
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded px-3 py-1.5 text-sm"
+            style={buttonStyle()}
+            onClick={() => void catchup.savePastedWatchLater(pasted)}
+          >
+            Save pasted videos
+          </button>
+          <button
+            type="button"
+            className="rounded px-3 py-1.5 text-sm"
+            style={buttonStyle()}
+            onClick={() => void catchup.clearWatchLater()}
+          >
+            Clear Watch Later
+          </button>
+        </div>
       </div>
 
       {catchup.notices.length > 0 && (

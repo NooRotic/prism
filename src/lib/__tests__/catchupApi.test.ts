@@ -161,3 +161,17 @@ describe('describeVideos keeps unplayable videos out', () => {
     expect((await describeVideos(['agerestrict1', 'normalvideo1'])).map((v) => v.id)).toEqual(['normalvideo1'])
   })
 })
+
+describe('fetchSubscriptionLane when forced', () => {
+  it('ignores a warm cache and asks YouTube again', async () => {
+    writeSLaneCache([{ id: 'cached00000', title: 't', channel: 'c', publishedAt: '', durationSec: 5, thumbnail: '' }])
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const u = new URL(urlOf(input))
+      if (u.pathname.endsWith('/playlistItems')) return json({ items: [{ contentDetails: { videoId: 'fresh000000' } }] })
+      return json({ items: u.searchParams.get('id')!.split(',').map((id) => videoItem(id)) })
+    })
+    const lane = await fetchSubscriptionLane([{ id: ch(0), title: 'c0' }], { force: true })
+    expect(fetchMock).toHaveBeenCalled()
+    expect(lane.map((v) => v.id)).toEqual(['fresh000000'])
+  })
+})

@@ -153,3 +153,85 @@ describe('useCatchup: no recent videos to start the related lane from', () => {
     expect(result.current.notices).toEqual([])
   })
 })
+
+describe('useCatchup: first paint', () => {
+  it('starts as loading, so the empty-state text does not flash before the first load', async () => {
+    const seen: string[] = []
+    const { result } = renderHook(() => {
+      const c = useCatchup()
+      seen.push(c.status)
+      return c
+    })
+    expect(seen[0]).toBe('loading')
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+  })
+})
+
+describe('useCatchup: forced refresh', () => {
+  it('asks the subscription lane to skip its cache', async () => {
+    setSubscriptions([{ id: 'UCa', title: 'A' }])
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await act(async () => {
+      await result.current.refresh({ force: true })
+    })
+    expect(mS).toHaveBeenLastCalledWith([{ id: 'UCa', title: 'A' }], { force: true })
+  })
+})
+
+describe('useCatchup: pasting Watch Later', () => {
+  it('keeps the saved list and says so when nothing in the paste is a video link', async () => {
+    setWatchLater(['aaaaaaaaaaa'])
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await act(async () => {
+      await result.current.savePastedWatchLater('Some Video Title\nAnother Title')
+    })
+    expect(getWatchLater()).toEqual(['aaaaaaaaaaa'])
+    expect(result.current.notices.join(' ')).toMatch(/no video links/i)
+  })
+
+  it('tells the owner how many videos were saved', async () => {
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await act(async () => {
+      await result.current.savePastedWatchLater('https://youtu.be/aaaaaaaaaaa https://youtu.be/bbbbbbbbbbb')
+    })
+    expect(result.current.notices.join(' ')).toMatch(/saved 2 watch later videos/i)
+  })
+
+  it('clears the list on request', async () => {
+    setWatchLater(['aaaaaaaaaaa'])
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await act(async () => {
+      await result.current.clearWatchLater()
+    })
+    expect(getWatchLater()).toEqual([])
+    expect(result.current.watchLaterCount).toBe(0)
+  })
+})
+
+describe('useCatchup: import in progress', () => {
+  it('reports importing while Google is open, and ignores a second click', async () => {
+    let finish!: (t: string) => void
+    vi.mocked(requestYoutubeReadToken).mockReturnValue(new Promise<string>((r) => (finish = r)))
+    vi.mocked(listSubscriptions).mockResolvedValue([])
+    const { result } = renderHook(() => useCatchup())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    let first!: Promise<void>
+    act(() => {
+      first = result.current.importSubscriptions()
+    })
+    await waitFor(() => expect(result.current.importing).toBe(true))
+    await act(async () => {
+      await result.current.importSubscriptions()
+    })
+    expect(vi.mocked(requestYoutubeReadToken)).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      finish('tok')
+      await first
+    })
+    expect(result.current.importing).toBe(false)
+  })
+})
