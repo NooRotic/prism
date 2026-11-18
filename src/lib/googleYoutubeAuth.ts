@@ -9,12 +9,11 @@ const GSI_SRC = 'https://accounts.google.com/gsi/client'
 export type GoogleAuthReason = 'denied' | 'closed' | 'unconfigured' | 'load'
 
 export class GoogleAuthError extends Error {
-  constructor(
-    public reason: GoogleAuthReason,
-    message: string,
-  ) {
+  reason: GoogleAuthReason
+  constructor(reason: GoogleAuthReason, message: string) {
     super(message)
     this.name = 'GoogleAuthError'
+    this.reason = reason
   }
 }
 

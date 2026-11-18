@@ -3,6 +3,12 @@
 /** Why a video is in the queue: S = new from a subscription, W = Watch Later, R = related. */
 export type Lane = 'S' | 'W' | 'R'
 
+export const LANE_LABEL: Record<Lane, string> = {
+  S: 'New from your subscriptions',
+  W: 'From your Watch Later',
+  R: 'Related to what you watched',
+}
+
 export interface CatchupVideo {
   id: string
   title: string

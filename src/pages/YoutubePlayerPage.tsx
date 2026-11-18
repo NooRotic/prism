@@ -6,6 +6,7 @@ import { detectURLType } from '../lib/urlDetection'
 import { getDemoById } from '../config/demoContent'
 import { getVideoDetails, isYouTubeApiAvailable, type YouTubeVideo } from '../lib/youtubeApi'
 import { logger } from '../lib/logger'
+import { recordWatched } from '../lib/catchupStore'
 import PlayerHost from '../components/player/PlayerHost'
 import DebugPanel from '../components/layout/DebugPanel'
 
@@ -18,6 +19,7 @@ export default function YoutubePlayerPage() {
   // Set player URL from route param
   useEffect(() => {
     if (!videoId) return
+    recordWatched(videoId)
     const demo = getDemoById(videoId)
     const url = demo ? demo.url : `https://www.youtube.com/watch?v=${videoId}`
     const detection = detectURLType(url)
