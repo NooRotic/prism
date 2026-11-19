@@ -39,6 +39,8 @@ export const STORAGE_KEYS = {
   LOCAL_CATCHUP_WATCHED: 'prism_catchup_watched',
   /** Catch up: the subscription lane, cached for 30 minutes (JSON `{ at, videos }`). */
   LOCAL_CATCHUP_LANE_CACHE: 'prism_catchup_lane_s',
+  /** Catch up: the queue as shown (up to 200 `{ id, title, thumbnail }`), read by the player page's filmstrip. */
+  LOCAL_CATCHUP_QUEUE: 'prism_catchup_queue',
   /** Channel rail edge: 'left' or 'right'. */
   LOCAL_RAIL_POSITION: 'prism_rail_position',
   /** Chat dock state: JSON `{ side: 'left' | 'right', hidden: boolean }`. */
