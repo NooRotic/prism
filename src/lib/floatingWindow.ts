@@ -1,5 +1,5 @@
-import { FLOAT_DEFAULT_SIZE } from './floatingVideo'
-import type { FloatSize } from './floatingVideo'
+import { FLOAT_DEFAULT_SIZE, POPOUT_FAILED_MESSAGE, buildPopoutPlayerPath } from './floatingVideo'
+import type { FloatSize, FramedSource } from './floatingVideo'
 
 export const START_BUTTON_TEXT = 'Click here to start with sound'
 export const PLAYER_HOLDER_ID = 'prism-floating-player'
@@ -13,13 +13,20 @@ const TWITCH_EMBED_SCRIPT = 'https://embed.twitch.tv/embed/v1.js'
 export interface FloatingSession {
   /** Switches the player to another channel. A no-op after close, or for the channel already showing. */
   setChannel(channel: string): void
+  /** Switches a window that shows a pasted video or stream to another one. A no-op after close, and on a Twitch window. */
+  setSource(source: FramedSource): void
   /** Closes the window. Safe to call more than once. */
   close(): void
   readonly closed: boolean
 }
 
 export interface OpenFloatingOptions {
-  channel: string
+  /** The Twitch channel to show. Leave out when `source` is given. */
+  channel?: string
+  /** A YouTube video or a pasted stream, played by the app's own player page in a frame instead of the Twitch embed. */
+  source?: FramedSource
+  /** Where the app is served from, for the frame's address and for trusting its messages. Defaults to this page's origin. */
+  appOrigin?: string
   /** The main page's hostname; the window's own origin reads "null", so Twitch must be told. */
   parent: string
   size: FloatSize
@@ -109,7 +116,10 @@ function buildSession(
   loadScript: (win: Window) => Promise<void>,
 ): FloatingSession {
   const { parent, onClosed, onFailed, onResize } = options
-  let currentChannel = options.channel
+  let currentChannel = options.channel ?? ''
+  let currentSource = options.source
+  const appOrigin = options.appOrigin ?? window.location.origin
+  let frame: HTMLIFrameElement | null = null
   let closed = false
   let failed = false
   let started = false
@@ -150,6 +160,20 @@ function buildSession(
     onFailed()
   }
 
+  const framePath = (source: FramedSource) => new URL(buildPopoutPlayerPath(source), appOrigin).toString()
+
+  /** The app's player page in a frame. It is loaded by a click inside the window, so the browser lets it play sound. */
+  const createFrame = (source: FramedSource) => {
+    const element = doc.createElement('iframe')
+    element.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture')
+    element.setAttribute('allowfullscreen', '')
+    // Once the page has loaded the window has done its part; a page that cannot play says so by message.
+    element.addEventListener('load', clearReadyTimer)
+    element.setAttribute('src', framePath(source))
+    holder.appendChild(element)
+    frame = element
+  }
+
   const createEmbed = () => {
     const Embed = embedClassOf(win)
     if (!Embed) throw new Error('The Twitch Embed SDK is not available in the floating window')
@@ -183,6 +207,10 @@ function buildSession(
     // Armed before the script is fetched, so a request that stalls fails too.
     armReadyTimer()
     try {
+      if (currentSource) {
+        createFrame(currentSource)
+        return
+      }
       await loadScript(win)
       if (closed || failed) return
       createEmbed()
@@ -202,6 +230,11 @@ function buildSession(
     onClosed()
   }
   win.addEventListener('pagehide', handleClosed)
+  // The player page in the frame tells us when it cannot play. Only the app's own origin is believed.
+  win.addEventListener('message', (event: unknown) => {
+    const { origin, data } = event as { origin?: string; data?: { type?: string } }
+    if (origin === appOrigin && data?.type === POPOUT_FAILED_MESSAGE) fail()
+  })
   // Closed before it was handed over (the viewer shut it at once): no `pagehide` will come now.
   if (win.closed) handleClosed()
 
@@ -263,6 +296,13 @@ function buildSession(
       } catch {
         fail()
       }
+    },
+    setSource(next: FramedSource) {
+      if (closed || !currentSource) return
+      currentSource = next
+      // Not started yet: the latest source is the one that starts on the click.
+      frame?.setAttribute('src', framePath(next))
+      if (frame) armReadyTimer()
     },
     close() {
       if (closed) return

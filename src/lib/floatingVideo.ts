@@ -112,6 +112,9 @@ export function youtubeVideoIdFromPath(pathname: string): string | null {
   return id === 'catchup' ? null : id
 }
 
+/** What the pop-out player page tells the window that holds it when it cannot play: the window then closes and says so. */
+export const POPOUT_FAILED_MESSAGE = 'prism-popout-failed'
+
 const POPOUT_PLAYER_PATH = '/popout/player'
 const YOUTUBE_ID = /^[\w-]{11}$/
 

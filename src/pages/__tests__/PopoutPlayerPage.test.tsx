@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import PopoutPlayerPage, { POPOUT_FAILED_MESSAGE } from '../PopoutPlayerPage'
+import PopoutPlayerPage from '../PopoutPlayerPage'
+import { POPOUT_FAILED_MESSAGE } from '../../lib/floatingVideo'
 
 type HostProps = { url: string; detection: { type: string }; renderError?: (e: string | null) => React.ReactNode }
 let lastHost: HostProps | null = null

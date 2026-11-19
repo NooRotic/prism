@@ -1,11 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import PlayerHost from '../components/player/PlayerHost'
-import { parsePopoutPlayerQuery } from '../lib/floatingVideo'
+import { POPOUT_FAILED_MESSAGE, parsePopoutPlayerQuery } from '../lib/floatingVideo'
 import { detectURLType, detectURLTypeAs } from '../lib/urlDetection'
-
-/** What this page tells the window that holds it when it cannot play: the window then closes and says so. */
-export const POPOUT_FAILED_MESSAGE = 'prism-popout-failed'
 
 /** Only the window that embeds this page hears it, and only from this origin. */
 function tellOpenerItFailed() {
