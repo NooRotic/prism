@@ -25,6 +25,8 @@ export const STORAGE_KEYS = {
   LOCAL_INTROS_SEEN: 'prism_intros_seen',
   /** Prefix for per-category YouTube cache entries (e.g. prism_yt_cache_popular). */
   LOCAL_YOUTUBE_CACHE_PREFIX: 'prism_yt_cache_',
+  /** Prefix for the YouTube player page's cached API answers (details, comments, playlists, topic searches, related). */
+  LOCAL_VIDEO_PAGE_CACHE_PREFIX: 'prism_vp_',
   /** Twitch's recommended channels the owner sent from the PRISM helper extension (JSON `{ logins, importedAt }`). */
   LOCAL_TWITCH_RECOMMENDED: 'prism_twitch_recommended',
   /** Catch up: the owner's imported YouTube subscriptions (JSON array of `{ id, title }`). */
@@ -37,6 +39,8 @@ export const STORAGE_KEYS = {
   LOCAL_CATCHUP_WATCHED: 'prism_catchup_watched',
   /** Catch up: the subscription lane, cached for 30 minutes (JSON `{ at, videos }`). */
   LOCAL_CATCHUP_LANE_CACHE: 'prism_catchup_lane_s',
+  /** Catch up: the queue as shown (up to 200 `{ id, title, thumbnail }`), read by the player page's filmstrip. */
+  LOCAL_CATCHUP_QUEUE: 'prism_catchup_queue',
   /** Channel rail edge: 'left' or 'right'. */
   LOCAL_RAIL_POSITION: 'prism_rail_position',
   /** Chat dock state: JSON `{ side: 'left' | 'right', hidden: boolean }`. */

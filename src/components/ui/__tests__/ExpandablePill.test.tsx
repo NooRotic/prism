@@ -3,6 +3,20 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { ExpandablePill } from '../ExpandablePill'
 
+describe('ExpandablePill readability', () => {
+  it('sets its label at body size, not the tiny text-xs', () => {
+    render(<ExpandablePill label="Gaming" />)
+    const label = screen.getByText('Gaming')
+    expect(label.className).toContain('text-sm')
+    expect(label.className).not.toContain('text-xs')
+  })
+  it('keeps an idle label brighter than the muted token and the idle border visible', () => {
+    render(<ExpandablePill label="Gaming" />)
+    expect(screen.getByText('Gaming')).toHaveStyle({ color: 'var(--text-secondary)' })
+    expect(screen.getByRole('button')).toHaveStyle({ border: '1px solid rgba(255,255,255,0.25)' })
+  })
+})
+
 describe('ExpandablePill', () => {
   // ── Rendering ─────────────────────────────────────────────────────────────
 

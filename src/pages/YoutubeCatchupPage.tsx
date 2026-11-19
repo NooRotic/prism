@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import CatchupCard from '../components/youtube/CatchupCard'
 import { useCatchup } from '../hooks/useCatchup'
 import { LANE_LABEL, type Lane } from '../lib/catchup'
 import { isGoogleAuthConfigured } from '../lib/googleYoutubeAuth'
+import { writeQueueSnapshot } from '../lib/videoContext'
 
 type Filter = 'All' | Lane
 const FILTERS: Filter[] = ['All', 'S', 'W', 'R']
@@ -19,7 +20,15 @@ export default function YoutubeCatchupPage() {
   const [filter, setFilter] = useState<Filter>('All')
   const [pasted, setPasted] = useState('')
   const configured = isGoogleAuthConfigured()
-  const shown = filter === 'All' ? catchup.queue : catchup.queue.filter((v) => v.tag === filter)
+  const shown = useMemo(
+    () => (filter === 'All' ? catchup.queue : catchup.queue.filter((v) => v.tag === filter)),
+    [filter, catchup.queue],
+  )
+  // The player page's filmstrip reads this: the queue as it is shown here, in this order.
+  useEffect(() => {
+    // An empty list (still loading, or an empty lane) never replaces a good snapshot.
+    if (shown.length > 0) writeQueueSnapshot(shown)
+  }, [shown])
 
   return (
     <div className="flex flex-col gap-4 w-full max-w-6xl mx-auto px-4 md:px-6 pt-4 pb-8">

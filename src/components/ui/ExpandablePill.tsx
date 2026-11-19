@@ -48,8 +48,8 @@ export function ExpandablePill({
           active
             ? accentColor
             : highlighted
-              ? 'rgba(255,255,255,0.25)'
-              : 'rgba(255,255,255,0.1)'
+              ? 'rgba(255,255,255,0.45)'
+              : 'rgba(255,255,255,0.25)'
         }`,
         backgroundColor: active
           ? `color-mix(in srgb, ${accentColor} 15%, transparent)`
@@ -64,7 +64,7 @@ export function ExpandablePill({
           <span
             className="shrink-0 flex items-center"
             style={{
-              color: active ? accentColor : highlighted ? 'white' : 'var(--text-muted)',
+              color: active ? accentColor : highlighted ? 'white' : 'var(--text-secondary)',
               transition: 'color 200ms ease-out',
             }}
           >
@@ -72,13 +72,13 @@ export function ExpandablePill({
           </span>
         )}
         <span
-          className="text-xs font-medium leading-none whitespace-nowrap"
+          className="text-sm font-medium leading-none whitespace-nowrap"
           style={{
             color: active
               ? accentColor
               : highlighted
                 ? 'var(--text-primary, white)'
-                : 'var(--text-muted)',
+                : 'var(--text-secondary)',
             transition: 'color 200ms ease-out',
           }}
         >
@@ -97,7 +97,7 @@ export function ExpandablePill({
           }}
         >
           <p
-            className="text-[11px] leading-snug pt-1"
+            className="text-xs leading-snug pt-1"
             style={{ color: 'var(--text-secondary)' }}
           >
             {description}

@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import type { CatchupVideo } from '../../lib/catchup'
 import { useCatchup, type CatchupState } from '../../hooks/useCatchup'
 import { isGoogleAuthConfigured } from '../../lib/googleYoutubeAuth'
+import { readQueueSnapshot } from '../../lib/videoContext'
 import YoutubeCatchupPage from '../YoutubeCatchupPage'
 
 vi.mock('../../hooks/useCatchup', () => ({ useCatchup: vi.fn() }))
@@ -48,9 +49,17 @@ describe('YoutubeCatchupPage', () => {
   it('shows each video as a card linking to its player page, with a lane chip', () => {
     renderPage(state())
     const link = screen.getByRole('link', { name: /title aaaaaaaaaaa/ })
-    expect(link).toHaveAttribute('href', '/youtube/aaaaaaaaaaa')
+    expect(link).toHaveAttribute('href', '/youtube/aaaaaaaaaaa?from=catchup')
     expect(within(link).getByText('S')).toBeInTheDocument()
     expect(within(link).getByText('2:05')).toBeInTheDocument()
+  })
+
+  it('saves the queue it shows, in order, for the player page strip', () => {
+    localStorage.clear()
+    renderPage(state())
+    expect(readQueueSnapshot().map((i) => i.id)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb', 'ccccccccccc'])
+    fireEvent.click(screen.getByRole('button', { name: 'S' }))
+    expect(readQueueSnapshot().map((i) => i.id)).toEqual(['aaaaaaaaaaa'])
   })
 
   it('filters the grid to one lane', () => {

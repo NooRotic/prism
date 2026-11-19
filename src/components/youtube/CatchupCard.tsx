@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom'
 import { formatDuration, LANE_LABEL, type CatchupVideo } from '../../lib/catchup'
 
 /** One video in the Catch up queue. The whole card opens it in PRISM's YouTube player. */
-export default function CatchupCard({ video }: { video: CatchupVideo }) {
+export default function CatchupCard({ video, href }: { video: CatchupVideo; href?: string }) {
   return (
     <Link
-      to={`/youtube/${video.id}`}
+      to={href ?? `/youtube/${video.id}?from=catchup`}
       className="flex flex-col rounded-lg overflow-hidden"
       style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}
     >
