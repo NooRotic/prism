@@ -48,11 +48,12 @@ export type PlaylistResult =
   | { status: 'unreadable' }
 
 class ApiFailure extends Error {
-  constructor(
-    public status: number,
-    public reason?: string,
-  ) {
+  status: number
+  reason?: string
+  constructor(status: number, reason?: string) {
     super(`YouTube API ${status}${reason ? ` (${reason})` : ''}`)
+    this.status = status
+    this.reason = reason
   }
 }
 

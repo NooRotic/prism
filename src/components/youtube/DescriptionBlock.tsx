@@ -20,7 +20,7 @@ export default function DescriptionBlock({ text }: { text: string }) {
       >
         {linkify(text).map((part, i) =>
           part.href ? (
-            <a key={i} href={part.href} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--accent-youtube)' }}>
+            <a key={i} href={part.href} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: '#ff8a8a' }}>
               {part.text}
             </a>
           ) : (

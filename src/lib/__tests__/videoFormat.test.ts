@@ -5,6 +5,7 @@ describe('formatCount', () => {
   it('shortens millions and thousands', () => {
     expect(formatCount('1234567')).toBe('1.2M')
     expect(formatCount(34_000)).toBe('34K')
+    expect(formatCount('1712345678')).toBe('1.7B')
   })
   it('keeps small numbers whole', () => {
     expect(formatCount('999')).toBe('999')

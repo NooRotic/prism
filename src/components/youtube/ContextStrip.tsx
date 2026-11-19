@@ -21,8 +21,14 @@ const stepStyle = (enabled: boolean) => ({
 /** The queue or playlist as a full-width filmstrip under the player: position, previous / next, what is behind and ahead. */
 export default function ContextStrip({ source, status, strip, currentId }: Props) {
   const currentRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  // Centre the current video in the strip, so what is behind and ahead are both in view. Scrolls the strip only,
+  // never the page (scrollIntoView would move both).
   useEffect(() => {
-    currentRef.current?.scrollIntoView?.({ inline: 'center', block: 'nearest' })
+    const scroller = scrollerRef.current
+    const current = currentRef.current
+    if (!scroller || !current) return
+    scroller.scrollLeft = Math.max(0, current.offsetLeft - scroller.clientWidth / 2 + current.offsetWidth / 2)
   }, [currentId, strip])
 
   if (status === 'none' || !source) return null
@@ -77,7 +83,7 @@ export default function ContextStrip({ source, status, strip, currentId }: Props
           </span>
         )}
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+      <div ref={scrollerRef} className="relative flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
         {strip.before.map((item) => (
           <Link key={item.id} to={href(item)} className="shrink-0 w-32 md:w-40 flex flex-col gap-1 opacity-80 hover:opacity-100">
             {thumb(item)}

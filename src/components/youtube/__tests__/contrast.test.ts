@@ -1,8 +1,7 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import css from '../../../index.css?raw'
 import { TAG_CHIP_BG } from '../TagChip'
 
-const css = readFileSync('src/index.css', 'utf8')
 const token = (name: string) => css.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`))![1]
 
 function luminance(hex: string): number {

@@ -6,6 +6,7 @@ export function formatCount(n?: string | number): string {
   const v = typeof n === 'number' ? n : parseInt(n, 10)
   if (!Number.isFinite(v)) return ''
   const short = (x: number, unit: string) => `${x.toFixed(1).replace(/\.0$/, '')}${unit}`
+  if (v >= 1_000_000_000) return short(v / 1_000_000_000, 'B')
   if (v >= 1_000_000) return short(v / 1_000_000, 'M')
   if (v >= 1_000) return short(v / 1_000, 'K')
   return String(v)

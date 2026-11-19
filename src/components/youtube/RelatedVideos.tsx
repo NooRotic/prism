@@ -9,7 +9,7 @@ export default function RelatedVideos({ videos, status }: { videos: CatchupVideo
         Related videos
       </h2>
       {status === 'loading' && (
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" aria-hidden="true">
+        <div className="grid gap-3 grid-cols-2" aria-hidden="true">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="aspect-video rounded-lg" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }} />
           ))}
@@ -21,7 +21,7 @@ export default function RelatedVideos({ videos, status }: { videos: CatchupVideo
         </p>
       )}
       {status === 'ready' && (
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        <div className="grid gap-3 grid-cols-2">
           {videos.map((v) => (
             <CatchupCard key={v.id} video={v} href={`/youtube/${v.id}`} />
           ))}
