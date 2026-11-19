@@ -1,6 +1,7 @@
 import { matchPath } from 'react-router-dom'
 import { STORAGE_KEYS } from '../config/storageKeys'
-import type { URLDetectionResult } from './urlDetection'
+import { parseStreamKind } from './urlDetection'
+import type { StreamKind, URLDetectionResult } from './urlDetection'
 
 export interface FloatSize {
   width: number
@@ -100,7 +101,76 @@ export function canPopOutOn(pathname: string, detection: URLDetectionResult | nu
  */
 const OWN_VIDEO_ROUTES = ['/youtube/:videoId', '/hls-dash/:streamId?']
 
-export function floatingShouldEnd(pathname: string, detection: URLDetectionResult | null): boolean {
+/** What the window plays when it is not a Twitch channel: a YouTube video or a pasted stream, in one of the app's own players. */
+export type FramedSource =
+  | { kind: 'youtube'; videoId: string; startSec?: number }
+  | { kind: 'stream'; url: string; streamKind: StreamKind }
+
+/** The video of a `/youtube/:videoId` address, or null for any other page (the Catch up page included). */
+export function youtubeVideoIdFromPath(pathname: string): string | null {
+  const id = matchPath('/youtube/:videoId', pathname)?.params.videoId ?? null
+  return id === 'catchup' ? null : id
+}
+
+const POPOUT_PLAYER_PATH = '/popout/player'
+const YOUTUBE_ID = /^[\w-]{11}$/
+
+function isHttpAddress(text: string): boolean {
+  try {
+    const { protocol } = new URL(text)
+    return protocol === 'http:' || protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/** The address of the bare player page the window loads. */
+export function buildPopoutPlayerPath(source: FramedSource): string {
+  const params = new URLSearchParams()
+  if (source.kind === 'youtube') {
+    params.set('kind', 'youtube')
+    params.set('v', source.videoId)
+    if (typeof source.startSec === 'number' && Number.isFinite(source.startSec) && source.startSec >= 1) {
+      params.set('t', String(Math.floor(source.startSec)))
+    }
+  } else {
+    params.set('kind', 'stream')
+    params.set('as', source.streamKind)
+    params.set('url', source.url)
+  }
+  return `${POPOUT_PLAYER_PATH}?${params.toString()}`
+}
+
+/** What a pop-out player address asks for, or null when it is not something to play (a hand-typed or damaged address). */
+export function parsePopoutPlayerQuery(search: string): FramedSource | null {
+  const params = new URLSearchParams(search)
+  const kind = params.get('kind')
+  if (kind === 'youtube') {
+    const videoId = params.get('v') ?? ''
+    if (!YOUTUBE_ID.test(videoId)) return null
+    const start = Number(params.get('t'))
+    return Number.isFinite(start) && start >= 1 ? { kind, videoId, startSec: Math.floor(start) } : { kind, videoId }
+  }
+  if (kind === 'stream') {
+    const url = params.get('url') ?? ''
+    const streamKind = parseStreamKind(params.get('as'))
+    if (!streamKind || !isHttpAddress(url)) return null
+    return { kind, url, streamKind }
+  }
+  return null
+}
+
+/**
+ * Whether the window must end for this page. A Twitch window ends on pages that play their own video (the
+ * YouTube and HLS / DASH pages, a clip or VOD). A window showing a pasted video or stream follows those pages
+ * instead, and ends only on a Twitch channel page, which plays its own stream.
+ */
+export function floatingShouldEnd(
+  pathname: string,
+  detection: URLDetectionResult | null,
+  windowKind: 'twitch' | 'framed' = 'twitch',
+): boolean {
+  if (windowKind === 'framed') return floatingChannelFromPath(pathname) !== null
   if (OWN_VIDEO_ROUTES.some((pattern) => matchPath(pattern, pathname) !== null)) return true
   return floatingChannelFromPath(pathname) !== null && isClipOrVod(detection)
 }

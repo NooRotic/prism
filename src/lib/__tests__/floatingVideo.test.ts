@@ -1,13 +1,16 @@
 import { detectURLType } from '../urlDetection'
 import { STORAGE_KEYS } from '../../config/storageKeys'
 import {
+  buildPopoutPlayerPath,
   canPopOutOn,
   clampFloatSize,
   floatingChannelFromPath,
   floatingShouldEnd,
   isFloatingSupported,
   loadFloatSize,
+  parsePopoutPlayerQuery,
   saveFloatSize,
+  youtubeVideoIdFromPath,
 } from '../floatingVideo'
 
 const live = detectURLType('https://twitch.tv/x')
@@ -180,5 +183,65 @@ describe('floatingShouldEnd', () => {
     ['a Twitch page whose detection has not arrived', '/twitch/x', null],
   ])('is false for %s', (_label, path, detection) => {
     expect(floatingShouldEnd(path, detection)).toBe(false)
+  })
+})
+
+describe('youtubeVideoIdFromPath', () => {
+  it.each([
+    ['/youtube/abcdefghijk', 'abcdefghijk'],
+    ['/youtube/abcdefghijk/', 'abcdefghijk'],
+    ['/youtube/catchup', null],
+    ['/youtube', null],
+    ['/youtube/a/b', null],
+    ['/twitch/abc', null],
+  ])('reads %s as %s', (path, expected) => {
+    expect(youtubeVideoIdFromPath(path)).toBe(expected)
+  })
+})
+
+describe('the pop-out player address', () => {
+  it('round-trips a YouTube video, with and without a start time', () => {
+    const plain = buildPopoutPlayerPath({ kind: 'youtube', videoId: 'abcdefghijk' })
+    expect(parsePopoutPlayerQuery(plain.slice(plain.indexOf('?')))).toEqual({ kind: 'youtube', videoId: 'abcdefghijk' })
+    const timed = buildPopoutPlayerPath({ kind: 'youtube', videoId: 'abcdefghijk', startSec: 95.7 })
+    expect(parsePopoutPlayerQuery(timed.slice(timed.indexOf('?')))).toEqual({ kind: 'youtube', videoId: 'abcdefghijk', startSec: 95 })
+  })
+
+  it('round-trips a stream address, however odd the characters in it', () => {
+    const url = 'https://cdn.example/live/master.m3u8?token=a&b=c#x'
+    const path = buildPopoutPlayerPath({ kind: 'stream', url, streamKind: 'hls' })
+    expect(path.startsWith('/popout/player?')).toBe(true)
+    expect(parsePopoutPlayerQuery(path.slice(path.indexOf('?')))).toEqual({ kind: 'stream', url, streamKind: 'hls' })
+  })
+
+  it('leaves out a start time that is zero, negative or not a number', () => {
+    for (const startSec of [0, -3, Number.NaN]) {
+      expect(buildPopoutPlayerPath({ kind: 'youtube', videoId: 'abcdefghijk', startSec })).not.toContain('t=')
+    }
+  })
+
+  it.each([
+    ['nothing', ''],
+    ['an unknown kind', '?kind=vimeo&v=abcdefghijk'],
+    ['a short video id', '?kind=youtube&v=abc'],
+    ['a video id with a slash', '?kind=youtube&v=abcdefghi/k'],
+    ['a stream with no address', '?kind=stream&as=hls'],
+    ['a stream address that is not http(s)', '?kind=stream&as=hls&url=javascript%3Aalert(1)'],
+    ['a stream with an unknown type', '?kind=stream&as=flv&url=https%3A%2F%2Fa.example%2Fx'],
+  ])('refuses %s', (_label, query) => {
+    expect(parsePopoutPlayerQuery(query)).toBeNull()
+  })
+})
+
+describe('floatingShouldEnd for a window showing a pasted video or stream', () => {
+  it('ends on a Twitch channel page, where that page plays its own video', () => {
+    expect(floatingShouldEnd('/twitch/x', live, 'framed')).toBe(true)
+  })
+  it.each([
+    ['a YouTube page', '/youtube/abcdefghijk'],
+    ['the HLS / DASH page', '/hls-dash/s'],
+    ['the hub', '/'],
+  ])('keeps going on %s', (_label, path) => {
+    expect(floatingShouldEnd(path, null, 'framed')).toBe(false)
   })
 })
