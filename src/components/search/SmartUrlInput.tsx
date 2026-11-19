@@ -1,3 +1,4 @@
+import { listIdFromUrl } from '../../lib/videoContext'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -151,7 +152,8 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
         navigate(`/twitch/${det.metadata.channelName}`)
       } else if (det.type === 'youtube') {
         const ytId = det.metadata?.videoId ?? extractYouTubeVideoId(url)
-        navigate(ytId ? `/youtube/${ytId}` : `/youtube/${encodeURIComponent(url)}`)
+        const list = listIdFromUrl(url)
+        navigate(ytId ? `/youtube/${ytId}${list ? `?list=${list}` : ''}` : `/youtube/${encodeURIComponent(url)}`)
       } else if (
         det.type === 'hls' ||
         det.type === 'dash' ||

@@ -103,7 +103,7 @@ describe('getPlaylistItems', () => {
   })
   it('drops private and deleted entries and returns the next page token', async () => {
     fetchMock.mockResolvedValueOnce(
-      json({ nextPageToken: 'N', items: [entry('a'), entry('b', 'Private video', 'private'), entry('c', 'Deleted video'), entry('d')] }),
+      json({ nextPageToken: 'N', pageInfo: { totalResults: 120 }, items: [entry('a'), entry('b', 'Private video', 'private'), entry('c', 'Deleted video'), entry('d')] }),
     )
     const r = await getPlaylistItems('PLabcdefghij')
     expect(r).toEqual({
@@ -113,6 +113,7 @@ describe('getPlaylistItems', () => {
         { id: 'd', title: 't-d', thumbnail: 'u-d' },
       ],
       nextPageToken: 'N',
+      totalResults: 120,
     })
   })
   it('is unreadable on a 404', async () => {
@@ -132,5 +133,15 @@ describe('searchTopic', () => {
     expect(searchYouTubeVideos).toHaveBeenCalledTimes(1)
     vi.mocked(searchYouTubeVideos).mockRejectedValueOnce(new Error('x'))
     expect(await searchTopic('other')).toEqual([])
+  })
+  it('spends one search, not two, on a double click (the same query while it is still running)', async () => {
+    vi.mocked(searchYouTubeVideos).mockClear()
+    let resolve!: (v: { videos: never[]; nextPageToken: null }) => void
+    vi.mocked(searchYouTubeVideos).mockImplementationOnce(() => new Promise((r) => { resolve = r }))
+    const first = searchTopic('Double Click')
+    const second = searchTopic('double click')
+    resolve({ videos: [], nextPageToken: null })
+    await Promise.all([first, second])
+    expect(searchYouTubeVideos).toHaveBeenCalledTimes(1)
   })
 })

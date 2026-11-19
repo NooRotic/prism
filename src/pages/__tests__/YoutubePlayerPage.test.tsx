@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { act } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,7 @@ import { useVideoContext } from '../../hooks/useVideoContext'
 import { useVideoPage } from '../../hooks/useVideoPage'
 import { getWatchedSeeds } from '../../lib/catchupStore'
 import { windowAround } from '../../lib/videoContext'
-import type { VideoPageData } from '../../lib/videoPageApi'
+import { searchTopic, type VideoPageData } from '../../lib/videoPageApi'
 
 vi.mock('../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../hooks/useVideoPage', () => ({ useVideoPage: vi.fn() }))
@@ -19,6 +19,7 @@ vi.mock('../../hooks/useVideoContext', () => ({ useVideoContext: vi.fn() }))
 vi.mock('../../hooks/useRelatedVideos', () => ({ useRelatedVideos: vi.fn() }))
 vi.mock('../../components/player/PlayerHost', () => ({ default: () => <div data-testid="player" /> }))
 vi.mock('../../components/layout/DebugPanel', () => ({ default: () => <div data-testid="debug" /> }))
+vi.mock('../../lib/videoPageApi', async (orig) => ({ ...(await orig<object>()), searchTopic: vi.fn() }))
 vi.mock('../../lib/youtubeApi', async (orig) => ({ ...(await orig<object>()), isYouTubeApiAvailable: () => true }))
 
 const data = (over: Partial<VideoPageData> = {}): VideoPageData => ({
@@ -118,5 +119,20 @@ describe('YoutubePlayerPage', () => {
     renderPage()
     expect(useVideoPage).toHaveBeenCalledWith('abcdefghijk')
     expect(useVideoContext).toHaveBeenCalledWith('abcdefghijk', '?from=catchup')
+  })
+
+  it('starts the next video with a clean screen: tags folded, description folded, no topic results from the last one', async () => {
+    const tags = Array.from({ length: 12 }, (_, i) => `tag${i}`)
+    vi.mocked(useVideoPage).mockReturnValue({ status: 'ready', data: data({ tags, topics: ['Topic one'], description: 'x'.repeat(600) }) })
+    vi.mocked(searchTopic).mockResolvedValue([{ id: 'zzzzzzzzzzz', title: 'result card', channelTitle: 'c', thumbnail: '' }])
+    const { navigate } = renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '+4 more' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show more' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Topic one' }))
+    await waitFor(() => expect(screen.getByRole('link', { name: /result card/ })).toBeInTheDocument())
+    navigate('/youtube/yyyyyyyyyyy')
+    expect(screen.getByRole('button', { name: '+4 more' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /result card/ })).not.toBeInTheDocument()
   })
 })

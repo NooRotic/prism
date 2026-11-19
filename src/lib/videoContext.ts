@@ -25,6 +25,17 @@ export function parseContext(search: string): VideoContextSource {
   return null
 }
 
+/** A readable playlist id in a YouTube address. Mixes (RD...), Watch Later and Liked are private or unreadable, so they are skipped. */
+export function listIdFromUrl(url: string): string | null {
+  try {
+    const list = new URL(url).searchParams.get('list')
+    if (!list || !LIST_ID.test(list) || /^(RD|WL|LL)/.test(list)) return null
+    return list
+  } catch {
+    return null
+  }
+}
+
 /** The query string that keeps a context when moving to another video in it. */
 export function contextSearch(source: VideoContextSource): string {
   if (!source) return ''
@@ -60,14 +71,14 @@ export interface ContextWindow {
   next: ContextItem | null
 }
 
-/** What is behind and ahead of the current video, or null when it is not in the list. */
-export function windowAround(items: ContextItem[], currentId: string, behind = 3, ahead = 6): ContextWindow | null {
+/** What is behind and ahead of the current video, or null when it is not in the list. `total` is the full length when only part of the list is loaded. */
+export function windowAround(items: ContextItem[], currentId: string, behind = 3, ahead = 6, total?: number): ContextWindow | null {
   const index = items.findIndex((i) => i.id === currentId)
   if (index < 0) return null
   return {
     current: items[index],
     index,
-    total: items.length,
+    total: Math.max(total ?? 0, items.length),
     before: items.slice(Math.max(0, index - behind), index),
     after: items.slice(index + 1, index + 1 + ahead),
     prev: items[index - 1] ?? null,

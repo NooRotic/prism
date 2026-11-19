@@ -85,15 +85,16 @@ export default function YoutubePlayerPage() {
 
       <ContextStrip source={context.source} status={context.status} strip={context.strip} currentId={videoId} />
 
-      <VideoMeta data={data} />
-      <DescriptionBlock text={data?.description ?? ''} />
+      {/* The keys give each video fresh component state: folded tags and description, no old topic results. */}
+      <VideoMeta key={videoId} data={data} />
+      <DescriptionBlock key={videoId} text={data?.description ?? ''} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <CommentsSection videoId={videoId} result={comments} />
         <RelatedVideos videos={related.videos} status={related.status} />
       </div>
 
-      <RelatedTopics topics={topics} apiAvailable={isYouTubeApiAvailable()} />
+      <RelatedTopics key={videoId} topics={topics} apiAvailable={isYouTubeApiAvailable()} />
 
       <DebugPanel />
     </div>

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { CatchupVideo } from '../catchup'
-import { contextSearch, parseContext, readQueueSnapshot, windowAround, writeQueueSnapshot, type ContextItem } from '../videoContext'
+import { contextSearch, listIdFromUrl, parseContext, readQueueSnapshot, windowAround, writeQueueSnapshot, type ContextItem } from '../videoContext'
 
 beforeEach(() => localStorage.clear())
 
@@ -28,6 +28,12 @@ describe('contextSearch', () => {
     expect(contextSearch({ kind: 'catchup' })).toBe('?from=catchup')
     expect(contextSearch({ kind: 'playlist', listId: 'PLabcdefghij' })).toBe('?list=PLabcdefghij')
     expect(contextSearch(null)).toBe('')
+  })
+})
+
+describe('windowAround total', () => {
+  it('uses a given total (a playlist longer than what is loaded)', () => {
+    expect(windowAround(items, 'id5', 3, 6, 120)!.total).toBe(120)
   })
 })
 
@@ -72,5 +78,18 @@ describe('queue snapshot', () => {
     expect(readQueueSnapshot()).toEqual([])
     localStorage.setItem('prism_catchup_queue', '{bad')
     expect(readQueueSnapshot()).toEqual([])
+  })
+})
+
+describe('listIdFromUrl', () => {
+  it('reads a playlist from a watch address', () => {
+    expect(listIdFromUrl('https://www.youtube.com/watch?v=abc12345678&list=PLabcdefghij1234')).toBe('PLabcdefghij1234')
+  })
+  it('ignores Mixes, Watch Later, Liked and anything malformed', () => {
+    expect(listIdFromUrl('https://www.youtube.com/watch?v=abc12345678&list=RDabc12345678')).toBeNull()
+    expect(listIdFromUrl('https://www.youtube.com/watch?v=abc12345678&list=WL')).toBeNull()
+    expect(listIdFromUrl('https://www.youtube.com/watch?v=abc12345678&list=LLabcdefghijkl')).toBeNull()
+    expect(listIdFromUrl('not a url')).toBeNull()
+    expect(listIdFromUrl('https://youtu.be/abc12345678')).toBeNull()
   })
 })

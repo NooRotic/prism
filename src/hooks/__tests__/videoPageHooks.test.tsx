@@ -74,12 +74,39 @@ describe('useVideoContext', () => {
   it('pages a playlist until it finds the video', async () => {
     const item = (id: string) => ({ id, title: id, thumbnail: '' })
     vi.mocked(getPlaylistItems)
-      .mockResolvedValueOnce({ status: 'ok', items: [item('a'), item('b')], nextPageToken: 'N' })
-      .mockResolvedValueOnce({ status: 'ok', items: [item('c')], nextPageToken: null })
+      .mockResolvedValueOnce({ status: 'ok', items: [item('a'), item('b')], nextPageToken: 'N', totalResults: 3 })
+      .mockResolvedValueOnce({ status: 'ok', items: [item('c')], nextPageToken: null, totalResults: 3 })
     const { result } = renderHook(() => useVideoContext('c', '?list=PLabcdefghij'))
     await waitFor(() => expect(result.current.status).toBe('ready'))
     expect(result.current.strip?.index).toBe(2)
     expect(getPlaylistItems).toHaveBeenCalledTimes(2)
+  })
+  it('reads one more page when the video is near the end of a loaded page, and reports the true total', async () => {
+    const item = (id: string) => ({ id, title: id, thumbnail: '' })
+    const first = Array.from({ length: 10 }, (_, i) => item(`p${i}`))
+    const second = Array.from({ length: 5 }, (_, i) => item(`q${i}`))
+    vi.mocked(getPlaylistItems)
+      .mockResolvedValueOnce({ status: 'ok', items: first, nextPageToken: 'N', totalResults: 15 })
+      .mockResolvedValueOnce({ status: 'ok', items: second, nextPageToken: null, totalResults: 15 })
+    const { result } = renderHook(() => useVideoContext('p8', '?list=PLabcdefghij'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(getPlaylistItems).toHaveBeenCalledTimes(2)
+    expect(result.current.strip?.next?.id).toBe('p9')
+    expect(result.current.strip?.after.map((i) => i.id)).toContain('q2')
+    expect(result.current.strip?.total).toBe(15)
+  })
+  it('does not read more pages when the video is far from the end', async () => {
+    const item = (id: string) => ({ id, title: id, thumbnail: '' })
+    vi.mocked(getPlaylistItems).mockResolvedValue({
+      status: 'ok',
+      items: Array.from({ length: 50 }, (_, i) => item(`p${i}`)),
+      nextPageToken: 'N',
+      totalResults: 120,
+    })
+    const { result } = renderHook(() => useVideoContext('p3', '?list=PLabcdefghij'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(getPlaylistItems).toHaveBeenCalledTimes(1)
+    expect(result.current.strip?.total).toBe(120)
   })
   it('is unreadable when the playlist cannot be read', async () => {
     vi.mocked(getPlaylistItems).mockResolvedValue({ status: 'unreadable' })

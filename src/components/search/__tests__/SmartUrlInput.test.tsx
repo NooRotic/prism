@@ -174,4 +174,13 @@ describe('SmartUrlInput routing of pasted links', () => {
     await paste('https://youtu.be/abc12345678')
     expect(screen.getByTestId('location')).toHaveTextContent('/youtube/abc12345678')
   })
+  it('keeps a playlist from a YouTube watch address, so the page can show where you are in it', async () => {
+    await paste('https://www.youtube.com/watch?v=abc12345678&list=PLabcdefghij1234')
+    expect(screen.getByTestId('location')).toHaveTextContent('/youtube/abc12345678?list=PLabcdefghij1234')
+  })
+
+  it('drops a Mix (RD...) list, which the API cannot read', async () => {
+    await paste('https://www.youtube.com/watch?v=abc12345678&list=RDabc12345678')
+    expect(screen.getByTestId('location').textContent).toBe('/youtube/abc12345678')
+  })
 })

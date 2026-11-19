@@ -44,7 +44,7 @@ export interface PlaylistItem {
 }
 
 export type PlaylistResult =
-  | { status: 'ok'; items: PlaylistItem[]; nextPageToken: string | null }
+  | { status: 'ok'; items: PlaylistItem[]; nextPageToken: string | null; totalResults: number }
   | { status: 'unreadable' }
 
 class ApiFailure extends Error {
@@ -158,7 +158,12 @@ export async function getPlaylistItems(listId: string, pageToken?: string): Prom
         title: e.snippet.title,
         thumbnail: thumbOf(e.snippet.thumbnails),
       }))
-    const result: PlaylistResult = { status: 'ok', items, nextPageToken: data.nextPageToken ?? null }
+    const result: PlaylistResult = {
+      status: 'ok',
+      items,
+      nextPageToken: data.nextPageToken ?? null,
+      totalResults: data.pageInfo?.totalResults ?? items.length,
+    }
     ttlSet(cacheKey, result)
     return result
   } catch {
@@ -166,16 +171,28 @@ export async function getPlaylistItems(listId: string, pageToken?: string): Prom
   }
 }
 
-/** Videos for a topic. 100 units, so only on a click; cached 24 h per lower-cased query. Empty on any failure. */
+const searching = new Map<string, Promise<YouTubeSearchResult[]>>()
+
+/**
+ * Videos for a topic. 100 units, so only on a click; cached 24 h per lower-cased query. Empty on any failure.
+ * The same query asked while its search is still running shares that one search (a double click costs 100, not 200).
+ */
 export async function searchTopic(q: string): Promise<YouTubeSearchResult[]> {
-  const cacheKey = `${prefix}topic_${q.trim().toLowerCase()}`
+  const query = q.trim().toLowerCase()
+  const cacheKey = `${prefix}topic_${query}`
   const cached = ttlGet<YouTubeSearchResult[]>(cacheKey, DAY_MS)
   if (cached) return cached
-  try {
-    const { videos } = await searchYouTubeVideos(q, 8)
-    ttlSet(cacheKey, videos)
-    return videos
-  } catch {
-    return []
-  }
+  const running = searching.get(query)
+  if (running) return running
+  const search = (async () => {
+    try {
+      const { videos } = await searchYouTubeVideos(q, 8)
+      ttlSet(cacheKey, videos)
+      return videos
+    } catch {
+      return []
+    }
+  })().finally(() => searching.delete(query))
+  searching.set(query, search)
+  return search
 }
