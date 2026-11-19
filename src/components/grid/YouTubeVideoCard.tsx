@@ -1,13 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import type { YouTubeVideo } from '../../lib/youtubeApi'
-
-function formatViews(count?: string): string {
-  if (!count) return ''
-  const n = parseInt(count, 10)
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M views`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K views`
-  return `${n} views`
-}
+import { formatCount, formatPublished } from '../../lib/videoFormat'
 
 export function YouTubeVideoCard({ video }: { video: YouTubeVideo }) {
   const navigate = useNavigate()
@@ -55,7 +48,7 @@ export function YouTubeVideoCard({ video }: { video: YouTubeVideo }) {
               color: '#fff',
             }}
           >
-            {formatViews(video.viewCount)}
+            {`${formatCount(video.viewCount)} views`}
           </span>
         )}
       </div>
@@ -68,8 +61,8 @@ export function YouTubeVideoCard({ video }: { video: YouTubeVideo }) {
         >
           {video.title}
         </span>
-        <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
-          {video.channelTitle}
+        <span className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>
+          {[video.channelTitle, formatPublished(video.publishedAt)].filter(Boolean).join(' · ')}
         </span>
         <span
           className="text-[10px] font-mono uppercase tracking-wider mt-1"
