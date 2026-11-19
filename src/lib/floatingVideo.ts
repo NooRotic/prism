@@ -177,3 +177,13 @@ export function floatingShouldEnd(
   if (OWN_VIDEO_ROUTES.some((pattern) => matchPath(pattern, pathname) !== null)) return true
   return floatingChannelFromPath(pathname) !== null && isClipOrVod(detection)
 }
+
+/**
+ * Where the YouTube video on this page is, in seconds, so the floating window can carry on from there. The player is
+ * react-player's `youtube-video` element, which reports `currentTime` like a media element. Best effort: anything
+ * unreadable means the window starts from the beginning.
+ */
+export function currentYoutubeTime(root: ParentNode = document): number | undefined {
+  const time = (root.querySelector('youtube-video') as { currentTime?: unknown } | null)?.currentTime
+  return typeof time === 'number' && Number.isFinite(time) && time > 0 ? time : undefined
+}

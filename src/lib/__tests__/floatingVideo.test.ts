@@ -4,6 +4,7 @@ import {
   buildPopoutPlayerPath,
   canPopOutOn,
   clampFloatSize,
+  currentYoutubeTime,
   floatingChannelFromPath,
   floatingShouldEnd,
   isFloatingSupported,
@@ -243,5 +244,29 @@ describe('floatingShouldEnd for a window showing a pasted video or stream', () =
     ['the hub', '/'],
   ])('keeps going on %s', (_label, path) => {
     expect(floatingShouldEnd(path, null, 'framed')).toBe(false)
+  })
+})
+
+describe('currentYoutubeTime', () => {
+  function pageWith(markup: string) {
+    const root = document.createElement('div')
+    root.innerHTML = markup
+    return root
+  }
+  it('reads where the playing YouTube video is', () => {
+    const root = pageWith('<youtube-video></youtube-video>')
+    Object.defineProperty(root.querySelector('youtube-video'), 'currentTime', { value: 61.5 })
+    expect(currentYoutubeTime(root)).toBe(61.5)
+  })
+  it.each([
+    ['no player on the page', '<div></div>'],
+    ['a player that has not started', '<youtube-video></youtube-video>'],
+  ])('is nothing for %s', (_label, markup) => {
+    expect(currentYoutubeTime(pageWith(markup))).toBeUndefined()
+  })
+  it('is nothing for a time that is not a positive number', () => {
+    const root = pageWith('<youtube-video></youtube-video>')
+    Object.defineProperty(root.querySelector('youtube-video'), 'currentTime', { value: Number.NaN })
+    expect(currentYoutubeTime(root)).toBeUndefined()
   })
 })
