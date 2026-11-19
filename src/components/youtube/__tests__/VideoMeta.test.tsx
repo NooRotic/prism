@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { VideoPageData } from '../../../lib/videoPageApi'
 import DescriptionBlock from '../DescriptionBlock'
 import VideoMeta from '../VideoMeta'
@@ -19,6 +19,21 @@ const data = (over: Partial<VideoPageData> = {}): VideoPageData => ({
 })
 
 describe('VideoMeta', () => {
+  it('makes each tag a button that opens its topic when the page handles topics', () => {
+    const onTopic = vi.fn()
+    render(<VideoMeta data={data({ tags: ['Alpha', 'Beta'] })} onTopic={onTopic} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Beta' }))
+    expect(onTopic).toHaveBeenCalledWith('Beta')
+  })
+  it('leaves the tags as plain text without a handler', () => {
+    render(<VideoMeta data={data({ tags: ['Alpha'] })} />)
+    expect(screen.queryByRole('button', { name: 'Alpha' })).not.toBeInTheDocument()
+  })
+  it('leaves the title to the page when showTitle is false', () => {
+    render(<VideoMeta data={data()} showTitle={false} />)
+    expect(screen.queryByRole('heading', { name: 'A title' })).not.toBeInTheDocument()
+    expect(screen.getByText('A channel')).toBeInTheDocument()
+  })
   it('shows title, channel, views and the upload date', () => {
     render(<VideoMeta data={data()} />)
     expect(screen.getByRole('heading', { name: 'A title' })).toBeInTheDocument()

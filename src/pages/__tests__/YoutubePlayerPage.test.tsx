@@ -137,7 +137,7 @@ describe('YoutubePlayerPage', () => {
     expect(useVideoContext).toHaveBeenCalledWith('abcdefghijk', '?from=catchup')
   })
 
-  it('starts the next video with a clean screen: tags folded, description folded, no topic results from the last one', async () => {
+  it('starts the next video with a clean screen: tags folded, description folded, the player back, no topic results from the last one', async () => {
     const tags = Array.from({ length: 12 }, (_, i) => `tag${i}`)
     vi.mocked(useVideoPage).mockReturnValue({ status: 'ready', data: data({ tags, topics: ['Topic one'], description: 'x'.repeat(600) }) })
     vi.mocked(searchTopic).mockResolvedValue([{ id: 'zzzzzzzzzzz', title: 'result card', channelTitle: 'c', thumbnail: '' }])
@@ -150,6 +150,57 @@ describe('YoutubePlayerPage', () => {
     expect(screen.getByRole('button', { name: '+4 more' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /result card/ })).not.toBeInTheDocument()
+    expect(screen.getByTestId('player')).toBeInTheDocument()
+  })
+
+  it('puts the related column beside the tags, under the title', () => {
+    renderPage()
+    const grid = screen.getByRole('group', { name: 'Tags' }).closest('.grid')
+    expect(grid).not.toBeNull()
+    expect(within(grid as HTMLElement).getByRole('region', { name: 'Related videos' })).toBeInTheDocument()
+    expect(within(grid as HTMLElement).getByRole('region', { name: 'Comments' })).toBeInTheDocument()
+  })
+
+  describe('opening a tag or topic', () => {
+    const hit = { id: 'zzzzzzzzzzz', title: 'result card', channelTitle: 'c', thumbnail: '' }
+    beforeEach(() => {
+      vi.mocked(searchTopic).mockReset()
+      vi.mocked(searchTopic).mockResolvedValue([hit])
+    })
+
+    it('a tag replaces the player with that topic videos and a Replay video bar returns it', async () => {
+      renderPage()
+      fireEvent.click(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: 'Alpha' }))
+      await waitFor(() => expect(screen.getByRole('link', { name: /result card/ })).toHaveAttribute('href', '/youtube/zzzzzzzzzzz'))
+      expect(screen.queryByTestId('player')).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Videos for Alpha' })).toBeInTheDocument()
+      expect(searchTopic).toHaveBeenCalledWith('Alpha')
+      fireEvent.click(screen.getByRole('button', { name: 'Replay video' }))
+      expect(screen.getByTestId('player')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /result card/ })).not.toBeInTheDocument()
+    })
+
+    it('a button in Related topics does the same', async () => {
+      renderPage()
+      fireEvent.click(within(screen.getByRole('region', { name: 'Related topics' })).getByRole('button', { name: 'Gamma' }))
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Videos for Gamma' })).toBeInTheDocument())
+      expect(screen.queryByTestId('player')).not.toBeInTheDocument()
+    })
+
+    it('hides the pop-out bar while the topic videos are shown', async () => {
+      renderPage()
+      fireEvent.click(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: 'Alpha' }))
+      await waitFor(() => expect(screen.getByRole('link', { name: /result card/ })).toBeInTheDocument())
+      expect(screen.queryByRole('button', { name: 'Pop out video' })).not.toBeInTheDocument()
+    })
+
+    it('moving to another video shows its player again', async () => {
+      const { navigate } = renderPage()
+      fireEvent.click(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: 'Alpha' }))
+      await waitFor(() => expect(screen.getByRole('link', { name: /result card/ })).toBeInTheDocument())
+      navigate('/youtube/yyyyyyyyyyy')
+      expect(screen.getByTestId('player')).toBeInTheDocument()
+    })
   })
 
   describe('pop-out', () => {
