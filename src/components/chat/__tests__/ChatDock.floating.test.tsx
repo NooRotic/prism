@@ -24,6 +24,7 @@ const controls = (overrides: Partial<FloatingVideoControls> = {}): FloatingVideo
   failed: false,
   open: vi.fn(),
   close: vi.fn(),
+  registerSource: vi.fn(),
   ...overrides,
 })
 
