@@ -21,7 +21,7 @@ function renderStrip(source: VideoContextSource, status: 'none' | 'loading' | 'r
 describe('ContextStrip', () => {
   it('says where you are and marks the current video', () => {
     renderStrip({ kind: 'catchup' }, 'ready', 'id3')
-    expect(screen.getByText('4 of 8 · Catch up')).toBeInTheDocument()
+    expect(screen.getByText('4 of 8 · Import from YT')).toBeInTheDocument()
     expect(screen.getByLabelText('Now playing: title 3')).toHaveAttribute('aria-current', 'true')
   })
   it('keeps the queue context on the thumbnail links', () => {
