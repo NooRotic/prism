@@ -4,6 +4,8 @@ import { act } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import YoutubePlayerPage from '../YoutubePlayerPage'
 import { useApp } from '../../contexts/AppContext'
+import { FloatingVideoContext } from '../../components/chat/floatingVideoContext'
+import type { FloatingVideoControls } from '../../components/chat/floatingVideoContext'
 import { useRelatedVideos } from '../../hooks/useRelatedVideos'
 import { useVideoComments } from '../../hooks/useVideoComments'
 import { useVideoContext } from '../../hooks/useVideoContext'
@@ -54,19 +56,33 @@ beforeEach(() => {
   vi.mocked(useVideoContext).mockReturnValue({ source: { kind: 'catchup' }, status: 'ready', strip: windowAround(items, 'abcdefghijk') })
 })
 
-function renderPage(path = '/youtube/abcdefghijk?from=catchup') {
+const floatingControls = (over: Partial<FloatingVideoControls> = {}): FloatingVideoControls => ({
+  supported: true,
+  canOpen: true,
+  isFloating: false,
+  blocked: false,
+  failed: false,
+  open: vi.fn(),
+  close: vi.fn(),
+  registerSource: vi.fn(),
+  ...over,
+})
+
+function renderPage(path = '/youtube/abcdefghijk?from=catchup', video: FloatingVideoControls = floatingControls()) {
   let nav: ReturnType<typeof useNavigate>
   const Grab = () => {
     nav = useNavigate()
     return null
   }
   const utils = render(
-    <MemoryRouter initialEntries={[path]}>
-      <Grab />
-      <Routes>
-        <Route path="/youtube/:videoId" element={<YoutubePlayerPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <FloatingVideoContext.Provider value={video}>
+      <MemoryRouter initialEntries={[path]}>
+        <Grab />
+        <Routes>
+          <Route path="/youtube/:videoId" element={<YoutubePlayerPage />} />
+        </Routes>
+      </MemoryRouter>
+    </FloatingVideoContext.Provider>,
   )
   return { ...utils, navigate: (to: string) => act(() => nav(to)) }
 }
@@ -134,5 +150,40 @@ describe('YoutubePlayerPage', () => {
     expect(screen.getByRole('button', { name: '+4 more' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /result card/ })).not.toBeInTheDocument()
+  })
+
+  describe('pop-out', () => {
+    it('tells the floating window which video it shows, follows the route, and withdraws on leaving', () => {
+      const video = floatingControls()
+      const { navigate, unmount } = renderPage('/youtube/abcdefghijk', video)
+      expect(video.registerSource).toHaveBeenLastCalledWith({ kind: 'youtube', videoId: 'abcdefghijk' })
+      navigate('/youtube/zzzzzzzzzzz')
+      expect(video.registerSource).toHaveBeenLastCalledWith({ kind: 'youtube', videoId: 'zzzzzzzzzzz' })
+      unmount()
+      expect(video.registerSource).toHaveBeenLastCalledWith(null)
+    })
+
+    it('opens the window from where the video is playing', () => {
+      const video = floatingControls()
+      renderPage('/youtube/abcdefghijk', video)
+      const element = document.createElement('youtube-video')
+      Object.defineProperty(element, 'currentTime', { value: 61.5 })
+      document.body.appendChild(element)
+      fireEvent.click(screen.getByRole('button', { name: 'Pop out video' }))
+      element.remove()
+      expect(video.open).toHaveBeenCalledWith({ startSec: 61.5 })
+    })
+
+    it('has no button where the browser cannot float a video', () => {
+      renderPage('/youtube/abcdefghijk', floatingControls({ supported: false, canOpen: false }))
+      expect(screen.queryByRole('button', { name: 'Pop out video' })).not.toBeInTheDocument()
+    })
+
+    it('takes the player out of the page while the window plays, so nothing plays twice', () => {
+      renderPage('/youtube/abcdefghijk', floatingControls({ isFloating: true, canOpen: false }))
+      expect(screen.queryByTestId('player')).not.toBeInTheDocument()
+      expect(screen.getByTestId('floating-panel')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'A title' })).toBeInTheDocument()
+    })
   })
 })

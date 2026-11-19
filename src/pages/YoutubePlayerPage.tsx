@@ -6,10 +6,15 @@ import { detectURLType } from '../lib/urlDetection'
 import { getDemoById } from '../config/demoContent'
 import { isYouTubeApiAvailable } from '../lib/youtubeApi'
 import { recordWatched } from '../lib/catchupStore'
+import { currentYoutubeTime } from '../lib/floatingVideo'
+import type { FramedSource } from '../lib/floatingVideo'
 import { useRelatedVideos } from '../hooks/useRelatedVideos'
 import { useVideoComments } from '../hooks/useVideoComments'
 import { useVideoContext } from '../hooks/useVideoContext'
 import { useVideoPage } from '../hooks/useVideoPage'
+import FloatingPanel from '../components/chat/FloatingPanel'
+import { useFloatingPageSource, useFloatingVideo } from '../components/chat/floatingVideoContext'
+import VideoPopoutBar from '../components/chat/VideoPopoutBar'
 import PlayerHost from '../components/player/PlayerHost'
 import DebugPanel from '../components/layout/DebugPanel'
 import CommentsSection from '../components/youtube/CommentsSection'
@@ -54,6 +59,11 @@ export default function YoutubePlayerPage() {
     }
   }, [videoId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The pop-out follows this page: it opens on this video and switches when the page moves to another one.
+  const video = useFloatingVideo()
+  const floatSource = useMemo<FramedSource | null>(() => (videoId ? { kind: 'youtube', videoId } : null), [videoId])
+  useFloatingPageSource(floatSource)
+
   const { data } = useVideoPage(videoId)
   const { result: comments } = useVideoComments(videoId)
   const context = useVideoContext(videoId, search)
@@ -71,7 +81,9 @@ export default function YoutubePlayerPage() {
           boxShadow: '0 0 20px rgba(255, 0, 0, 0.1)',
         }}
       >
-        {player.currentUrl && player.detection ? (
+        {video.isFloating ? (
+          <FloatingPanel onBringBack={video.close} />
+        ) : player.currentUrl && player.detection ? (
           <PlayerHost url={player.currentUrl} detection={player.detection} />
         ) : (
           <div className="flex items-center justify-center w-full h-full" style={{ color: 'var(--text-muted)' }}>
@@ -82,6 +94,8 @@ export default function YoutubePlayerPage() {
           </div>
         )}
       </div>
+
+      <VideoPopoutBar getStartSec={currentYoutubeTime} />
 
       <ContextStrip source={context.source} status={context.status} strip={context.strip} currentId={videoId} />
 
