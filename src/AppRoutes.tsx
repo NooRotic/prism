@@ -8,6 +8,7 @@ import HlsPage from './pages/HlsPage'
 import YoutubeCatchupPage from './pages/YoutubeCatchupPage'
 import ImportPage from './pages/ImportPage'
 import ChatPopoutPage from './pages/ChatPopoutPage'
+import PopoutPlayerPage from './pages/PopoutPlayerPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 // The owner's admin pages are their own chunk: a visitor never downloads them, only a sign-in prompt is ever shown without the owner's token.
@@ -28,6 +29,8 @@ export default function AppRoutes({ layout }: AppRoutesProps) {
       {/* The chat pop-out is a window of its own, so it sits outside the layout
           and carries none of the page chrome. */}
       <Route path="chat/:channel" element={<ChatPopoutPage />} />
+      {/* The video pop-out's frame: the player and nothing else, for the same reason. */}
+      <Route path="popout/player" element={<PopoutPlayerPage />} />
       {/* The owner's admin pages: outside the layout too, so no header, rail or viewer sign-in runs there. */}
       <Route
         path="admin/*"
