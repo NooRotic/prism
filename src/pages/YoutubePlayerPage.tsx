@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { Tv } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
@@ -23,7 +23,8 @@ import DescriptionBlock from '../components/youtube/DescriptionBlock'
 import RelatedByTopic from '../components/youtube/RelatedByTopic'
 import RelatedTopics from '../components/youtube/RelatedTopics'
 import RelatedVideos from '../components/youtube/RelatedVideos'
-import VideoMeta from '../components/youtube/VideoMeta'
+import TopicVideos from '../components/youtube/TopicVideos'
+import VideoMeta, { VideoTitle } from '../components/youtube/VideoMeta'
 
 const MAX_TOPICS = 12
 
@@ -71,11 +72,22 @@ export default function YoutubePlayerPage() {
   const related = useRelatedVideos(videoId)
   const topics = useMemo(() => mergeTopics(data?.topics ?? [], data?.tags ?? []), [data])
   // No Mix videos: the column shows the first topic's videos instead (a search, so only with a key).
-  const fallbackTopic = related.status === 'empty' && isYouTubeApiAvailable() ? topics[0] : undefined
+  const apiAvailable = isYouTubeApiAvailable()
+  const fallbackTopic = related.status === 'empty' && apiAvailable ? topics[0] : undefined
+
+  // A tag or topic click puts that topic's videos in the player's place; "Replay video" brings the player back.
+  // Remembered with the video id, so moving to another video starts on the player again.
+  const [picked, setPicked] = useState<{ videoId: string; topic: string } | null>(null)
+  const openTopic = apiAvailable ? (topic: string) => { setPicked({ videoId, topic }); window.scrollTo(0, 0) } : undefined
+  const replay = useCallback(() => setPicked(null), [])
+  const activeTopic = picked?.videoId === videoId ? picked.topic : null
 
   return (
     <div className="flex flex-col gap-5 w-full max-w-5xl mx-auto px-4 md:px-6 pt-4 pb-8">
-      {/* Player */}
+      {activeTopic ? (
+        <TopicVideos key={activeTopic} topic={activeTopic} onReplay={replay} />
+      ) : (
+      /* Player */
       <div
         className="w-full aspect-video rounded-lg overflow-hidden relative"
         style={{
@@ -97,21 +109,26 @@ export default function YoutubePlayerPage() {
           </div>
         )}
       </div>
+      )}
 
-      <VideoPopoutBar getStartSec={currentYoutubeTime} />
+      {!activeTopic && <VideoPopoutBar getStartSec={currentYoutubeTime} />}
 
       <ContextStrip source={context.source} status={context.status} strip={context.strip} currentId={videoId} />
 
-      {/* The keys give each video fresh component state: folded tags and description, no old topic results. */}
-      <VideoMeta key={videoId} data={data} />
-      <DescriptionBlock key={videoId} text={data?.description ?? ''} />
+      <VideoTitle data={data} />
 
+      {/* Left: channel, tags, description, comments. Right: related videos, from the title down.
+          The keys give each video fresh component state: folded tags and description. */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <CommentsSection videoId={videoId} result={comments} />
+        <div className="flex flex-col gap-5 min-w-0">
+          <VideoMeta key={videoId} data={data} showTitle={false} onTopic={openTopic} />
+          <DescriptionBlock key={videoId} text={data?.description ?? ''} />
+          <CommentsSection videoId={videoId} result={comments} />
+        </div>
         {fallbackTopic ? <RelatedByTopic key={fallbackTopic} topic={fallbackTopic} /> : <RelatedVideos videos={related.videos} status={related.status} />}
       </div>
 
-      <RelatedTopics key={videoId} topics={topics} apiAvailable={isYouTubeApiAvailable()} />
+      <RelatedTopics key={videoId} topics={topics} apiAvailable={apiAvailable} onPick={openTopic} />
 
       <DebugPanel />
     </div>

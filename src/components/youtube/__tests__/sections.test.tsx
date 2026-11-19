@@ -6,6 +6,7 @@ import { searchTopic } from '../../../lib/videoPageApi'
 import CommentsSection from '../CommentsSection'
 import RelatedTopics from '../RelatedTopics'
 import RelatedVideos from '../RelatedVideos'
+import TopicVideos from '../TopicVideos'
 
 vi.mock('../../../lib/videoPageApi', () => ({ searchTopic: vi.fn() }))
 
@@ -52,29 +53,41 @@ describe('RelatedVideos', () => {
 })
 
 describe('RelatedTopics', () => {
-  beforeEach(() => vi.mocked(searchTopic).mockReset())
-
-  it('searches once on a click and shows the results as cards', async () => {
-    vi.mocked(searchTopic).mockResolvedValue([{ id: 'zzz', title: 'found it', channelTitle: 'c', thumbnail: '' }])
-    wrap(<RelatedTopics topics={['Video game']} apiAvailable />)
+  it('tells the page which topic was clicked', () => {
+    const onPick = vi.fn()
+    wrap(<RelatedTopics topics={['Video game', 'Odd']} apiAvailable onPick={onPick} />)
     fireEvent.click(screen.getByRole('button', { name: 'Video game' }))
-    await waitFor(() => expect(screen.getByRole('link', { name: /found it/ })).toHaveAttribute('href', '/youtube/zzz'))
-    expect(searchTopic).toHaveBeenCalledTimes(1)
-    expect(searchTopic).toHaveBeenCalledWith('Video game')
-  })
-  it('says when a topic has nothing', async () => {
-    vi.mocked(searchTopic).mockResolvedValue([])
-    wrap(<RelatedTopics topics={['Odd']} apiAvailable />)
-    fireEvent.click(screen.getByRole('button', { name: 'Odd' }))
-    await waitFor(() => expect(screen.getByText('Nothing found')).toBeInTheDocument())
+    expect(onPick).toHaveBeenCalledWith('Video game')
+    expect(onPick).toHaveBeenCalledTimes(1)
   })
   it('shows plain text, not buttons, without the API', () => {
-    wrap(<RelatedTopics topics={['Video game']} apiAvailable={false} />)
+    wrap(<RelatedTopics topics={['Video game']} apiAvailable={false} onPick={vi.fn()} />)
     expect(screen.getByText('Video game')).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
   it('renders nothing without topics', () => {
-    const { container } = wrap(<RelatedTopics topics={[]} apiAvailable />)
+    const { container } = wrap(<RelatedTopics topics={[]} apiAvailable onPick={vi.fn()} />)
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('TopicVideos', () => {
+  beforeEach(() => vi.mocked(searchTopic).mockReset())
+
+  it('searches once and shows the results as cards under a Replay video bar', async () => {
+    vi.mocked(searchTopic).mockResolvedValue([{ id: 'zzz', title: 'found it', channelTitle: 'c', thumbnail: '' }])
+    const onReplay = vi.fn()
+    wrap(<TopicVideos topic="Video game" onReplay={onReplay} />)
+    await waitFor(() => expect(screen.getByRole('link', { name: /found it/ })).toHaveAttribute('href', '/youtube/zzz'))
+    expect(searchTopic).toHaveBeenCalledTimes(1)
+    expect(searchTopic).toHaveBeenCalledWith('Video game')
+    fireEvent.click(screen.getByRole('button', { name: 'Replay video' }))
+    expect(onReplay).toHaveBeenCalledTimes(1)
+  })
+  it('says when a topic has nothing, and still offers the way back', async () => {
+    vi.mocked(searchTopic).mockResolvedValue([])
+    wrap(<TopicVideos topic="Odd" onReplay={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Nothing found')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Replay video' })).toBeInTheDocument()
   })
 })
