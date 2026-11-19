@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useApp } from '../../contexts/AppContext'
 import {
+  buildPopoutPlayerPath,
   canPopOutOn,
   floatingChannelFromPath,
   floatingShouldEnd,
@@ -10,6 +11,7 @@ import {
   loadFloatSize,
   saveFloatSize,
 } from '../../lib/floatingVideo'
+import type { FramedSource } from '../../lib/floatingVideo'
 import { openFloatingWindow } from '../../lib/floatingWindow'
 import type { FloatingSession } from '../../lib/floatingWindow'
 import { FloatingVideoContext } from './floatingVideoContext'
@@ -46,16 +48,27 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
   const [supported] = useState(() => isFloatingSupported())
   const [isFloating, setIsFloating] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
+  /** What the YouTube or HLS / DASH page in front of the viewer shows; null on every other page. */
+  const [pageSource, setPageSource] = useState<FramedSource | null>(null)
 
   const sessionRef = useRef<FloatingSession | null>(null)
   const openingRef = useRef(false)
   const mountedRef = useRef(true)
   /** The channel the window was last told to show, so only a real change is sent on. */
   const shownChannelRef = useRef<string | null>(null)
+  /** What the window shows: a Twitch channel, or a pasted video or stream in a frame. */
+  const windowKindRef = useRef<'twitch' | 'framed'>('twitch')
+  /** The address of the source the window was last told to show, so only a real change is sent on. */
+  const shownSourceRef = useRef<string | null>(null)
+  const pageSourceRef = useRef(pageSource)
+  useEffect(() => {
+    pageSourceRef.current = pageSource
+  })
 
   const handleClosed = useCallback(() => {
     sessionRef.current = null
     shownChannelRef.current = null
+    shownSourceRef.current = null
     setIsFloating(false)
   }, [])
 
@@ -74,13 +87,21 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
     close()
   }, [showNotice, close])
 
-  const open = useCallback(() => {
-    if (!supported || !channel || sessionRef.current || openingRef.current) return
+  const open = useCallback((openOptions?: { startSec?: number }) => {
+    const framedSource = !channel ? pageSourceRef.current : null
+    if (!supported || (!channel && !framedSource) || sessionRef.current || openingRef.current) return
     openingRef.current = true
+    windowKindRef.current = framedSource ? 'framed' : 'twitch'
     shownChannelRef.current = channel
+    shownSourceRef.current = framedSource ? buildPopoutPlayerPath(framedSource) : null
+    // A click handler hands over its event; only a real number is a start time.
+    const startSec = openOptions?.startSec
+    const source: FramedSource | undefined =
+      framedSource?.kind === 'youtube' && typeof startSec === 'number' ? { ...framedSource, startSec } : (framedSource ?? undefined)
     // Called synchronously: the browser only allows the request inside the click.
     openFloatingWindow({
-      channel,
+      channel: channel ?? undefined,
+      source,
       parent: window.location.hostname,
       size: loadFloatSize(),
       onClosed: handleClosed,
@@ -100,6 +121,7 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
       })
       .catch(() => {
         shownChannelRef.current = null
+        shownSourceRef.current = null
         showNotice('blocked')
       })
       .finally(() => {
@@ -114,6 +136,15 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
     sessionRef.current?.setChannel(channel)
   }, [isFloating, channel])
 
+  // A window showing a YouTube video or a stream follows the page the same way.
+  useEffect(() => {
+    if (!isFloating || windowKindRef.current !== 'framed' || !pageSource) return
+    const address = buildPopoutPlayerPath(pageSource)
+    if (address === shownSourceRef.current) return
+    shownSourceRef.current = address
+    sessionRef.current?.setSource(pageSource)
+  }, [isFloating, pageSource])
+
   // A page that plays its own video ends the window, so two things never play at once. A clip or
   // VOD only counts when it is started while a channel page is showing: the last thing played
   // can be a clip from an earlier page (one pasted on the hub), and reaching a channel must not
@@ -124,7 +155,7 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
     const startedNow = detection !== seenDetectionRef.current
     seenDetectionRef.current = detection
     if (!isFloating) return
-    if (floatingShouldEnd(pathname, startedNow ? detection : null)) sessionRef.current?.close()
+    if (floatingShouldEnd(pathname, startedNow ? detection : null, windowKindRef.current)) sessionRef.current?.close()
   }, [isFloating, pathname, detection])
 
   useEffect(() => {
@@ -144,14 +175,15 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
   const value = useMemo<FloatingVideoControls>(
     () => ({
       supported,
-      canOpen: supported && !isFloating && canPopOutOn(pathname, detection),
+      canOpen: supported && !isFloating && (canPopOutOn(pathname, detection) || pageSource !== null),
       isFloating,
       blocked: notice?.kind === 'blocked',
       failed: notice?.kind === 'failed',
       open,
       close,
+      registerSource: setPageSource,
     }),
-    [supported, isFloating, pathname, detection, notice, open, close],
+    [supported, isFloating, pathname, detection, pageSource, notice, open, close],
   )
 
   return <FloatingVideoContext.Provider value={value}>{children}</FloatingVideoContext.Provider>

@@ -212,6 +212,7 @@ describe('OfflineLayout', () => {
       failed: false,
       open: vi.fn(),
       close: vi.fn(),
+      registerSource: vi.fn(),
       ...over,
     })
     const withVideo = (value: FloatingVideoControls, player: React.ReactNode | null) => (

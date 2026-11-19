@@ -10,7 +10,7 @@ export interface FakeFloatingWindow {
   /** Stands in for the window Chrome would return. */
   win: Window
   /** Plays an event in as if the browser fired it on the window (`pagehide`, `resize`). */
-  emit: (type: string) => void
+  emit: (type: string, event?: unknown) => void
   /** Changes what `innerWidth` / `innerHeight` report; follow with `emit('resize')`. */
   setSize: (width: number, height: number) => void
   /** Makes `closed` read true without firing `pagehide`, like a window that went away before it was handed over. */
@@ -18,9 +18,9 @@ export interface FakeFloatingWindow {
 }
 
 export function createFakeFloatingWindow(): FakeFloatingWindow {
-  const listeners = new Map<string, Set<() => void>>()
-  const emit = (type: string) => {
-    listeners.get(type)?.forEach((callback) => callback())
+  const listeners = new Map<string, Set<(event?: unknown) => void>>()
+  const emit = (type: string, event?: unknown) => {
+    listeners.get(type)?.forEach((callback) => callback(event))
   }
   const state = { closed: false }
   const fake = {
@@ -30,12 +30,12 @@ export function createFakeFloatingWindow(): FakeFloatingWindow {
     get closed() {
       return state.closed
     },
-    addEventListener: (type: string, callback: () => void) => {
+    addEventListener: (type: string, callback: (event?: unknown) => void) => {
       const existing = listeners.get(type)
       if (existing) existing.add(callback)
       else listeners.set(type, new Set([callback]))
     },
-    removeEventListener: (type: string, callback: () => void) => {
+    removeEventListener: (type: string, callback: (event?: unknown) => void) => {
       listeners.get(type)?.delete(callback)
     },
     // Closing a real window marks it closed and fires pagehide in it.

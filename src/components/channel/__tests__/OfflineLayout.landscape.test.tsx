@@ -36,6 +36,7 @@ const controls = (over: Partial<FloatingVideoControls> = {}): FloatingVideoContr
   failed: false,
   open: vi.fn(),
   close: vi.fn(),
+  registerSource: vi.fn(),
   ...over,
 })
 

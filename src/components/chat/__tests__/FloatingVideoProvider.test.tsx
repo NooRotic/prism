@@ -1,15 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { act, render } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { AppProvider, useApp } from '../../../contexts/AppContext'
 import { detectURLType } from '../../../lib/urlDetection'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
 import { isFloatingSupported, loadFloatSize } from '../../../lib/floatingVideo'
+import type { FramedSource } from '../../../lib/floatingVideo'
 import { openFloatingWindow } from '../../../lib/floatingWindow'
 import type { FloatingSession, OpenFloatingOptions } from '../../../lib/floatingWindow'
 import type { Mock } from 'vitest'
 import FloatingVideoProvider from '../FloatingVideoProvider'
-import { useFloatingVideo } from '../floatingVideoContext'
+import { useFloatingPageSource, useFloatingVideo } from '../floatingVideoContext'
 import type { FloatingVideoControls } from '../floatingVideoContext'
 
 // The browser's window is the one thing replaced: opening it is what only Chrome can do.
@@ -24,6 +25,7 @@ const CLIP_URL = 'https://clips.twitch.tv/AbcDef'
 
 interface FakeSession extends FloatingSession {
   setChannel: Mock<(channel: string) => void>
+  setSource: Mock<(source: FramedSource) => void>
   close: Mock<() => void>
 }
 
@@ -52,6 +54,7 @@ function armOpener({ sessionClosed = false }: { sessionClosed?: boolean } = {}) 
     })
     const session: FakeSession = {
       setChannel: vi.fn(),
+      setSource: vi.fn(),
       // Closing a real session reports back through onClosed.
       close: vi.fn(() => options.onClosed()),
       closed: sessionClosed,
@@ -406,5 +409,97 @@ describe('useFloatingVideo outside a provider', () => {
       controls?.open()
       controls?.close()
     }).not.toThrow()
+  })
+})
+
+/** Stands in for a YouTube or HLS page: it tells the provider which video it shows. */
+let setPageSource: (source: FramedSource | null) => void = () => {}
+function PageSource({ initial }: { initial: FramedSource | null }) {
+  const [source, setSource] = useState(initial)
+  useEffect(() => {
+    setPageSource = setSource
+  }, [])
+  useFloatingPageSource(source)
+  return null
+}
+
+function renderFramed(initialPath: string, source: FramedSource | null) {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <AppProvider>
+        <FloatingVideoProvider>
+          <Probe />
+          <PageSource initial={source} />
+        </FloatingVideoProvider>
+      </AppProvider>
+    </MemoryRouter>,
+  )
+}
+
+const YT_A: FramedSource = { kind: 'youtube', videoId: 'abcdefghijk' }
+const YT_B: FramedSource = { kind: 'youtube', videoId: 'zzzzzzzzzzz' }
+
+describe('FloatingVideoProvider: a YouTube or HLS / DASH page', () => {
+  it('offers the control once the page says what it shows, and not before', () => {
+    renderFramed('/youtube/abcdefghijk', null)
+    expect(probe.controls.canOpen).toBe(false)
+    act(() => setPageSource(YT_A))
+    expect(probe.controls.canOpen).toBe(true)
+    act(() => setPageSource(null))
+    expect(probe.controls.canOpen).toBe(false)
+  })
+
+  it('opens with what the page shows, from the time it was given, and no channel', async () => {
+    armOpener()
+    renderFramed('/youtube/abcdefghijk', YT_A)
+    act(() => probe.controls.open({ startSec: 42 }))
+    expect(lastOpening().options.source).toEqual({ kind: 'youtube', videoId: 'abcdefghijk', startSec: 42 })
+    expect(lastOpening().options.channel).toBeUndefined()
+    await lastOpening().resolve()
+    expect(probe.controls.isFloating).toBe(true)
+    expect(probe.controls.canOpen).toBe(false)
+  })
+
+  it('opens from a click handler that passes the event along', async () => {
+    armOpener()
+    renderFramed('/youtube/abcdefghijk', YT_A)
+    act(() => probe.controls.open({ type: 'click' } as never))
+    expect(lastOpening().options.source).toEqual(YT_A)
+  })
+
+  it('follows the page to the next video, once per change', async () => {
+    armOpener()
+    renderFramed('/youtube/abcdefghijk', YT_A)
+    act(() => probe.controls.open())
+    await lastOpening().resolve()
+
+    act(() => setPageSource({ ...YT_A }))
+    expect(lastOpening().session.setSource).not.toHaveBeenCalled()
+    act(() => setPageSource(YT_B))
+    expect(lastOpening().session.setSource).toHaveBeenCalledTimes(1)
+    expect(lastOpening().session.setSource).toHaveBeenCalledWith(YT_B)
+  })
+
+  it('keeps playing when the page goes away, as a Twitch window does off a channel page', async () => {
+    armOpener()
+    renderFramed('/youtube/abcdefghijk', YT_A)
+    act(() => probe.controls.open())
+    await lastOpening().resolve()
+
+    act(() => setPageSource(null))
+    act(() => probe.navigate('/'))
+    expect(lastOpening().session.close).not.toHaveBeenCalled()
+    expect(probe.controls.isFloating).toBe(true)
+  })
+
+  it('ends on a Twitch channel page, which plays its own stream', async () => {
+    armOpener()
+    renderFramed('/youtube/abcdefghijk', YT_A)
+    act(() => probe.controls.open())
+    await lastOpening().resolve()
+
+    act(() => probe.navigate('/twitch/streamer'))
+    expect(lastOpening().session.close).toHaveBeenCalled()
+    expect(probe.controls.isFloating).toBe(false)
   })
 })

@@ -7,6 +7,7 @@ import {
   openFloatingWindow,
 } from '../floatingWindow'
 import type { OpenFloatingOptions } from '../floatingWindow'
+import { POPOUT_FAILED_MESSAGE } from '../floatingVideo'
 
 function setup(twitchOptions?: Parameters<typeof createFakeTwitch>[0]) {
   const fake = createFakeFloatingWindow()
@@ -420,5 +421,93 @@ describe('openFloatingWindow: the window going away and resizing', () => {
     vi.advanceTimersByTime(1)
     expect(callbacks.onResize).toHaveBeenCalledOnce()
     expect(callbacks.onResize).toHaveBeenCalledWith({ width: 700, height: 400 })
+  })
+})
+
+describe('openFloatingWindow: a pasted video or stream', () => {
+  const APP = 'https://prism.example'
+
+  function framedSetup(source: NonNullable<OpenFloatingOptions['source']>) {
+    const context = setup()
+    const options: OpenFloatingOptions = { ...context.options, channel: undefined, source, appOrigin: APP }
+    return { ...context, options }
+  }
+  const frameOf = (win: Window) => win.document.querySelector('iframe')
+
+  it('shows the start screen first, with no frame and no Twitch script', async () => {
+    const { options, fake, twitch } = framedSetup({ kind: 'youtube', videoId: 'abcdefghijk' })
+    await openFloatingWindow(options)
+    expect(startButton(fake.win).textContent).toBe(START_BUTTON_TEXT)
+    expect(frameOf(fake.win)).toBeNull()
+    expect(twitch.loadScript).not.toHaveBeenCalled()
+  })
+
+  it('puts the player page in a frame after the click, with the autoplay permission', async () => {
+    const { options, fake, twitch } = framedSetup({ kind: 'youtube', videoId: 'abcdefghijk', startSec: 40 })
+    await openFloatingWindow(options)
+    startButton(fake.win).click()
+    await flush()
+    const frame = frameOf(fake.win)
+    expect(frame?.getAttribute('src')).toBe(`${APP}/popout/player?kind=youtube&v=abcdefghijk&t=40`)
+    expect(frame?.getAttribute('allow')).toContain('autoplay')
+    expect(twitch.loadScript).not.toHaveBeenCalled()
+  })
+
+  it('points the frame at the next video when the page it follows moves on', async () => {
+    const { options, fake } = framedSetup({ kind: 'youtube', videoId: 'abcdefghijk' })
+    const session = await openFloatingWindow(options)
+    startButton(fake.win).click()
+    await flush()
+    session.setSource({ kind: 'stream', url: 'https://a.example/x.m3u8', streamKind: 'hls' })
+    expect(frameOf(fake.win)?.getAttribute('src')).toBe(
+      `${APP}/popout/player?kind=stream&as=hls&url=${encodeURIComponent('https://a.example/x.m3u8')}`,
+    )
+  })
+
+  it('starts on the latest source when it changed before the click', async () => {
+    const { options, fake } = framedSetup({ kind: 'youtube', videoId: 'abcdefghijk' })
+    const session = await openFloatingWindow(options)
+    session.setSource({ kind: 'youtube', videoId: 'zzzzzzzzzzz' })
+    startButton(fake.win).click()
+    await flush()
+    expect(frameOf(fake.win)?.getAttribute('src')).toContain('v=zzzzzzzzzzz')
+  })
+
+  it('fails when the frame says it cannot play, and ignores any other message', async () => {
+    const { options, fake, callbacks } = framedSetup({ kind: 'youtube', videoId: 'abcdefghijk' })
+    await openFloatingWindow(options)
+    startButton(fake.win).click()
+    await flush()
+    fake.emit('message', { origin: 'https://evil.example', data: { type: POPOUT_FAILED_MESSAGE } })
+    fake.emit('message', { origin: APP, data: { type: 'something-else' } })
+    expect(callbacks.onFailed).not.toHaveBeenCalled()
+    fake.emit('message', { origin: APP, data: { type: POPOUT_FAILED_MESSAGE } })
+    expect(callbacks.onFailed).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not time out once the frame has loaded', async () => {
+    vi.useFakeTimers()
+    const { options, fake, callbacks } = framedSetup({ kind: 'youtube', videoId: 'abcdefghijk' })
+    await openFloatingWindow(options)
+    startButton(fake.win).click()
+    await vi.advanceTimersByTimeAsync(0)
+    frameOf(fake.win)?.dispatchEvent(new Event('load'))
+    await vi.advanceTimersByTimeAsync(READY_TIMEOUT_MS + 1)
+    expect(callbacks.onFailed).not.toHaveBeenCalled()
+  })
+
+  it('gives up on a frame that never loads', async () => {
+    vi.useFakeTimers()
+    const { options, fake, callbacks } = framedSetup({ kind: 'youtube', videoId: 'abcdefghijk' })
+    await openFloatingWindow(options)
+    startButton(fake.win).click()
+    await vi.advanceTimersByTimeAsync(READY_TIMEOUT_MS + 1)
+    expect(callbacks.onFailed).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves a Twitch window alone when asked to change source', async () => {
+    const { session, fake } = await openAndStart()
+    session.setSource({ kind: 'youtube', videoId: 'abcdefghijk' })
+    expect(frameOf(fake.win)).toBeNull()
   })
 })

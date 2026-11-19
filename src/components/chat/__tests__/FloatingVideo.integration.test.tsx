@@ -24,7 +24,7 @@ vi.mock('../useFullscreen', () => ({ useFullscreen: vi.fn() }))
 const LIVE_URL = 'https://twitch.tv/streamer'
 
 let options: OpenFloatingOptions | null = null
-const session = { setChannel: vi.fn(), close: vi.fn(), closed: false }
+const session = { setChannel: vi.fn(), setSource: vi.fn(), close: vi.fn(), closed: false }
 
 /** What the dock's page does on a live channel: points the player at the channel. */
 function Page() {

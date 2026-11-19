@@ -9,6 +9,10 @@ import { buildStreamPath, CUSTOM_STREAM_ID } from '../lib/routes'
 import { filterStreams, groupCounts } from '../lib/streamFilter'
 import { resolveSnapshotStream, resolveStreamSource, type StreamSource } from '../lib/streamSource'
 import type { StreamEntry } from '../lib/streamsApi'
+import type { FramedSource } from '../lib/floatingVideo'
+import FloatingPanel from '../components/chat/FloatingPanel'
+import { useFloatingPageSource, useFloatingVideo } from '../components/chat/floatingVideoContext'
+import VideoPopoutBar from '../components/chat/VideoPopoutBar'
 import StreamPlayerPanel from '../components/player/StreamPlayerPanel'
 import AboutPanel from '../components/streams/AboutPanel'
 import FavoritesFilter from '../components/streams/FavoritesFilter'
@@ -141,6 +145,14 @@ export default function HlsPage() {
     return { source: listedDefault ?? resolveStreamSource(DEFAULT_DEMO_ID, NO_PARAMS), waiting: false }
   }, [streamId, searchParams, real, status])
 
+  // The pop-out follows this page: it opens on the stream shown and switches when the page moves to another one.
+  const video = useFloatingVideo()
+  const floatSource = useMemo<FramedSource | null>(
+    () => (source ? { kind: 'stream', url: source.url, streamKind: source.kind } : null),
+    [source],
+  )
+  useFloatingPageSource(floatSource)
+
   // The rest of the app (debug panel, floating window) reads what is playing from app state.
   useEffect(() => {
     if (!source) return
@@ -193,12 +205,24 @@ export default function HlsPage() {
       <div ref={playerAnchor} className="flex scroll-mt-20 flex-col gap-4 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
           {source ? (
-            <StreamPlayerPanel
-              key={`${source.url}|${source.detection.type}`}
-              source={source}
-              heading={false}
-              className="flex w-full flex-col gap-4"
-            />
+            <div className="flex flex-col gap-2">
+              <VideoPopoutBar />
+              {video.isFloating ? (
+                <div
+                  className="aspect-video w-full overflow-hidden rounded-lg"
+                  style={{ backgroundColor: '#000', border: '2px solid var(--accent-hls)' }}
+                >
+                  <FloatingPanel onBringBack={video.close} />
+                </div>
+              ) : (
+                <StreamPlayerPanel
+                  key={`${source.url}|${source.detection.type}`}
+                  source={source}
+                  heading={false}
+                  className="flex w-full flex-col gap-4"
+                />
+              )}
+            </div>
           ) : waiting ? (
             <PlayerPlaceholder>
               <p>Loading stream…</p>
