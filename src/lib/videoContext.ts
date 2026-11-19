@@ -51,6 +51,7 @@ export function readQueueSnapshot(): ContextItem[] {
 }
 
 export interface ContextWindow {
+  current: ContextItem
   index: number
   total: number
   before: ContextItem[]
@@ -64,6 +65,7 @@ export function windowAround(items: ContextItem[], currentId: string, behind = 3
   const index = items.findIndex((i) => i.id === currentId)
   if (index < 0) return null
   return {
+    current: items[index],
     index,
     total: items.length,
     before: items.slice(Math.max(0, index - behind), index),

@@ -35,6 +35,7 @@ describe('windowAround', () => {
   it('shows what is behind and ahead in the middle', () => {
     const w = windowAround(items, 'id5', 3, 6)!
     expect(w.index).toBe(5)
+    expect(w.current.id).toBe('id5')
     expect(w.total).toBe(10)
     expect(w.before.map((i) => i.id)).toEqual(['id2', 'id3', 'id4'])
     expect(w.after.map((i) => i.id)).toEqual(['id6', 'id7', 'id8', 'id9'])
