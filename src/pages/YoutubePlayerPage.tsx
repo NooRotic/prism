@@ -20,6 +20,7 @@ import DebugPanel from '../components/layout/DebugPanel'
 import CommentsSection from '../components/youtube/CommentsSection'
 import ContextStrip from '../components/youtube/ContextStrip'
 import DescriptionBlock from '../components/youtube/DescriptionBlock'
+import RelatedByTopic from '../components/youtube/RelatedByTopic'
 import RelatedTopics from '../components/youtube/RelatedTopics'
 import RelatedVideos from '../components/youtube/RelatedVideos'
 import VideoMeta from '../components/youtube/VideoMeta'
@@ -69,6 +70,8 @@ export default function YoutubePlayerPage() {
   const context = useVideoContext(videoId, search)
   const related = useRelatedVideos(videoId)
   const topics = useMemo(() => mergeTopics(data?.topics ?? [], data?.tags ?? []), [data])
+  // No Mix videos: the column shows the first topic's videos instead (a search, so only with a key).
+  const fallbackTopic = related.status === 'empty' && isYouTubeApiAvailable() ? topics[0] : undefined
 
   return (
     <div className="flex flex-col gap-5 w-full max-w-5xl mx-auto px-4 md:px-6 pt-4 pb-8">
@@ -105,7 +108,7 @@ export default function YoutubePlayerPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <CommentsSection videoId={videoId} result={comments} />
-        <RelatedVideos videos={related.videos} status={related.status} />
+        {fallbackTopic ? <RelatedByTopic key={fallbackTopic} topic={fallbackTopic} /> : <RelatedVideos videos={related.videos} status={related.status} />}
       </div>
 
       <RelatedTopics key={videoId} topics={topics} apiAvailable={isYouTubeApiAvailable()} />

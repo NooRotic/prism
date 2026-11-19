@@ -34,7 +34,7 @@ export default function YoutubeCatchupPage() {
     <div className="flex flex-col gap-4 w-full max-w-6xl mx-auto px-4 md:px-6 pt-4 pb-8">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-bold font-heading uppercase tracking-wider" style={{ color: 'var(--accent-youtube)' }}>
-          Catch up
+          Import from YT
         </h2>
         <p className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
           {catchup.subscriptionCount} subscriptions, {catchup.watchLaterCount} Watch Later videos

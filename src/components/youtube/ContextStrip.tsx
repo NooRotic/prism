@@ -44,7 +44,7 @@ export default function ContextStrip({ source, status, strip, currentId }: Props
 
   const search = contextSearch(source)
   const href = (item: ContextItem) => `/youtube/${item.id}${search}`
-  const label = `${strip.index + 1} of ${strip.total} · ${source.kind === 'catchup' ? 'Catch up' : 'Playlist'}`
+  const label = `${strip.index + 1} of ${strip.total} · ${source.kind === 'catchup' ? 'Import from YT' : 'Playlist'}`
   const thumb = (item: ContextItem) => (
     <>
       <div className="aspect-video w-32 md:w-40 rounded overflow-hidden" style={{ backgroundColor: '#000' }}>

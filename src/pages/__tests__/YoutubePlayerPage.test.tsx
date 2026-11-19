@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { act } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -52,7 +52,7 @@ beforeEach(() => {
   } as never)
   vi.mocked(useVideoPage).mockReturnValue({ data: data(), status: 'ready' })
   vi.mocked(useVideoComments).mockReturnValue({ result: { status: 'disabled' } })
-  vi.mocked(useRelatedVideos).mockReturnValue({ videos: [], status: 'empty' })
+  vi.mocked(useRelatedVideos).mockReturnValue({ videos: [{ id: 'rrrrrrrrrrr', title: 'a related one', channel: 'c', publishedAt: '', durationSec: 60, thumbnail: '' }], status: 'ready' })
   vi.mocked(useVideoContext).mockReturnValue({ source: { kind: 'catchup' }, status: 'ready', strip: windowAround(items, 'abcdefghijk') })
 })
 
@@ -184,6 +184,57 @@ describe('YoutubePlayerPage', () => {
       expect(screen.queryByTestId('player')).not.toBeInTheDocument()
       expect(screen.getByTestId('floating-panel')).toBeInTheDocument()
       expect(screen.getByRole('heading', { name: 'A title' })).toBeInTheDocument()
+    })
+  })
+
+  describe('when the Mix has no related videos', () => {
+    const hit = { id: 'zzzzzzzzzzz', title: 'topic result', channelTitle: 'c', thumbnail: '' }
+    beforeEach(() => {
+      vi.mocked(searchTopic).mockReset()
+      vi.mocked(searchTopic).mockResolvedValue([hit])
+      vi.mocked(useRelatedVideos).mockReturnValue({ videos: [], status: 'empty' })
+    })
+
+    it('shows the first topic videos under "Related videos to <topic>"', async () => {
+      renderPage()
+      const region = screen.getByRole('region', { name: 'Related videos' })
+      expect(within(region).getByRole('heading', { name: 'Related videos to alpha' })).toBeInTheDocument()
+      await waitFor(() => expect(within(region).getByRole('link', { name: /topic result/ })).toBeInTheDocument())
+      expect(searchTopic).toHaveBeenCalledWith('alpha')
+    })
+
+    it('with one topic, still shows the one topic button below the comments as before', async () => {
+      vi.mocked(useVideoPage).mockReturnValue({ status: 'ready', data: data({ tags: [], topics: ['Only one'] }) })
+      renderPage()
+      expect(screen.getByRole('heading', { name: 'Related videos to Only one' })).toBeInTheDocument()
+      const topics = screen.getByRole('region', { name: 'Related topics' })
+      expect(within(topics).getAllByRole('button')).toHaveLength(1)
+      await waitFor(() => expect(searchTopic).toHaveBeenCalledTimes(1))
+    })
+
+    it('says nothing found when the topic search finds nothing', async () => {
+      vi.mocked(searchTopic).mockResolvedValue([])
+      renderPage()
+      const region = screen.getByRole('region', { name: 'Related videos' })
+      await waitFor(() => expect(within(region).getByText('Nothing found')).toBeInTheDocument())
+    })
+
+    it('keeps the plain message when the video has no topics', () => {
+      vi.mocked(useVideoPage).mockReturnValue({ status: 'ready', data: data({ tags: [], topics: [] }) })
+      renderPage()
+      expect(screen.getByText('No related videos found.')).toBeInTheDocument()
+      expect(searchTopic).not.toHaveBeenCalled()
+    })
+
+    it('does not search while the Mix is still loading, or when it found videos', () => {
+      vi.mocked(useRelatedVideos).mockReturnValue({ videos: [], status: 'loading' })
+      const { unmount } = renderPage()
+      expect(searchTopic).not.toHaveBeenCalled()
+      unmount()
+      vi.mocked(useRelatedVideos).mockReturnValue({ videos: [{ id: 'rrrrrrrrrrr', title: 'rel', channel: 'c', publishedAt: '', durationSec: 60, thumbnail: '' }], status: 'ready' })
+      renderPage()
+      expect(screen.getByRole('heading', { name: 'Related videos' })).toBeInTheDocument()
+      expect(searchTopic).not.toHaveBeenCalled()
     })
   })
 })

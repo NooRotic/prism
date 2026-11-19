@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { searchTopic } from '../../lib/videoPageApi'
 import type { YouTubeSearchResult } from '../../lib/youtubeApi'
 import TagChip from './TagChip'
+import TopicResults from './TopicResults'
 
 type Results = { topic: string; status: 'searching' | 'done'; videos: YouTubeSearchResult[] }
 
@@ -40,28 +40,7 @@ export default function RelatedTopics({ topics, apiAvailable }: { topics: string
         </p>
       )}
       {results?.status === 'done' && results.videos.length > 0 && (
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {results.videos.map((v) => (
-            <Link
-              key={v.id}
-              to={`/youtube/${v.id}`}
-              className="flex flex-col rounded-lg overflow-hidden"
-              style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}
-            >
-              <div className="aspect-video" style={{ backgroundColor: '#000' }}>
-                {v.thumbnail && <img src={v.thumbnail} alt="" loading="lazy" className="w-full h-full object-cover" />}
-              </div>
-              <div className="p-2 flex flex-col gap-0.5">
-                <span className="text-sm font-medium line-clamp-2" style={{ color: 'var(--text-primary)' }}>
-                  {v.title}
-                </span>
-                <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
-                  {v.channelTitle}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <TopicResults videos={results.videos} columns="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" />
       )}
     </section>
   )

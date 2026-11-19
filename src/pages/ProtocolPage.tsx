@@ -17,7 +17,7 @@ interface ProtocolPageProps {
   protocol: Exclude<ProtocolKey, 'hls-dash'>
 }
 
-function ProtocolSidebar() {
+function ProtocolSidebar({ protocol }: { protocol: ProtocolPageProps['protocol'] }) {
   // Collapsed by default on mobile (< md breakpoint)
   const [collapsed, setCollapsed] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768,
@@ -111,34 +111,38 @@ function ProtocolSidebar() {
         )
       })}
 
-      {/* Divider */}
-      <div className="mx-4 my-3" style={{ borderTop: '1px solid var(--border)' }} />
+      {protocol === 'twitch' && (
+        <>
+        {/* Divider */}
+        <div className="mx-4 my-3" style={{ borderTop: '1px solid var(--border)' }} />
 
-      {/* Auth-gated links */}
-      <button
-        type="button"
-        onClick={isAuthenticated ? undefined : login}
-        className="flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left"
-        style={{
-          color: 'var(--accent-twitch)',
-          opacity: isAuthenticated ? 1 : 0.55,
-        }}
-      >
-        {!isAuthenticated && <Lock size={12} />}
-        Following
-      </button>
-      <button
-        type="button"
-        onClick={isAuthenticated ? undefined : login}
-        className="flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left"
-        style={{
-          color: 'var(--accent-twitch)',
-          opacity: isAuthenticated ? 1 : 0.55,
-        }}
-      >
-        {!isAuthenticated && <Lock size={12} />}
-        Your Stats
-      </button>
+        {/* Auth-gated links */}
+        <button
+          type="button"
+          onClick={isAuthenticated ? undefined : login}
+          className="flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left"
+          style={{
+            color: 'var(--accent-twitch)',
+            opacity: isAuthenticated ? 1 : 0.55,
+          }}
+        >
+          {!isAuthenticated && <Lock size={12} />}
+          Following
+        </button>
+        <button
+          type="button"
+          onClick={isAuthenticated ? undefined : login}
+          className="flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left"
+          style={{
+            color: 'var(--accent-twitch)',
+            opacity: isAuthenticated ? 1 : 0.55,
+          }}
+        >
+          {!isAuthenticated && <Lock size={12} />}
+          Your Stats
+        </button>
+        </>
+      )}
 
       {/* Divider */}
       <div className="mx-4 my-3" style={{ borderTop: '1px solid var(--border)' }} />
@@ -149,7 +153,7 @@ function ProtocolSidebar() {
       </div>
 
       {/* Connect Twitch CTA */}
-      {!isAuthenticated && (
+      {protocol === 'twitch' && !isAuthenticated && (
         <div className="px-3 mt-auto pt-4">
           <ConnectTwitchButton onClick={login} fullWidth />
         </div>
@@ -193,7 +197,7 @@ export default function ProtocolPage({ protocol }: ProtocolPageProps) {
 
       {/* Desktop sidebar — hidden on mobile */}
       <div className="hidden md:block">
-        <ProtocolSidebar />
+        <ProtocolSidebar protocol={protocol} />
       </div>
 
       <div className="min-w-0 flex-1 p-4 md:p-6">
@@ -218,7 +222,7 @@ export default function ProtocolPage({ protocol }: ProtocolPageProps) {
               className="ml-auto rounded px-3 py-1 text-xs font-mono uppercase tracking-wider"
               style={{ border: '1px solid var(--accent-youtube)', color: 'var(--accent-youtube)' }}
             >
-              Catch up
+              Import from YT
             </Link>
           )}
         </div>

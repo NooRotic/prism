@@ -144,7 +144,7 @@ export function Header() {
             className="whitespace-nowrap rounded-md px-2 py-1 transition-colors duration-150 hover:bg-white/10 sm:px-3"
             style={{ ...ROW_ITEM_STYLE, color: 'var(--text-secondary)' }}
           >
-            Catch up
+            Import from YT
           </Link>
         )}
       </FoldingRow>
