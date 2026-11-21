@@ -13,6 +13,7 @@ import { useVideoPage } from '../../hooks/useVideoPage'
 import { getWatchedSeeds } from '../../lib/catchupStore'
 import { windowAround } from '../../lib/videoContext'
 import { searchTopic, type VideoPageData } from '../../lib/videoPageApi'
+import { markQuotaReached, resetQuotaForTests } from '../../lib/youtubeQuota'
 
 vi.mock('../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../hooks/useVideoPage', () => ({ useVideoPage: vi.fn() }))
@@ -246,27 +247,41 @@ describe('YoutubePlayerPage', () => {
       vi.mocked(useRelatedVideos).mockReturnValue({ videos: [], status: 'empty' })
     })
 
-    it('shows the first topic videos under "Related videos to <topic>"', async () => {
+    it('offers the first topic as a button and runs no search until it is clicked', async () => {
       renderPage()
       const region = screen.getByRole('region', { name: 'Related videos' })
+      expect(within(region).getByText('No related videos found.')).toBeInTheDocument()
+      expect(searchTopic).not.toHaveBeenCalled()
+      fireEvent.click(within(region).getByRole('button', { name: 'Find videos for alpha' }))
       expect(within(region).getByRole('heading', { name: 'Related videos to alpha' })).toBeInTheDocument()
       await waitFor(() => expect(within(region).getByRole('link', { name: /topic result/ })).toBeInTheDocument())
+      expect(searchTopic).toHaveBeenCalledTimes(1)
       expect(searchTopic).toHaveBeenCalledWith('alpha')
     })
 
-    it('with one topic, still shows the one topic button below the comments as before', async () => {
+    it('with one topic, still shows the one topic button below the comments as before', () => {
       vi.mocked(useVideoPage).mockReturnValue({ status: 'ready', data: data({ tags: [], topics: ['Only one'] }) })
       renderPage()
-      expect(screen.getByRole('heading', { name: 'Related videos to Only one' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Find videos for Only one' })).toBeInTheDocument()
       const topics = screen.getByRole('region', { name: 'Related topics' })
       expect(within(topics).getAllByRole('button')).toHaveLength(1)
+      expect(searchTopic).not.toHaveBeenCalled()
+    })
+
+    it('offers the button again after moving to another video', async () => {
+      const { navigate } = renderPage()
+      fireEvent.click(screen.getByRole('button', { name: 'Find videos for alpha' }))
       await waitFor(() => expect(searchTopic).toHaveBeenCalledTimes(1))
+      await navigate('/youtube/bbbbbbbbbbb')
+      expect(screen.getByRole('button', { name: 'Find videos for alpha' })).toBeInTheDocument()
+      expect(searchTopic).toHaveBeenCalledTimes(1)
     })
 
     it('says nothing found when the topic search finds nothing', async () => {
       vi.mocked(searchTopic).mockResolvedValue([])
       renderPage()
       const region = screen.getByRole('region', { name: 'Related videos' })
+      fireEvent.click(within(region).getByRole('button', { name: 'Find videos for alpha' }))
       await waitFor(() => expect(within(region).getByText('Nothing found')).toBeInTheDocument())
     })
 
@@ -286,6 +301,23 @@ describe('YoutubePlayerPage', () => {
       renderPage()
       expect(screen.getByRole('heading', { name: 'Related videos' })).toBeInTheDocument()
       expect(searchTopic).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the YouTube daily limit is used up', () => {
+    beforeEach(() => resetQuotaForTests())
+
+    it('shows no notice while there is quota', () => {
+      renderPage()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+
+    it('says so, and that the video still plays, once a call is refused for quota', () => {
+      renderPage()
+      act(() => markQuotaReached())
+      expect(screen.getByRole('status')).toHaveTextContent(/daily limit/)
+      expect(screen.getByRole('status')).toHaveTextContent(/video itself still plays/)
+      expect(screen.getByTestId('player')).toBeInTheDocument()
     })
   })
 })
