@@ -19,6 +19,7 @@ import { YouTubeVideoCard } from './YouTubeVideoCard'
 import { YouTubeSearchBar } from './YouTubeSearchBar'
 import QuotaNotice from '../youtube/QuotaNotice'
 import { useGridSearch } from '../../hooks/useGridSearch'
+import { SORT_LABELS, sortVideos, type SortOrder } from '../../lib/sortVideos'
 
 /** Fetch videos for a category, returning normalized YouTubeVideo[] + pagination token. */
 async function fetchFromApi(categoryId: string, pageToken?: string) {
@@ -46,7 +47,7 @@ export function YouTubeGrid() {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshCounter, setRefreshCounter] = useState(0)
-  const { search, run: runSearch, clear: clearSearch } = useGridSearch()
+  const { search, run: runSearch, clear: clearSearch, order, setOrder } = useGridSearch()
 
   // Tracks the current fetch generation — incremented on category change or refresh
   // so in-flight requests from previous generations are discarded
@@ -217,11 +218,36 @@ export function YouTubeGrid() {
             </p>
           )}
           {search.status === 'ready' && (
+            <>
+              {search.videos.length > 1 && (
+                <div role="group" aria-label="Sort by" className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    Sort by
+                  </span>
+                  {(Object.keys(SORT_LABELS) as SortOrder[]).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-pressed={order === key}
+                      onClick={() => setOrder(key)}
+                      className="rounded px-2.5 py-1 text-sm cursor-pointer"
+                      style={{
+                        background: order === key ? 'var(--accent-youtube)' : 'var(--bg-card)',
+                        color: order === key ? '#fff' : 'var(--text-secondary)',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      {SORT_LABELS[key]}
+                    </button>
+                  ))}
+                </div>
+              )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {search.videos.map((video) => (
+              {sortVideos(search.videos, order).map((video) => (
                 <YouTubeVideoCard key={video.id} video={video} />
               ))}
             </div>
+            </>
           )}
         </section>
       )}

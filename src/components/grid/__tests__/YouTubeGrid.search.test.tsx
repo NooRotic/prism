@@ -8,6 +8,7 @@ import { markQuotaReached, resetQuotaForTests } from '../../../lib/youtubeQuota'
 
 vi.mock('../../../lib/channelLatestApi', () => ({ latestFromChannel: vi.fn() }))
 vi.mock('../../../lib/videoPageApi', () => ({ searchTopic: vi.fn() }))
+vi.mock('../../../lib/videoStats', () => ({ withStats: vi.fn(async (videos: unknown[]) => videos) }))
 vi.mock('../../../lib/youtubeApi', () => ({
   isYouTubeApiAvailable: () => true,
   getPopularVideos: vi.fn().mockResolvedValue({
@@ -102,5 +103,49 @@ describe('YouTubeGrid search', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     markQuotaReached()
     return waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/daily limit/))
+  })
+})
+
+describe('YouTubeGrid search sorting', () => {
+  const dated = (id: string, title: string, publishedAt: string, viewCount: string) => ({ ...vid(id, title), publishedAt, viewCount })
+  const titles = () => screen.getAllByTestId('yt-card-title').map((e) => e.textContent)
+  const threeVideos = [
+    dated('aaaaaaaaaaa', 'mid', '2026-05-01T00:00:00Z', '500'),
+    dated('bbbbbbbbbbb', 'old', '2026-01-01T00:00:00Z', '9000'),
+    dated('ccccccccccc', 'new', '2026-11-01T00:00:00Z', '10'),
+  ]
+
+  it('lists newest first by default, and re-sorts to oldest and most viewed on a click', async () => {
+    vi.mocked(latestFromChannel).mockResolvedValue({ status: 'ok', channelTitle: 'Mr Beast', videos: threeVideos })
+    renderGrid()
+    searchFor('latest MrBeast video')
+    await screen.findByText('mid')
+    expect(titles()).toEqual(['new', 'mid', 'old'])
+    expect(screen.getByRole('button', { name: 'Newest' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Oldest' }))
+    expect(titles()).toEqual(['old', 'mid', 'new'])
+    fireEvent.click(screen.getByRole('button', { name: 'Most viewed' }))
+    expect(titles()).toEqual(['old', 'mid', 'new'])
+    expect(screen.getByRole('button', { name: 'Most viewed' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Newest' }))
+    expect(titles()).toEqual(['new', 'mid', 'old'])
+  })
+
+  it('goes back to Newest for the next search', async () => {
+    vi.mocked(latestFromChannel).mockResolvedValue({ status: 'ok', channelTitle: 'Mr Beast', videos: threeVideos })
+    renderGrid()
+    searchFor('latest MrBeast video')
+    await screen.findByText('mid')
+    fireEvent.click(screen.getByRole('button', { name: 'Oldest' }))
+    searchFor('latest MrBeast video')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Newest' })).toHaveAttribute('aria-pressed', 'true'))
+  })
+
+  it('offers no sort buttons for a single video', async () => {
+    vi.mocked(latestFromChannel).mockResolvedValue({ status: 'ok', channelTitle: 'Mr Beast', videos: [threeVideos[0]] })
+    renderGrid()
+    searchFor('latest MrBeast video')
+    await screen.findByText('mid')
+    expect(screen.queryByRole('group', { name: 'Sort by' })).not.toBeInTheDocument()
   })
 })
