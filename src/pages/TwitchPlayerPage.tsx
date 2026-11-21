@@ -114,8 +114,11 @@ export default function TwitchPlayerPage() {
     if (wentLive || unfolded) window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [layout.offline, layout.folded])
 
+  // Only Twitch content (the channel, or one of its clips or VODs) belongs in this page's player. Arriving from a
+  // YouTube or HLS page, the first render still holds that page's address; the effect above replaces it, and until
+  // then the player is not started on it.
   const playerNode =
-    player.currentUrl && player.detection ? (
+    player.currentUrl && player.detection && player.detection.type === 'twitch' ? (
       <PlayerHost url={player.currentUrl} detection={player.detection} />
     ) : (
       <div
