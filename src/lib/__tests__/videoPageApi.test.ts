@@ -136,6 +136,42 @@ describe('searchTopic', () => {
     vi.mocked(searchYouTubeVideos).mockRejectedValueOnce(new Error('x'))
     expect(await searchTopic('other')).toEqual([])
   })
+  it('treats spacing, punctuation and case as the same search', async () => {
+    vi.mocked(searchYouTubeVideos).mockClear()
+    const hit = { id: 'v', title: 't', channelTitle: 'c', thumbnail: '' }
+    vi.mocked(searchYouTubeVideos).mockResolvedValueOnce({ videos: [hit], nextPageToken: null })
+    await searchTopic('Minecraft  Speedrun')
+    expect(await searchTopic('  minecraft speedrun!  ')).toEqual([hit])
+    expect(await searchTopic('Minecraft, Speedrun?')).toEqual([hit])
+    expect(searchYouTubeVideos).toHaveBeenCalledTimes(1)
+  })
+  it('keeps accented and non-Latin letters, so different searches stay different', async () => {
+    vi.mocked(searchYouTubeVideos).mockClear()
+    vi.mocked(searchYouTubeVideos).mockResolvedValue({ videos: [], nextPageToken: null })
+    await searchTopic('café')
+    await searchTopic('cafe')
+    await searchTopic('猫')
+    expect(searchYouTubeVideos).toHaveBeenCalledTimes(3)
+  })
+  it('does not spend a search on text with no letters or numbers in it', async () => {
+    vi.mocked(searchYouTubeVideos).mockClear()
+    expect(await searchTopic('?!  ...')).toEqual([])
+    expect(searchYouTubeVideos).not.toHaveBeenCalled()
+  })
+  it('remembers a search that found nothing, so it is not paid for again', async () => {
+    vi.mocked(searchYouTubeVideos).mockClear()
+    vi.mocked(searchYouTubeVideos).mockResolvedValueOnce({ videos: [], nextPageToken: null })
+    expect(await searchTopic('zzqx nothing here')).toEqual([])
+    expect(await searchTopic('zzqx nothing here')).toEqual([])
+    expect(searchYouTubeVideos).toHaveBeenCalledTimes(1)
+  })
+  it('does not remember a failed search', async () => {
+    vi.mocked(searchYouTubeVideos).mockClear()
+    vi.mocked(searchYouTubeVideos).mockRejectedValueOnce(new Error('x'))
+    expect(await searchTopic('flaky query')).toEqual([])
+    vi.mocked(searchYouTubeVideos).mockResolvedValueOnce({ videos: [{ id: 'v', title: 't', channelTitle: 'c', thumbnail: '' }], nextPageToken: null })
+    expect(await searchTopic('flaky query')).toHaveLength(1)
+  })
   it('spends one search, not two, on a double click (the same query while it is still running)', async () => {
     vi.mocked(searchYouTubeVideos).mockClear()
     let resolve!: (v: { videos: never[]; nextPageToken: null }) => void
