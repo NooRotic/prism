@@ -56,6 +56,7 @@ export function YouTubeVideoCard({ video }: { video: YouTubeVideo }) {
       {/* Info */}
       <div className="p-3 flex flex-col gap-1">
         <span
+          data-testid="yt-card-title"
           className="text-sm font-medium line-clamp-2 group-hover:underline"
           style={{ color: 'var(--text-primary)' }}
         >
