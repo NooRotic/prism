@@ -16,6 +16,8 @@ export interface RailEntry {
   gameName: string | null
   /** ISO 8601; drives the uptime readout. */
   startedAt: string | null
+  /** Which platform's colour rings the avatar. Defaults to Twitch. */
+  accent?: 'twitch' | 'youtube'
 }
 
 /**

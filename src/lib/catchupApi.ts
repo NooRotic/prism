@@ -17,7 +17,7 @@ export class CatchupApiError extends Error {
 }
 
 /** One GET against the Data API. With a token it signs in as the owner, otherwise it uses the API key. */
-async function call(path: string, params: Record<string, string>, accessToken?: string): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
+export async function call(path: string, params: Record<string, string>, accessToken?: string): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const qs = new URLSearchParams(params)
   const init: RequestInit = {}
   if (accessToken) {
@@ -92,7 +92,7 @@ export async function describeVideos(ids: string[]): Promise<CatchupVideo[]> {
 }
 
 /** Run `fn` over `items` with at most `size` calls in flight, keeping result order. */
-async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+export async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out = new Array<R>(items.length)
   let next = 0
   const worker = async () => {

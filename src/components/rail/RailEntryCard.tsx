@@ -18,6 +18,7 @@ interface RailEntryCardProps {
  */
 function RailAvatar({ entry }: { entry: RailEntry }) {
   const [failed, setFailed] = useState(false)
+  const accent = entry.accent === 'youtube' ? 'var(--accent-youtube)' : 'var(--accent-twitch)'
 
   if (!entry.avatarUrl || failed) {
     return (
@@ -26,7 +27,7 @@ function RailAvatar({ entry }: { entry: RailEntry }) {
         style={{
           width: AVATAR_SIZE,
           height: AVATAR_SIZE,
-          background: 'var(--accent-twitch)',
+          background: accent,
           color: '#fff',
           fontFamily: 'var(--font-mono)',
         }}
@@ -46,10 +47,9 @@ function RailAvatar({ entry }: { entry: RailEntry }) {
       onError={() => setFailed(true)}
       className="shrink-0 rounded-full"
       style={{
-        // Twitch purple, not the app's accent green: the ring identifies the
-        // platform an entry came from, so a future YouTube or Kick section
-        // gets its own colour rather than every rail avatar looking alike.
-        outline: entry.isLive ? '2px solid var(--accent-twitch)' : 'none',
+        // The platform's colour, not the app's accent green: the ring identifies
+        // where an entry came from rather than every rail avatar looking alike.
+        outline: entry.isLive ? `2px solid ${accent}` : 'none',
         outlineOffset: '1px',
       }}
     />
