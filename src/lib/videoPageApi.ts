@@ -75,7 +75,9 @@ async function get(path: string, params: Record<string, string>): Promise<any> {
   return res.json()
 }
 
-const thumbOf = (t: any): string => t?.medium?.url ?? t?.default?.url ?? '' // eslint-disable-line @typescript-eslint/no-explicit-any
+export { get as youtubeGet }
+
+const thumbOf =(t: any): string => t?.medium?.url ?? t?.default?.url ?? '' // eslint-disable-line @typescript-eslint/no-explicit-any
 
 /** Everything the page shows about a video. 1 unit, cached 24 h. Null when there is no key or no such video. */
 export async function getVideoPage(id: string): Promise<VideoPageData | null> {
