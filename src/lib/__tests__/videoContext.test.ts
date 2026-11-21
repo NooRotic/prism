@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { CatchupVideo } from '../catchup'
-import { contextSearch, listIdFromUrl, parseContext, readQueueSnapshot, windowAround, writeQueueSnapshot, type ContextItem } from '../videoContext'
+import { contextSearch, dedupeById, listIdFromUrl, parseContext, readQueueSnapshot, windowAround, writeQueueSnapshot, type ContextItem } from '../videoContext'
 
 beforeEach(() => localStorage.clear())
 
@@ -74,6 +74,20 @@ describe('queue snapshot', () => {
     writeQueueSnapshot(Array.from({ length: 250 }, (_, i) => video(`v${i}`)))
     expect(readQueueSnapshot()).toHaveLength(200)
   })
+  it('skips entries that are not videos (null, numbers, no id) instead of crashing on them', () => {
+    localStorage.setItem(
+      'prism_catchup_queue',
+      JSON.stringify([null, 3, 'x', { title: 'no id' }, { id: 7 }, { id: 'ok', title: 'fine', thumbnail: 'u' }, { id: 'half' }]),
+    )
+    expect(readQueueSnapshot()).toEqual([
+      { id: 'ok', title: 'fine', thumbnail: 'u' },
+      { id: 'half', title: '', thumbnail: '' },
+    ])
+  })
+  it('keeps a video once when the saved queue lists it twice', () => {
+    writeQueueSnapshot([video('a'), video('b'), video('a')])
+    expect(readQueueSnapshot().map((i) => i.id)).toEqual(['a', 'b'])
+  })
   it('reads corrupt or missing storage as empty', () => {
     expect(readQueueSnapshot()).toEqual([])
     localStorage.setItem('prism_catchup_queue', '{bad')
@@ -91,5 +105,11 @@ describe('listIdFromUrl', () => {
     expect(listIdFromUrl('https://www.youtube.com/watch?v=abc12345678&list=LLabcdefghijkl')).toBeNull()
     expect(listIdFromUrl('not a url')).toBeNull()
     expect(listIdFromUrl('https://youtu.be/abc12345678')).toBeNull()
+  })
+})
+
+describe('dedupeById', () => {
+  it('keeps the first of each id, in order', () => {
+    expect(dedupeById([item(1), item(2), item(1), item(3), item(2)]).map((i) => i.id)).toEqual(['id1', 'id2', 'id3'])
   })
 })

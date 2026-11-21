@@ -108,6 +108,35 @@ describe('useVideoContext', () => {
     expect(getPlaylistItems).toHaveBeenCalledTimes(1)
     expect(result.current.strip?.total).toBe(120)
   })
+  it('keeps showing the strip while moving to another video in the playlist it already read', async () => {
+    const item = (id: string) => ({ id, title: id, thumbnail: '' })
+    vi.mocked(getPlaylistItems).mockResolvedValue({
+      status: 'ok',
+      items: Array.from({ length: 12 }, (_, i) => item(`p${i}`)),
+      nextPageToken: null,
+      totalResults: 12,
+    })
+    const { result, rerender } = renderHook(({ id }) => useVideoContext(id, '?list=PLabcdefghij'), { initialProps: { id: 'p1' } })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    rerender({ id: 'p2' })
+    expect(result.current.status).toBe('ready')
+    expect(result.current.strip?.current.id).toBe('p2')
+  })
+  it('does not show the old strip for a video that is not in the list it read', async () => {
+    const item = (id: string) => ({ id, title: id, thumbnail: '' })
+    vi.mocked(getPlaylistItems).mockResolvedValue({ status: 'ok', items: [item('a'), item('b')], nextPageToken: null, totalResults: 2 })
+    const { result, rerender } = renderHook(({ id }) => useVideoContext(id, '?list=PLabcdefghij'), { initialProps: { id: 'a' } })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    rerender({ id: 'zzz' })
+    expect(result.current.status).toBe('loading')
+  })
+  it('lists a video once when the playlist repeats it', async () => {
+    const item = (id: string) => ({ id, title: id, thumbnail: '' })
+    vi.mocked(getPlaylistItems).mockResolvedValue({ status: 'ok', items: [item('a'), item('b'), item('a'), item('c')], nextPageToken: null, totalResults: 4 })
+    const { result } = renderHook(() => useVideoContext('a', '?list=PLabcdefghij'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.strip?.after.map((i) => i.id)).toEqual(['b', 'c'])
+  })
   it('is unreadable when the playlist cannot be read', async () => {
     vi.mocked(getPlaylistItems).mockResolvedValue({ status: 'unreadable' })
     const { result } = renderHook(() => useVideoContext('c', '?list=PLabcdefghij'))

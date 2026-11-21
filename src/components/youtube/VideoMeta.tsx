@@ -3,8 +3,18 @@ import { formatCount, formatPublished } from '../../lib/videoFormat'
 import type { VideoPageData } from '../../lib/videoPageApi'
 import TagChip from './TagChip'
 
-/** The video's title, on its own so the page can put the columns under it. */
-export function VideoTitle({ data }: { data: VideoPageData | null }) {
+/**
+ * The video's title, on its own so the page can put the columns under it. While the details load it holds the
+ * space; when they cannot be had (no such video, no key, YouTube refusing) it says so instead of leaving a gap.
+ */
+export function VideoTitle({ data, unavailable = false }: { data: VideoPageData | null; unavailable?: boolean }) {
+  if (!data && unavailable) {
+    return (
+      <p className="text-base" style={{ color: 'var(--text-secondary)' }}>
+        Details for this video aren't available.
+      </p>
+    )
+  }
   if (!data) return <div className="h-16" aria-hidden="true" />
   return (
     <h1 className="text-xl md:text-2xl font-bold leading-snug" style={{ color: 'var(--text-primary)' }}>
