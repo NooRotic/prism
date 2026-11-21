@@ -8,6 +8,8 @@ import { useRailAvatars } from '../../hooks/useRailAvatars'
 import ConnectTwitchPrompt from '../ui/ConnectTwitchPrompt'
 import RailSection from './RailSection'
 import RailOfflineLink from './RailOfflineLink'
+import YoutubeRailSection from './YoutubeRailSection'
+import { useYoutubeLive } from '../../hooks/useYoutubeLive'
 import { useRailPosition } from './useRailPosition'
 import { isPlayerPagePath } from '../../lib/routes'
 import { sortNewestLiveFirst } from '../../lib/sortLiveFollows'
@@ -162,7 +164,9 @@ export default function ChannelRail() {
   // up: Following in the top nav lists everyone.) A loading rail is not "nothing
   // to show" — it stays mounted so the placeholders above can render.
   const hasContent = followEntries.length > 0
-  const rendered = !isAuthenticated || hasContent || showFollowsLoading
+  // The YouTube section carries the "Check live" button, so it keeps the rail up on its own.
+  const youtube = useYoutubeLive()
+  const rendered = !isAuthenticated || hasContent || showFollowsLoading || youtube.available
 
   // Tell the page how much of its edge the rail covers, so player pages can
   // keep the embed clear of it (see RailGutter). Only while the rail is
@@ -279,6 +283,8 @@ export default function ChannelRail() {
           )}
         </>
       )}
+
+      {youtube.available && <YoutubeRailSection live={youtube} expanded={expanded} />}
 
       <button
         type="button"

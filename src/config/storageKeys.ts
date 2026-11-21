@@ -41,6 +41,10 @@ export const STORAGE_KEYS = {
   LOCAL_CATCHUP_LANE_CACHE: 'prism_catchup_lane_s',
   /** Catch up: the queue as shown (up to 200 `{ id, title, thumbnail }`), read by the player page's filmstrip. */
   LOCAL_CATCHUP_QUEUE: 'prism_catchup_queue',
+  /** Rail "Check live": timestamps (ms) of the viewer's recent checks, for the cooldown and the daily limit (JSON array of numbers). */
+  LOCAL_YOUTUBE_LIVE_CHECKS: 'prism_youtube_live_checks',
+  /** Rail "Check live": the last answer (JSON `{ checkedAt, entries }`), kept so a reload does not cost another check. */
+  LOCAL_YOUTUBE_LIVE_LAST: 'prism_youtube_live_last',
   /** Channel rail edge: 'left' or 'right'. */
   LOCAL_RAIL_POSITION: 'prism_rail_position',
   /** Chat dock state: JSON `{ side: 'left' | 'right', hidden: boolean }`. */
