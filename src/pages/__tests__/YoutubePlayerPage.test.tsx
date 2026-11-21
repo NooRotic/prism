@@ -44,6 +44,13 @@ const items = [
   { id: 'abcdefghijk', title: 'two', thumbnail: '' },
 ]
 
+/** The app after it has handled this page's PLAY_URL: it holds that video's address. */
+const appHolds = (id: string) =>
+  vi.mocked(useApp).mockReturnValue({
+    state: { player: { currentUrl: `https://www.youtube.com/watch?v=${id}`, detection: { type: 'youtube' } } },
+    dispatch: vi.fn(),
+  } as never)
+
 beforeEach(() => {
   localStorage.clear()
   window.scrollTo = vi.fn()
@@ -106,6 +113,43 @@ describe('YoutubePlayerPage', () => {
     for (let i = 0; i < order.length - 1; i++) expect(before(order[i], order[i + 1])).toBe(true)
   })
 
+  it('does not hand the player a leftover Twitch address while it switches to this video', () => {
+    // Coming from a Twitch channel page: the app still holds that channel as the current content on the first render.
+    vi.mocked(useApp).mockReturnValue({
+      state: { player: { currentUrl: 'https://www.twitch.tv/somechannel', detection: { type: 'twitch' } } },
+      dispatch: vi.fn(),
+    } as never)
+    renderPage('/youtube/8uhD559zaLw')
+    expect(screen.queryByTestId('player')).not.toBeInTheDocument()
+    expect(screen.getByText('Loading video...')).toBeInTheDocument()
+  })
+
+  it('asks the app to play this video, and shows the player once the app holds its address', () => {
+    const dispatch = vi.fn()
+    vi.mocked(useApp).mockReturnValue({
+      state: { player: { currentUrl: 'https://www.twitch.tv/somechannel', detection: { type: 'twitch' } } },
+      dispatch,
+    } as never)
+    const first = renderPage('/youtube/8uhD559zaLw')
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'PLAY_URL', url: 'https://www.youtube.com/watch?v=8uhD559zaLw' }))
+    first.unmount()
+    vi.mocked(useApp).mockReturnValue({
+      state: { player: { currentUrl: 'https://www.youtube.com/watch?v=8uhD559zaLw', detection: { type: 'youtube' } } },
+      dispatch,
+    } as never)
+    renderPage('/youtube/8uhD559zaLw')
+    expect(screen.getByTestId('player')).toBeInTheDocument()
+  })
+
+  it('waits for the app to hold the next video address when moving from one video to another', () => {
+    vi.mocked(useApp).mockReturnValue({
+      state: { player: { currentUrl: 'https://www.youtube.com/watch?v=aaaaaaaaaaa', detection: { type: 'youtube' } } },
+      dispatch: vi.fn(),
+    } as never)
+    renderPage('/youtube/bbbbbbbbbbb')
+    expect(screen.queryByTestId('player')).not.toBeInTheDocument()
+  })
+
   it('says the details are not available, instead of leaving a gap, when the video cannot be described', () => {
     vi.mocked(useVideoPage).mockReturnValue({ data: null, status: 'unavailable' })
     renderPage()
@@ -160,6 +204,7 @@ describe('YoutubePlayerPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show more' }))
     fireEvent.click(screen.getByRole('button', { name: 'Topic one' }))
     await waitFor(() => expect(screen.getByRole('link', { name: /result card/ })).toBeInTheDocument())
+    appHolds('yyyyyyyyyyy')
     navigate('/youtube/yyyyyyyyyyy')
     expect(screen.getByRole('button', { name: '+4 more' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument()
@@ -212,6 +257,7 @@ describe('YoutubePlayerPage', () => {
       const { navigate } = renderPage()
       fireEvent.click(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: 'Alpha' }))
       await waitFor(() => expect(screen.getByRole('link', { name: /result card/ })).toBeInTheDocument())
+      appHolds('yyyyyyyyyyy')
       navigate('/youtube/yyyyyyyyyyy')
       expect(screen.getByTestId('player')).toBeInTheDocument()
     })
