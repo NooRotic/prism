@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
+    "pack:extension": "node tools/pack-extension.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview"

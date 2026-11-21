@@ -6,6 +6,9 @@ interface Handoff {
   buildFragment(kind: string, items: string[]): string | null
   importUrl(kind: string, items: string[], dev?: boolean): string | null
   isPrismImportUrl(url: string): boolean
+  playPath(url: string): string | null
+  playUrl(url: string, dev?: boolean): string | null
+  isPrismOpenUrl(url: string): boolean
   ORIGINS: { prod: string; dev: string }
 }
 
@@ -77,5 +80,59 @@ describe('extension hand-off: which addresses the background worker may open', (
     expect(handoff.isPrismImportUrl('http://prism.nooroticx.tv/import#v=1')).toBe(false)
     expect(handoff.isPrismImportUrl('javascript:alert(1)')).toBe(false)
     expect(handoff.isPrismImportUrl('not a url')).toBe(false)
+  })
+})
+
+describe('extension hand-off: opening a page in PRISM', () => {
+  const path = (url: string) => handoff.playPath(url)
+
+  it('maps a YouTube video address, in every common shape, to /youtube/<id>', () => {
+    expect(path('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('/youtube/dQw4w9WgXcQ')
+    expect(path('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLabc&t=42s')).toBe('/youtube/dQw4w9WgXcQ')
+    expect(path('https://m.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('/youtube/dQw4w9WgXcQ')
+    expect(path('https://youtu.be/dQw4w9WgXcQ?si=x')).toBe('/youtube/dQw4w9WgXcQ')
+    expect(path('https://www.youtube.com/shorts/dQw4w9WgXcQ')).toBe('/youtube/dQw4w9WgXcQ')
+    expect(path('https://www.youtube.com/live/dQw4w9WgXcQ')).toBe('/youtube/dQw4w9WgXcQ')
+    expect(path('https://www.youtube.com/embed/dQw4w9WgXcQ')).toBe('/youtube/dQw4w9WgXcQ')
+  })
+
+  it('maps a Twitch channel address to /twitch/<login>, lower-cased', () => {
+    expect(path('https://www.twitch.tv/Ogre_JPG')).toBe('/twitch/ogre_jpg')
+    expect(path('https://twitch.tv/zedxyr/')).toBe('/twitch/zedxyr')
+    expect(path('https://www.twitch.tv/zedxyr/videos?filter=all')).toBe('/twitch/zedxyr')
+  })
+
+  it('has nothing to open for Twitch pages that are not a channel, other sites and bad addresses', () => {
+    for (const bad of [
+      'https://www.twitch.tv/',
+      'https://www.twitch.tv/directory/game/Just%20Chatting',
+      'https://www.twitch.tv/videos/123456',
+      'https://www.twitch.tv/settings/profile',
+      'https://www.youtube.com/',
+      'https://www.youtube.com/watch?v=short',
+      'https://www.youtube.com/playlist?list=WL',
+      'https://www.youtube.com.evil.example/watch?v=dQw4w9WgXcQ',
+      'https://evil.example/twitch.tv/zedxyr',
+      'https://example.com/',
+      'javascript:alert(1)',
+      'not a url',
+    ]) {
+      expect(path(bad), bad).toBeNull()
+    }
+  })
+
+  it('builds the full address on the live site, or on localhost for the dev site', () => {
+    expect(handoff.playUrl('https://youtu.be/dQw4w9WgXcQ')).toBe('https://prism.nooroticx.tv/youtube/dQw4w9WgXcQ')
+    expect(handoff.playUrl('https://www.twitch.tv/zedxyr', true)).toBe('http://localhost:5000/twitch/zedxyr')
+    expect(handoff.playUrl('https://example.com/')).toBeNull()
+  })
+
+  it('lets the background worker open only PRISM import and play addresses', () => {
+    expect(handoff.isPrismOpenUrl('https://prism.nooroticx.tv/youtube/dQw4w9WgXcQ')).toBe(true)
+    expect(handoff.isPrismOpenUrl('https://prism.nooroticx.tv/twitch/zedxyr')).toBe(true)
+    expect(handoff.isPrismOpenUrl('https://prism.nooroticx.tv/import#v=1&kind=watch-later&ids=dQw4w9WgXcQ')).toBe(true)
+    expect(handoff.isPrismOpenUrl('https://prism.nooroticx.tv/admin')).toBe(false)
+    expect(handoff.isPrismOpenUrl('https://evil.example/youtube/dQw4w9WgXcQ')).toBe(false)
+    expect(handoff.isPrismOpenUrl('https://prism.nooroticx.tv.evil.example/twitch/x')).toBe(false)
   })
 })

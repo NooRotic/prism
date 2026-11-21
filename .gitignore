@@ -35,3 +35,6 @@ dist-ssr
 
 # Loose résumé/personal text (keep out of this public repo)
 resume_clause.txt
+
+# Packaged extension
+dist-extension
