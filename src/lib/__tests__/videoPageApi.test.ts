@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getComments, getPlaylistItems, getVideoPage, searchTopic } from '../videoPageApi'
 import { searchYouTubeVideos } from '../youtubeApi'
+import { isQuotaReached, resetQuotaForTests } from '../youtubeQuota'
 
 // youtubeApi reads its key once at import, so the search is faked here; the cache around it is what is tested.
 vi.mock('../youtubeApi', () => ({ searchYouTubeVideos: vi.fn() }))
@@ -10,6 +11,7 @@ const urlOf = (input: unknown) => String(input)
 
 let fetchMock: ReturnType<typeof vi.fn>
 beforeEach(() => {
+  resetQuotaForTests()
   localStorage.clear()
   vi.stubEnv('VITE_YOUTUBE_API_KEY', 'k')
   fetchMock = vi.fn()
@@ -143,5 +145,47 @@ describe('searchTopic', () => {
     resolve({ videos: [], nextPageToken: null })
     await Promise.all([first, second])
     expect(searchYouTubeVideos).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a refused call', () => {
+  it('remembers that the daily quota is used up, and still answers null', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: { errors: [{ reason: 'quotaExceeded' }] } }, 403))
+    expect(await getVideoPage('abcdefghijk')).toBeNull()
+    expect(isQuotaReached()).toBe(true)
+  })
+
+  it('does not treat a comments-off answer as the quota', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: { errors: [{ reason: 'commentsDisabled' }] } }, 403))
+    await getComments('abcdefghijk')
+    expect(isQuotaReached()).toBe(false)
+  })
+})
+
+describe('answers that will not change', () => {
+  it('asks only once about a video YouTube says does not exist', async () => {
+    fetchMock.mockResolvedValue(json({ items: [] }))
+    expect(await getVideoPage('abcdefghijk')).toBeNull()
+    expect(await getVideoPage('abcdefghijk')).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks again after a failure, which may be temporary', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: {} }, 500)).mockResolvedValueOnce(json({ items: [videoItem] }))
+    expect(await getVideoPage('abcdefghijk')).toBeNull()
+    expect((await getVideoPage('abcdefghijk'))?.title).toBe('T')
+  })
+
+  it('asks only once whether comments are turned off', async () => {
+    fetchMock.mockResolvedValue(json({ error: { errors: [{ reason: 'commentsDisabled' }] } }, 403))
+    expect(await getComments('abcdefghijk')).toEqual({ status: 'disabled' })
+    expect(await getComments('abcdefghijk')).toEqual({ status: 'disabled' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks again after a comments error', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: {} }, 500)).mockResolvedValueOnce(json({ items: [] }))
+    expect(await getComments('abcdefghijk')).toEqual({ status: 'error' })
+    expect((await getComments('abcdefghijk')).status).toBe('ok')
   })
 })

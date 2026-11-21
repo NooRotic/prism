@@ -6,11 +6,13 @@
 import { STORAGE_KEYS } from '../config/storageKeys'
 import { searchYouTubeVideos, type YouTubeSearchResult } from './youtubeApi'
 import { ttlGet, ttlSet } from './ttlCache'
+import { noteApiFailure } from './youtubeQuota'
 
 const BASE = 'https://www.googleapis.com/youtube/v3'
 const DAY_MS = 24 * 60 * 60 * 1000
 const COMMENTS_TTL_MS = 30 * 60 * 1000
 const prefix = STORAGE_KEYS.LOCAL_VIDEO_PAGE_CACHE_PREFIX
+const MISSING_TTL_MS = 60 * 60 * 1000
 
 export interface VideoPageData {
   id: string
@@ -68,22 +70,31 @@ async function get(path: string, params: Record<string, string>): Promise<any> {
     } catch {
       /* no JSON body */
     }
+    noteApiFailure(res.status, reason)
     throw new ApiFailure(res.status, reason)
   }
   return res.json()
 }
 
-const thumbOf = (t: any): string => t?.medium?.url ?? t?.default?.url ?? '' // eslint-disable-line @typescript-eslint/no-explicit-any
+export { get as youtubeGet }
+
+const thumbOf =(t: any): string => t?.medium?.url ?? t?.default?.url ?? '' // eslint-disable-line @typescript-eslint/no-explicit-any
 
 /** Everything the page shows about a video. 1 unit, cached 24 h. Null when there is no key or no such video. */
 export async function getVideoPage(id: string): Promise<VideoPageData | null> {
   const cacheKey = `${prefix}video_${id}`
   const cached = ttlGet<VideoPageData>(cacheKey, DAY_MS)
   if (cached) return cached
+  // A video YouTube said does not exist is remembered for an hour, so a dead link does not cost a unit per visit.
+  const missingKey = `${prefix}missing_${id}`
+  if (ttlGet<boolean>(missingKey, MISSING_TTL_MS)) return null
   try {
     const data = await get('videos', { part: 'snippet,statistics,topicDetails', id })
     const it = data.items?.[0]
-    if (!it) return null
+    if (!it) {
+      ttlSet(missingKey, true)
+      return null
+    }
     const result: VideoPageData = {
       id: it.id,
       title: it.snippet.title,
@@ -136,7 +147,12 @@ export async function getComments(id: string, max = 20): Promise<CommentsResult>
     ttlSet(cacheKey, result)
     return result
   } catch (err) {
-    return err instanceof ApiFailure && err.reason === 'commentsDisabled' ? { status: 'disabled' } : { status: 'error' }
+    if (err instanceof ApiFailure && err.reason === 'commentsDisabled') {
+      const off: CommentsResult = { status: 'disabled' }
+      ttlSet(cacheKey, off)
+      return off
+    }
+    return { status: 'error' }
   }
 }
 

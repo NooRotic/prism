@@ -1,5 +1,6 @@
 import { parseDuration, uploadsPlaylistId, type CatchupVideo } from './catchup'
 import { readSLaneCache, writeSLaneCache, type StoredChannel } from './catchupStore'
+import { noteApiFailure } from './youtubeQuota'
 
 const BASE = 'https://www.googleapis.com/youtube/v3'
 const POOL_SIZE = 6
@@ -34,6 +35,7 @@ async function call(path: string, params: Record<string, string>, accessToken?: 
     } catch {
       /* no JSON body */
     }
+    noteApiFailure(res.status, reason)
     throw new CatchupApiError(`YouTube API ${path}: ${res.status}${reason ? ` (${reason})` : ''}`, res.status, reason)
   }
   return res.json()

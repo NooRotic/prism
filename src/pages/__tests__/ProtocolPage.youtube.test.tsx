@@ -25,7 +25,7 @@ describe('ProtocolPage on the YouTube protocol', () => {
         <ProtocolPage protocol="youtube" />
       </MemoryRouter>,
     )
-    expect(screen.getByRole('link', { name: /Catch up/ })).toHaveAttribute('href', '/youtube/catchup')
+    expect(screen.getByRole('link', { name: /Import from YT/ })).toHaveAttribute('href', '/youtube/catchup')
   })
 
   it('does not offer it on the Twitch page', () => {
@@ -34,6 +34,27 @@ describe('ProtocolPage on the YouTube protocol', () => {
         <ProtocolPage protocol="twitch" />
       </MemoryRouter>,
     )
-    expect(screen.queryByRole('link', { name: /Catch up/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Import from YT/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps the Twitch-only Following and Your Stats links off the YouTube page', () => {
+    render(
+      <MemoryRouter>
+        <ProtocolPage protocol="youtube" />
+      </MemoryRouter>,
+    )
+    expect(screen.queryByRole('button', { name: 'Following' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Your Stats' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Connect Twitch')).not.toBeInTheDocument()
+  })
+
+  it('still shows them on the Twitch page', () => {
+    render(
+      <MemoryRouter>
+        <ProtocolPage protocol="twitch" />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('button', { name: 'Following' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Your Stats' })).toBeInTheDocument()
   })
 })

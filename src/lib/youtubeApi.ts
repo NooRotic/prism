@@ -1,4 +1,6 @@
-const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined
+import { noteApiFailure } from './youtubeQuota'
+
+const API_KEY =import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined
 const BASE = 'https://www.googleapis.com/youtube/v3'
 
 export interface YouTubeVideo {
@@ -23,6 +25,18 @@ export interface YouTubePagedResult<T> {
   nextPageToken: string | null
 }
 
+/** The error for a failed answer; a 403 quotaExceeded is also remembered (see youtubeQuota). */
+async function failure(res: Response): Promise<Error> {
+  let reason: string | undefined
+  try {
+    reason = (await res.json())?.error?.errors?.[0]?.reason
+  } catch {
+    /* no JSON body */
+  }
+  noteApiFailure(res.status, reason)
+  return new Error(`YouTube API error: ${res.status}`)
+}
+
 function assertKey(): string {
   if (!API_KEY) throw new Error('VITE_YOUTUBE_API_KEY is not set')
   return API_KEY
@@ -44,7 +58,7 @@ export async function getPopularVideos(
   })
   if (pageToken) params.set('pageToken', pageToken)
   const res = await fetch(`${BASE}/videos?${params}`)
-  if (!res.ok) throw new Error(`YouTube API error: ${res.status}`)
+  if (!res.ok) throw await failure(res)
   const data = await res.json()
   return { videos: (data.items ?? []).map(mapVideo), nextPageToken: data.nextPageToken ?? null }
 }
@@ -65,7 +79,7 @@ export async function searchYouTubeVideos(
   })
   if (pageToken) params.set('pageToken', pageToken)
   const res = await fetch(`${BASE}/search?${params}`)
-  if (!res.ok) throw new Error(`YouTube API error: ${res.status}`)
+  if (!res.ok) throw await failure(res)
   const data = await res.json()
   return { videos: (data.items ?? []).map(mapSearchResult), nextPageToken: data.nextPageToken ?? null }
 }
@@ -80,7 +94,7 @@ export async function getVideoDetails(ids: string[]): Promise<YouTubeVideo[]> {
     key,
   })
   const res = await fetch(`${BASE}/videos?${params}`)
-  if (!res.ok) throw new Error(`YouTube API error: ${res.status}`)
+  if (!res.ok) throw await failure(res)
   const data = await res.json()
   return (data.items ?? []).map(mapVideo)
 }

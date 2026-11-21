@@ -16,6 +16,9 @@ import {
 import { DEFAULT_CATEGORY_ID, getCategoryById } from '../../config/youtubeCategories'
 import { YouTubeCategoryBar } from './YouTubeCategoryBar'
 import { YouTubeVideoCard } from './YouTubeVideoCard'
+import { YouTubeSearchBar } from './YouTubeSearchBar'
+import QuotaNotice from '../youtube/QuotaNotice'
+import { useGridSearch } from '../../hooks/useGridSearch'
 
 /** Fetch videos for a category, returning normalized YouTubeVideo[] + pagination token. */
 async function fetchFromApi(categoryId: string, pageToken?: string) {
@@ -43,6 +46,7 @@ export function YouTubeGrid() {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshCounter, setRefreshCounter] = useState(0)
+  const { search, run: runSearch, clear: clearSearch } = useGridSearch()
 
   // Tracks the current fetch generation — incremented on category change or refresh
   // so in-flight requests from previous generations are discarded
@@ -104,6 +108,7 @@ export function YouTubeGrid() {
   }, [activeCategory, refreshCounter])
 
   function handleSelectCategory(categoryId: string) {
+    clearSearch()
     setActiveCategory(categoryId)
     setVideos([])
     setNextPageToken(null)
@@ -150,6 +155,9 @@ export function YouTubeGrid() {
 
   return (
     <div className="flex flex-col gap-4">
+      <QuotaNotice />
+      {isYouTubeApiAvailable() && <YouTubeSearchBar onSearch={runSearch} />}
+
       {/* Category pills bar + Refresh All button */}
       <div className="flex items-center justify-between">
         <YouTubeCategoryBar
@@ -178,8 +186,48 @@ export function YouTubeGrid() {
         </button>
       </div>
 
+      {search && (
+        <section aria-label="Search results" className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-bold uppercase tracking-wider font-heading" style={{ color: 'var(--text-primary)' }}>
+              {search.heading}
+            </h2>
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="text-sm cursor-pointer"
+              style={{ color: 'var(--text-muted)', background: 'none', border: 'none' }}
+            >
+              Clear search
+            </button>
+          </div>
+          {search.status === 'searching' && (
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Searching…
+            </p>
+          )}
+          {search.status === 'notfound' && (
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Nothing found
+            </p>
+          )}
+          {search.status === 'error' && (
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Could not reach YouTube
+            </p>
+          )}
+          {search.status === 'ready' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {search.videos.map((video) => (
+                <YouTubeVideoCard key={video.id} video={video} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Loading state */}
-      {loading && (
+      {!search && loading && (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent-youtube)' }} />
           <span className="ml-3 text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -189,7 +237,7 @@ export function YouTubeGrid() {
       )}
 
       {/* Error state */}
-      {error && !loading && (
+      {!search && error && !loading && (
         <div
           className="flex items-center gap-3 px-4 py-3 rounded-md"
           style={{
@@ -203,14 +251,14 @@ export function YouTubeGrid() {
       )}
 
       {/* Empty state */}
-      {!loading && !error && videos.length === 0 && (
+      {!search && !loading && !error && videos.length === 0 && (
         <div className="py-16 text-center">
           <span className="text-sm" style={{ color: 'var(--text-muted)' }}>No videos found</span>
         </div>
       )}
 
       {/* Video grid */}
-      {!loading && videos.length > 0 && (
+      {!search && !loading && videos.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {videos.map((video) => (
             <YouTubeVideoCard key={video.id} video={video} />
@@ -219,7 +267,7 @@ export function YouTubeGrid() {
       )}
 
       {/* Load More button */}
-      {!loading && nextPageToken && (
+      {!search && !loading && nextPageToken && (
         <div className="flex justify-center py-4">
           <button
             onClick={handleLoadMore}

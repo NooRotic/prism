@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { act } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,7 @@ import { useVideoPage } from '../../hooks/useVideoPage'
 import { getWatchedSeeds } from '../../lib/catchupStore'
 import { windowAround } from '../../lib/videoContext'
 import { searchTopic, type VideoPageData } from '../../lib/videoPageApi'
+import { markQuotaReached, resetQuotaForTests } from '../../lib/youtubeQuota'
 
 vi.mock('../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../hooks/useVideoPage', () => ({ useVideoPage: vi.fn() }))
@@ -52,7 +53,7 @@ beforeEach(() => {
   } as never)
   vi.mocked(useVideoPage).mockReturnValue({ data: data(), status: 'ready' })
   vi.mocked(useVideoComments).mockReturnValue({ result: { status: 'disabled' } })
-  vi.mocked(useRelatedVideos).mockReturnValue({ videos: [], status: 'empty' })
+  vi.mocked(useRelatedVideos).mockReturnValue({ videos: [{ id: 'rrrrrrrrrrr', title: 'a related one', channel: 'c', publishedAt: '', durationSec: 60, thumbnail: '' }], status: 'ready' })
   vi.mocked(useVideoContext).mockReturnValue({ source: { kind: 'catchup' }, status: 'ready', strip: windowAround(items, 'abcdefghijk') })
 })
 
@@ -105,6 +106,19 @@ describe('YoutubePlayerPage', () => {
     for (let i = 0; i < order.length - 1; i++) expect(before(order[i], order[i + 1])).toBe(true)
   })
 
+  it('says the details are not available, instead of leaving a gap, when the video cannot be described', () => {
+    vi.mocked(useVideoPage).mockReturnValue({ data: null, status: 'unavailable' })
+    renderPage()
+    expect(screen.getByText("Details for this video aren't available.")).toBeInTheDocument()
+    expect(screen.getByTestId('player')).toBeInTheDocument()
+  })
+
+  it('keeps the gap, not that message, while the details are loading', () => {
+    vi.mocked(useVideoPage).mockReturnValue({ data: null, status: 'loading' })
+    renderPage()
+    expect(screen.queryByText("Details for this video aren't available.")).not.toBeInTheDocument()
+  })
+
   it('has no strip when the video has no context', () => {
     vi.mocked(useVideoContext).mockReturnValue({ source: null, status: 'none', strip: null })
     renderPage('/youtube/abcdefghijk')
@@ -137,7 +151,7 @@ describe('YoutubePlayerPage', () => {
     expect(useVideoContext).toHaveBeenCalledWith('abcdefghijk', '?from=catchup')
   })
 
-  it('starts the next video with a clean screen: tags folded, description folded, no topic results from the last one', async () => {
+  it('starts the next video with a clean screen: tags folded, description folded, the player back, no topic results from the last one', async () => {
     const tags = Array.from({ length: 12 }, (_, i) => `tag${i}`)
     vi.mocked(useVideoPage).mockReturnValue({ status: 'ready', data: data({ tags, topics: ['Topic one'], description: 'x'.repeat(600) }) })
     vi.mocked(searchTopic).mockResolvedValue([{ id: 'zzzzzzzzzzz', title: 'result card', channelTitle: 'c', thumbnail: '' }])
@@ -150,6 +164,57 @@ describe('YoutubePlayerPage', () => {
     expect(screen.getByRole('button', { name: '+4 more' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /result card/ })).not.toBeInTheDocument()
+    expect(screen.getByTestId('player')).toBeInTheDocument()
+  })
+
+  it('puts the related column beside the tags, under the title', () => {
+    renderPage()
+    const grid = screen.getByRole('group', { name: 'Tags' }).closest('.grid')
+    expect(grid).not.toBeNull()
+    expect(within(grid as HTMLElement).getByRole('region', { name: 'Related videos' })).toBeInTheDocument()
+    expect(within(grid as HTMLElement).getByRole('region', { name: 'Comments' })).toBeInTheDocument()
+  })
+
+  describe('opening a tag or topic', () => {
+    const hit = { id: 'zzzzzzzzzzz', title: 'result card', channelTitle: 'c', thumbnail: '' }
+    beforeEach(() => {
+      vi.mocked(searchTopic).mockReset()
+      vi.mocked(searchTopic).mockResolvedValue([hit])
+    })
+
+    it('a tag replaces the player with that topic videos and a Replay video bar returns it', async () => {
+      renderPage()
+      fireEvent.click(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: 'Alpha' }))
+      await waitFor(() => expect(screen.getByRole('link', { name: /result card/ })).toHaveAttribute('href', '/youtube/zzzzzzzzzzz'))
+      expect(screen.queryByTestId('player')).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Videos for Alpha' })).toBeInTheDocument()
+      expect(searchTopic).toHaveBeenCalledWith('Alpha')
+      fireEvent.click(screen.getByRole('button', { name: 'Replay video' }))
+      expect(screen.getByTestId('player')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /result card/ })).not.toBeInTheDocument()
+    })
+
+    it('a button in Related topics does the same', async () => {
+      renderPage()
+      fireEvent.click(within(screen.getByRole('region', { name: 'Related topics' })).getByRole('button', { name: 'Gamma' }))
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Videos for Gamma' })).toBeInTheDocument())
+      expect(screen.queryByTestId('player')).not.toBeInTheDocument()
+    })
+
+    it('hides the pop-out bar while the topic videos are shown', async () => {
+      renderPage()
+      fireEvent.click(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: 'Alpha' }))
+      await waitFor(() => expect(screen.getByRole('link', { name: /result card/ })).toBeInTheDocument())
+      expect(screen.queryByRole('button', { name: 'Pop out video' })).not.toBeInTheDocument()
+    })
+
+    it('moving to another video shows its player again', async () => {
+      const { navigate } = renderPage()
+      fireEvent.click(within(screen.getByRole('group', { name: 'Tags' })).getByRole('button', { name: 'Alpha' }))
+      await waitFor(() => expect(screen.getByRole('link', { name: /result card/ })).toBeInTheDocument())
+      navigate('/youtube/yyyyyyyyyyy')
+      expect(screen.getByTestId('player')).toBeInTheDocument()
+    })
   })
 
   describe('pop-out', () => {
@@ -184,6 +249,88 @@ describe('YoutubePlayerPage', () => {
       expect(screen.queryByTestId('player')).not.toBeInTheDocument()
       expect(screen.getByTestId('floating-panel')).toBeInTheDocument()
       expect(screen.getByRole('heading', { name: 'A title' })).toBeInTheDocument()
+    })
+  })
+
+  describe('when the Mix has no related videos', () => {
+    const hit = { id: 'zzzzzzzzzzz', title: 'topic result', channelTitle: 'c', thumbnail: '' }
+    beforeEach(() => {
+      vi.mocked(searchTopic).mockReset()
+      vi.mocked(searchTopic).mockResolvedValue([hit])
+      vi.mocked(useRelatedVideos).mockReturnValue({ videos: [], status: 'empty' })
+    })
+
+    it('offers the first topic as a button and runs no search until it is clicked', async () => {
+      renderPage()
+      const region = screen.getByRole('region', { name: 'Related videos' })
+      expect(within(region).getByText('No related videos found.')).toBeInTheDocument()
+      expect(searchTopic).not.toHaveBeenCalled()
+      fireEvent.click(within(region).getByRole('button', { name: 'Find videos for alpha' }))
+      expect(within(region).getByRole('heading', { name: 'Related videos to alpha' })).toBeInTheDocument()
+      await waitFor(() => expect(within(region).getByRole('link', { name: /topic result/ })).toBeInTheDocument())
+      expect(searchTopic).toHaveBeenCalledTimes(1)
+      expect(searchTopic).toHaveBeenCalledWith('alpha')
+    })
+
+    it('with one topic, still shows the one topic button below the comments as before', () => {
+      vi.mocked(useVideoPage).mockReturnValue({ status: 'ready', data: data({ tags: [], topics: ['Only one'] }) })
+      renderPage()
+      expect(screen.getByRole('button', { name: 'Find videos for Only one' })).toBeInTheDocument()
+      const topics = screen.getByRole('region', { name: 'Related topics' })
+      expect(within(topics).getAllByRole('button')).toHaveLength(1)
+      expect(searchTopic).not.toHaveBeenCalled()
+    })
+
+    it('offers the button again after moving to another video', async () => {
+      const { navigate } = renderPage()
+      fireEvent.click(screen.getByRole('button', { name: 'Find videos for alpha' }))
+      await waitFor(() => expect(searchTopic).toHaveBeenCalledTimes(1))
+      await navigate('/youtube/bbbbbbbbbbb')
+      expect(screen.getByRole('button', { name: 'Find videos for alpha' })).toBeInTheDocument()
+      expect(searchTopic).toHaveBeenCalledTimes(1)
+    })
+
+    it('says nothing found when the topic search finds nothing', async () => {
+      vi.mocked(searchTopic).mockResolvedValue([])
+      renderPage()
+      const region = screen.getByRole('region', { name: 'Related videos' })
+      fireEvent.click(within(region).getByRole('button', { name: 'Find videos for alpha' }))
+      await waitFor(() => expect(within(region).getByText('Nothing found')).toBeInTheDocument())
+    })
+
+    it('keeps the plain message when the video has no topics', () => {
+      vi.mocked(useVideoPage).mockReturnValue({ status: 'ready', data: data({ tags: [], topics: [] }) })
+      renderPage()
+      expect(screen.getByText('No related videos found.')).toBeInTheDocument()
+      expect(searchTopic).not.toHaveBeenCalled()
+    })
+
+    it('does not search while the Mix is still loading, or when it found videos', () => {
+      vi.mocked(useRelatedVideos).mockReturnValue({ videos: [], status: 'loading' })
+      const { unmount } = renderPage()
+      expect(searchTopic).not.toHaveBeenCalled()
+      unmount()
+      vi.mocked(useRelatedVideos).mockReturnValue({ videos: [{ id: 'rrrrrrrrrrr', title: 'rel', channel: 'c', publishedAt: '', durationSec: 60, thumbnail: '' }], status: 'ready' })
+      renderPage()
+      expect(screen.getByRole('heading', { name: 'Related videos' })).toBeInTheDocument()
+      expect(searchTopic).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the YouTube daily limit is used up', () => {
+    beforeEach(() => resetQuotaForTests())
+
+    it('shows no notice while there is quota', () => {
+      renderPage()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+
+    it('says so, and that the video still plays, once a call is refused for quota', () => {
+      renderPage()
+      act(() => markQuotaReached())
+      expect(screen.getByRole('status')).toHaveTextContent(/daily limit/)
+      expect(screen.getByRole('status')).toHaveTextContent(/video itself still plays/)
+      expect(screen.getByTestId('player')).toBeInTheDocument()
     })
   })
 })

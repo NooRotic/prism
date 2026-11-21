@@ -133,7 +133,7 @@ describe('Header: the folding row', () => {
   it('shows Catch up in the YouTube row', async () => {
     renderAt('/hls-dash')
     await userEvent.click(screen.getByRole('button', { name: 'YouTube tools' }))
-    expect(within(row()).getByRole('link', { name: 'Catch up' })).toHaveAttribute('href', '/youtube/catchup')
+    expect(within(row()).getByRole('link', { name: 'Import from YT' })).toHaveAttribute('href', '/youtube/catchup')
   })
 
   it('keeps the row in the page flow', () => {

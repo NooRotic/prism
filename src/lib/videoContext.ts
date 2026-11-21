@@ -51,11 +51,25 @@ export function writeQueueSnapshot(videos: CatchupVideo[]): void {
   }
 }
 
+/** The first of each id, in order: a playlist can list a video twice, and a repeated id breaks the strip's keys. */
+export function dedupeById(items: ContextItem[]): ContextItem[] {
+  const seen = new Set<string>()
+  return items.filter((i) => !seen.has(i.id) && seen.add(i.id))
+}
+
+/** The saved queue. Anything in storage that is not a video with an id is skipped, so a damaged entry cannot crash the page. */
 export function readQueueSnapshot(): ContextItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.LOCAL_CATCHUP_QUEUE)
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(parsed)) return []
+    const items: ContextItem[] = []
+    for (const e of parsed) {
+      if (!e || typeof e !== 'object' || typeof (e as ContextItem).id !== 'string') continue
+      const { id, title, thumbnail } = e as Partial<ContextItem> & { id: string }
+      items.push({ id, title: typeof title === 'string' ? title : '', thumbnail: typeof thumbnail === 'string' ? thumbnail : '' })
+    }
+    return dedupeById(items)
   } catch {
     return []
   }
