@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   parseContext,
+  dedupeById,
   readQueueSnapshot,
   windowAround,
   type ContextItem,
@@ -25,7 +26,7 @@ export interface VideoContext {
 export function useVideoContext(id: string, search: string): VideoContext {
   const source = useMemo(() => parseContext(search), [search])
   const listId = source?.kind === 'playlist' ? source.listId : null
-  const [loaded, setLoaded] = useState<{ key: string; items: ContextItem[]; total: number; unreadable: boolean } | null>(null)
+  const [loaded, setLoaded] = useState<{ key: string; listId: string; items: ContextItem[]; total: number; unreadable: boolean } | null>(null)
   const key = listId ? `${listId}|${id}` : ''
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export function useVideoContext(id: string, search: string): VideoContext {
         const r = await getPlaylistItems(listId, pageToken)
         if (cancelled) return
         if (r.status === 'unreadable') {
-          setLoaded({ key, items: [], total: 0, unreadable: true })
+          setLoaded({ key, listId, items: [], total: 0, unreadable: true })
           return
         }
         items.push(...r.items)
@@ -48,7 +49,7 @@ export function useVideoContext(id: string, search: string): VideoContext {
         if (!r.nextPageToken || (at >= 0 && items.length - at - 1 >= AHEAD)) break
         pageToken = r.nextPageToken
       }
-      setLoaded({ key, items, total, unreadable: false })
+      setLoaded({ key, listId, items: dedupeById(items), total, unreadable: false })
     })()
     return () => {
       cancelled = true
@@ -60,8 +61,14 @@ export function useVideoContext(id: string, search: string): VideoContext {
     if (source.kind === 'catchup') {
       return { source, status: 'ready', strip: windowAround(readQueueSnapshot(), id) }
     }
+    if (loaded && loaded.listId === listId && !loaded.unreadable && loaded.key !== key) {
+      // Moving to another video in the playlist already read: show its strip now instead of blanking it while the
+      // (cached) pages are read again. A video the loaded part does not hold waits for its own read.
+      const strip = windowAround(loaded.items, id, undefined, undefined, loaded.total)
+      if (strip) return { source, status: 'ready', strip }
+    }
     if (!loaded || loaded.key !== key) return { source, status: 'loading', strip: null }
     if (loaded.unreadable) return { source, status: 'unreadable', strip: null }
     return { source, status: 'ready', strip: windowAround(loaded.items, id, undefined, undefined, loaded.total) }
-  }, [source, loaded, key, id])
+  }, [source, loaded, key, id, listId])
 }

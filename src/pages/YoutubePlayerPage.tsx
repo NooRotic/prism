@@ -67,7 +67,7 @@ export default function YoutubePlayerPage() {
   const floatSource = useMemo<FramedSource | null>(() => (videoId ? { kind: 'youtube', videoId } : null), [videoId])
   useFloatingPageSource(floatSource)
 
-  const { data } = useVideoPage(videoId)
+  const { data, status: pageStatus } = useVideoPage(videoId)
   const { result: comments } = useVideoComments(videoId)
   const context = useVideoContext(videoId, search)
   const related = useRelatedVideos(videoId)
@@ -118,7 +118,7 @@ export default function YoutubePlayerPage() {
 
       <ContextStrip source={context.source} status={context.status} strip={context.strip} currentId={videoId} />
 
-      <VideoTitle data={data} />
+      <VideoTitle data={data} unavailable={pageStatus === 'unavailable'} />
 
       {/* Left: channel, tags, description, comments. Right: related videos, from the title down.
           The keys give each video fresh component state: folded tags and description. */}

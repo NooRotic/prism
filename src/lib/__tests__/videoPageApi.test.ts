@@ -161,3 +161,31 @@ describe('a refused call', () => {
     expect(isQuotaReached()).toBe(false)
   })
 })
+
+describe('answers that will not change', () => {
+  it('asks only once about a video YouTube says does not exist', async () => {
+    fetchMock.mockResolvedValue(json({ items: [] }))
+    expect(await getVideoPage('abcdefghijk')).toBeNull()
+    expect(await getVideoPage('abcdefghijk')).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks again after a failure, which may be temporary', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: {} }, 500)).mockResolvedValueOnce(json({ items: [videoItem] }))
+    expect(await getVideoPage('abcdefghijk')).toBeNull()
+    expect((await getVideoPage('abcdefghijk'))?.title).toBe('T')
+  })
+
+  it('asks only once whether comments are turned off', async () => {
+    fetchMock.mockResolvedValue(json({ error: { errors: [{ reason: 'commentsDisabled' }] } }, 403))
+    expect(await getComments('abcdefghijk')).toEqual({ status: 'disabled' })
+    expect(await getComments('abcdefghijk')).toEqual({ status: 'disabled' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks again after a comments error', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: {} }, 500)).mockResolvedValueOnce(json({ items: [] }))
+    expect(await getComments('abcdefghijk')).toEqual({ status: 'error' })
+    expect((await getComments('abcdefghijk')).status).toBe('ok')
+  })
+})

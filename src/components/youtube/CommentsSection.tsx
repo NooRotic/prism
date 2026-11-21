@@ -40,7 +40,12 @@ export default function CommentsSection({ videoId, result }: { videoId: string; 
           Couldn't load comments.
         </p>
       )}
-      {result?.status === 'ok' && (
+      {result?.status === 'ok' && result.comments.length === 0 && (
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          No comments yet.
+        </p>
+      )}
+      {result?.status === 'ok' && result.comments.length > 0 && (
         <ul className="flex flex-col gap-3">
           {result.comments.map((c) => (
             <li

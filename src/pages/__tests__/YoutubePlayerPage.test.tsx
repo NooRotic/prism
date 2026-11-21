@@ -106,6 +106,19 @@ describe('YoutubePlayerPage', () => {
     for (let i = 0; i < order.length - 1; i++) expect(before(order[i], order[i + 1])).toBe(true)
   })
 
+  it('says the details are not available, instead of leaving a gap, when the video cannot be described', () => {
+    vi.mocked(useVideoPage).mockReturnValue({ data: null, status: 'unavailable' })
+    renderPage()
+    expect(screen.getByText("Details for this video aren't available.")).toBeInTheDocument()
+    expect(screen.getByTestId('player')).toBeInTheDocument()
+  })
+
+  it('keeps the gap, not that message, while the details are loading', () => {
+    vi.mocked(useVideoPage).mockReturnValue({ data: null, status: 'loading' })
+    renderPage()
+    expect(screen.queryByText("Details for this video aren't available.")).not.toBeInTheDocument()
+  })
+
   it('has no strip when the video has no context', () => {
     vi.mocked(useVideoContext).mockReturnValue({ source: null, status: 'none', strip: null })
     renderPage('/youtube/abcdefghijk')

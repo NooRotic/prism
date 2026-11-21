@@ -23,6 +23,10 @@ describe('CommentsSection', () => {
     expect(screen.getByText('5 likes')).toBeInTheDocument()
     expect(screen.getByText('2 replies')).toBeInTheDocument()
   })
+  it('says there are no comments yet when the list is empty', () => {
+    wrap(<CommentsSection videoId="abc" result={{ status: 'ok', comments: [] }} />)
+    expect(screen.getByText('No comments yet.')).toBeInTheDocument()
+  })
   it('says comments are off when they are disabled', () => {
     wrap(<CommentsSection videoId="abc" result={{ status: 'disabled' }} />)
     expect(screen.getByText('Comments are turned off for this video.')).toBeInTheDocument()

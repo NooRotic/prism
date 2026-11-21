@@ -12,6 +12,7 @@ const BASE = 'https://www.googleapis.com/youtube/v3'
 const DAY_MS = 24 * 60 * 60 * 1000
 const COMMENTS_TTL_MS = 30 * 60 * 1000
 const prefix = STORAGE_KEYS.LOCAL_VIDEO_PAGE_CACHE_PREFIX
+const MISSING_TTL_MS = 60 * 60 * 1000
 
 export interface VideoPageData {
   id: string
@@ -84,10 +85,16 @@ export async function getVideoPage(id: string): Promise<VideoPageData | null> {
   const cacheKey = `${prefix}video_${id}`
   const cached = ttlGet<VideoPageData>(cacheKey, DAY_MS)
   if (cached) return cached
+  // A video YouTube said does not exist is remembered for an hour, so a dead link does not cost a unit per visit.
+  const missingKey = `${prefix}missing_${id}`
+  if (ttlGet<boolean>(missingKey, MISSING_TTL_MS)) return null
   try {
     const data = await get('videos', { part: 'snippet,statistics,topicDetails', id })
     const it = data.items?.[0]
-    if (!it) return null
+    if (!it) {
+      ttlSet(missingKey, true)
+      return null
+    }
     const result: VideoPageData = {
       id: it.id,
       title: it.snippet.title,
@@ -140,7 +147,12 @@ export async function getComments(id: string, max = 20): Promise<CommentsResult>
     ttlSet(cacheKey, result)
     return result
   } catch (err) {
-    return err instanceof ApiFailure && err.reason === 'commentsDisabled' ? { status: 'disabled' } : { status: 'error' }
+    if (err instanceof ApiFailure && err.reason === 'commentsDisabled') {
+      const off: CommentsResult = { status: 'disabled' }
+      ttlSet(cacheKey, off)
+      return off
+    }
+    return { status: 'error' }
   }
 }
 
