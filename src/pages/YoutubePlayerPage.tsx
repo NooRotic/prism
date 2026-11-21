@@ -20,6 +20,7 @@ import DebugPanel from '../components/layout/DebugPanel'
 import CommentsSection from '../components/youtube/CommentsSection'
 import ContextStrip from '../components/youtube/ContextStrip'
 import DescriptionBlock from '../components/youtube/DescriptionBlock'
+import QuotaNotice from '../components/youtube/QuotaNotice'
 import RelatedByTopic from '../components/youtube/RelatedByTopic'
 import RelatedTopics from '../components/youtube/RelatedTopics'
 import RelatedVideos from '../components/youtube/RelatedVideos'
@@ -71,7 +72,7 @@ export default function YoutubePlayerPage() {
   const context = useVideoContext(videoId, search)
   const related = useRelatedVideos(videoId)
   const topics = useMemo(() => mergeTopics(data?.topics ?? [], data?.tags ?? []), [data])
-  // No Mix videos: the column shows the first topic's videos instead (a search, so only with a key).
+  // No Mix videos: the column offers the first topic's videos (a search, so only with a key and only on a click).
   const apiAvailable = isYouTubeApiAvailable()
   const fallbackTopic = related.status === 'empty' && apiAvailable ? topics[0] : undefined
 
@@ -113,6 +114,8 @@ export default function YoutubePlayerPage() {
 
       {!activeTopic && <VideoPopoutBar getStartSec={currentYoutubeTime} />}
 
+      <QuotaNotice />
+
       <ContextStrip source={context.source} status={context.status} strip={context.strip} currentId={videoId} />
 
       <VideoTitle data={data} />
@@ -125,7 +128,7 @@ export default function YoutubePlayerPage() {
           <DescriptionBlock key={videoId} text={data?.description ?? ''} />
           <CommentsSection videoId={videoId} result={comments} />
         </div>
-        {fallbackTopic ? <RelatedByTopic key={fallbackTopic} topic={fallbackTopic} /> : <RelatedVideos videos={related.videos} status={related.status} />}
+        {fallbackTopic ? <RelatedByTopic key={`${videoId}:${fallbackTopic}`} topic={fallbackTopic} /> : <RelatedVideos videos={related.videos} status={related.status} />}
       </div>
 
       <RelatedTopics key={videoId} topics={topics} apiAvailable={apiAvailable} onPick={openTopic} />

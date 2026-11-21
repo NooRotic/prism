@@ -6,6 +6,7 @@
 import { STORAGE_KEYS } from '../config/storageKeys'
 import { searchYouTubeVideos, type YouTubeSearchResult } from './youtubeApi'
 import { ttlGet, ttlSet } from './ttlCache'
+import { noteApiFailure } from './youtubeQuota'
 
 const BASE = 'https://www.googleapis.com/youtube/v3'
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -68,6 +69,7 @@ async function get(path: string, params: Record<string, string>): Promise<any> {
     } catch {
       /* no JSON body */
     }
+    noteApiFailure(res.status, reason)
     throw new ApiFailure(res.status, reason)
   }
   return res.json()
