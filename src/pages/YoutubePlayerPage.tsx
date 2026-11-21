@@ -43,6 +43,12 @@ function mergeTopics(topics: string[], tags: string[]): string[] {
   return out
 }
 
+/** The address the player plays for this page: a demo's own address, else the YouTube watch address. */
+function playUrlFor(videoId: string): string {
+  const demo = getDemoById(videoId)
+  return demo ? demo.url : `https://www.youtube.com/watch?v=${videoId}`
+}
+
 export default function YoutubePlayerPage() {
   const { videoId = '' } = useParams<{ videoId: string }>()
   const { search } = useLocation()
@@ -50,12 +56,13 @@ export default function YoutubePlayerPage() {
   const { player } = state
 
   // Set the player URL from the route param, and start at the top: moving between videos reuses this page.
+  // The effect runs after the first render, so until the app holds this video's address (below) the player is not
+  // shown: on arrival from a Twitch page it would otherwise start the leftover Twitch channel and fail on it.
   useEffect(() => {
     if (!videoId) return
     window.scrollTo(0, 0)
     recordWatched(videoId)
-    const demo = getDemoById(videoId)
-    const url = demo ? demo.url : `https://www.youtube.com/watch?v=${videoId}`
+    const url = playUrlFor(videoId)
     const detection = detectURLType(url)
     if (state.player.currentUrl !== url) {
       dispatch({ type: 'PLAY_URL', url, detection })
@@ -99,7 +106,7 @@ export default function YoutubePlayerPage() {
       >
         {video.isFloating ? (
           <FloatingPanel onBringBack={video.close} />
-        ) : player.currentUrl && player.detection ? (
+        ) : player.currentUrl && player.detection && player.currentUrl === playUrlFor(videoId) ? (
           <PlayerHost url={player.currentUrl} detection={player.detection} />
         ) : (
           <div className="flex items-center justify-center w-full h-full" style={{ color: 'var(--text-muted)' }}>
