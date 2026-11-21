@@ -187,14 +187,23 @@ export async function getPlaylistItems(listId: string, pageToken?: string): Prom
   }
 }
 
+/**
+ * The cache key for a search: lower case, letters and numbers of any language only, single spaces. So "Minecraft  Speedrun",
+ * "minecraft speedrun!" and "Minecraft, speedrun?" are one search and cost 100 units once; "café" and "cafe" stay two.
+ */
+export function normaliseQuery(q: string): string {
+  return q.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+}
+
 const searching = new Map<string, Promise<YouTubeSearchResult[]>>()
 
 /**
- * Videos for a topic. 100 units, so only on a click; cached 24 h per lower-cased query. Empty on any failure.
+ * Videos for a topic. 100 units, so only on a click; cached 24 h per normalised query (an empty answer too; a failure is not). Empty on any failure.
  * The same query asked while its search is still running shares that one search (a double click costs 100, not 200).
  */
 export async function searchTopic(q: string): Promise<YouTubeSearchResult[]> {
-  const query = q.trim().toLowerCase()
+  const query = normaliseQuery(q)
+  if (!query) return []
   const cacheKey = `${prefix}topic_${query}`
   const cached = ttlGet<YouTubeSearchResult[]>(cacheKey, DAY_MS)
   if (cached) return cached
