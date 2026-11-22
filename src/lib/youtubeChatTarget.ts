@@ -43,7 +43,10 @@ export function decodeTarget(s: string): YoutubeChatTarget {
   return { kind: 'looking' }
 }
 
-/** YouTube refuses to show the chat unless `embed_domain` is the page's own host. */
+/**
+ * YouTube refuses to show the chat unless `embed_domain` is the page's own host. `dark_theme=1` draws it dark, to match
+ * PRISM (which has no light theme).
+ */
 export function youtubeChatEmbedUrl(videoId: string, host: string): string {
-  return `https://www.youtube.com/live_chat?v=${encodeURIComponent(videoId)}&embed_domain=${encodeURIComponent(host)}`
+  return `https://www.youtube.com/live_chat?v=${encodeURIComponent(videoId)}&embed_domain=${encodeURIComponent(host)}&dark_theme=1`
 }

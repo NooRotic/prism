@@ -8,7 +8,7 @@ describe('ChatSource for the YouTube chat', () => {
     render(<ChatSource kind="youtube" channel="v:abcdefghijk" />)
     expect(screen.getByTitle('YouTube live chat')).toHaveAttribute(
       'src',
-      `https://www.youtube.com/live_chat?v=abcdefghijk&embed_domain=${window.location.hostname}`,
+      `https://www.youtube.com/live_chat?v=abcdefghijk&embed_domain=${window.location.hostname}&dark_theme=1`,
     )
   })
   it('says it is looking while the stream is being found', () => {

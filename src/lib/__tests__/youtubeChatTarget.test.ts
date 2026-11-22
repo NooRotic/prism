@@ -29,7 +29,7 @@ describe('the YouTube chat target code', () => {
   })
   it('builds the embed address for this host', () => {
     expect(youtubeChatEmbedUrl('abcdefghijk', 'prism.nooroticx.tv')).toBe(
-      'https://www.youtube.com/live_chat?v=abcdefghijk&embed_domain=prism.nooroticx.tv',
+      'https://www.youtube.com/live_chat?v=abcdefghijk&embed_domain=prism.nooroticx.tv&dark_theme=1',
     )
   })
 })
