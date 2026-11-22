@@ -79,8 +79,52 @@ describe('PrismLinkBar', () => {
     setup()
     fireEvent.click(bar())
     await screen.findByText('youtube mid')
-    // minmax(11rem, 1fr): 176px cards. The first compact grid (17.5rem) still gave two big columns in a zoomed-in window.
-    expect(screen.getByTestId('combined-grid').className).toContain('minmax(11rem,1fr)')
+    // minmax(min(11rem, 45%), 1fr): 176px cards, and never wider than 45% of the row so a phone still gets two columns
+    // (a plain 11rem minimum gave one 343px column at 375px wide).
+    expect(screen.getByTestId('combined-grid').className).toContain('minmax(min(11rem,45%),1fr)')
+  })
+
+  it('gives a link the viewer made the same spectrum outline as the Edit links button (still until hovered)', () => {
+    setup({ confirmed: false })
+    const outline = screen.getByTestId('prism-spectrum')
+    expect(outline).toHaveClass('prism-pill')
+    // Only a confirmed link gets the moving spectrum and glow.
+    expect(outline).not.toHaveClass('prism-spectrum')
+  })
+
+  it('colours the words Twitch and YouTube in the title with their platforms, readable on the dark card', () => {
+    setup()
+    expect(screen.getByText('Twitch')).toHaveStyle({ color: 'var(--accent-twitch-text)' })
+    expect(screen.getByText('YouTube')).toHaveStyle({ color: 'var(--accent-youtube-text)' })
+  })
+
+  it('shows "linked by you" and the channel name with strong contrast, the name bolder, and never cuts the name off', () => {
+    setup({ confirmed: false })
+    // On a phone the line wraps instead of truncating, so the channel name is always readable.
+    expect(screen.getByText('Mr Beast').parentElement).not.toHaveClass('truncate')
+    expect(screen.getByText('linked by you')).toHaveStyle({ color: 'var(--text-secondary)' })
+    expect(screen.getByText('Mr Beast')).toHaveStyle({ color: 'var(--text-primary)' })
+  })
+
+  it('tints the Twitch only and YouTube only buttons with their platform, solid when chosen; Both stays neutral', async () => {
+    setup()
+    fireEvent.click(bar())
+    await screen.findByText('youtube mid')
+    const twitch = screen.getByRole('button', { name: 'Twitch only' })
+    const youtube = screen.getByRole('button', { name: 'YouTube only' })
+    // Not chosen: a faint tint of the platform, its colour as the text and a thin outline.
+    expect(twitch).toHaveStyle({ color: 'var(--accent-twitch-text)' })
+    expect(twitch.getAttribute('style')).toContain('1px solid var(--accent-twitch)')
+    expect(youtube).toHaveStyle({ color: 'var(--accent-youtube-text)' })
+    expect(youtube.getAttribute('style')).toContain('1px solid var(--accent-youtube)')
+    expect(twitch.getAttribute('style')).toContain('rgba(145, 70, 255')
+    expect(youtube.getAttribute('style')).toContain('rgba(255, 0, 0')
+    expect(screen.getByRole('button', { name: 'Both' }).getAttribute('style')).not.toMatch(/rgba\((145|255)/)
+    // Chosen: the platform colour, solid, with white text.
+    fireEvent.click(twitch)
+    expect(twitch).toHaveStyle({ backgroundColor: 'var(--accent-twitch)', color: '#fff' })
+    fireEvent.click(youtube)
+    expect(youtube).toHaveStyle({ backgroundColor: 'var(--accent-youtube)', color: '#fff' })
   })
 
   it('stays closed and spends nothing until it is clicked', () => {

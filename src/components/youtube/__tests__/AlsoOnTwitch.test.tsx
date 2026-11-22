@@ -26,6 +26,12 @@ describe('AlsoOnTwitch', () => {
     expect(screen.getByText(/confirmed/i)).toBeInTheDocument()
   })
 
+  it('shows the Twitch chip in Twitch purple', () => {
+    saveLink(link(true))
+    renderIt(<AlsoOnTwitch channelId={CHANNEL} />)
+    expect(screen.getByRole('link', { name: /Twitch/ })).toHaveStyle({ color: 'var(--accent-twitch-text)' })
+  })
+
   it('says "linked by you" for a link the viewer made', () => {
     saveLink(link(false))
     renderIt(<AlsoOnTwitch channelId={CHANNEL} />)

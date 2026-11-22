@@ -339,6 +339,9 @@ html.counted .counted-note {
 /* The PRISM spectrum: a slowly moving rainbow marking a confirmed link between a creator's accounts. It is neither
    Twitch purple nor YouTube red on purpose. The gradient ends on its first colour so the loop has no seam. */
 :root {
+  /* The platform colours lightened for text on the dark cards (Twitch purple #9146FF and YouTube red are too dim to read at 12px). */
+  --accent-twitch-text: #b794ff;
+  --accent-youtube-text: #ff6b6b;
   --prism-gradient: linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe14d, #4dff88, #4dc3ff, #9a6bff, #ff4dd2, #ff4d4d);
 }
 .prism-spectrum {
