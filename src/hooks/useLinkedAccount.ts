@@ -1,6 +1,6 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { STORAGE_KEYS } from '../config/storageKeys'
-import { findByTwitch, subscribeLinks, type LinkRecord } from '../lib/linkedAccounts'
+import { findByTwitch, findByYoutube, subscribeLinks, type LinkRecord } from '../lib/linkedAccounts'
 
 const raw = () => {
   try {
@@ -15,4 +15,11 @@ export function useLinkedAccount(login: string): LinkRecord | null {
   const snapshot = useSyncExternalStore(subscribeLinks, raw, () => '')
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `snapshot` is the stored text: a change in it is what makes this read again
   return useMemo(() => findByTwitch(login), [login, snapshot])
+}
+
+/** The viewer's link for a YouTube channel (found by its channel id), re-read whenever a link is saved or removed. */
+export function useLinkedByYoutube(channelId: string | undefined): LinkRecord | null {
+  const snapshot = useSyncExternalStore(subscribeLinks, raw, () => '')
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `snapshot` is the stored text: a change in it is what makes this read again
+  return useMemo(() => (channelId ? findByYoutube(channelId) : null), [channelId, snapshot])
 }
