@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  POPOUT_WINDOW_NAME,
   boundsToFeatures,
   buildPopoutUrl,
   createPopoutBus,
   getTabId,
   loadBounds,
+  popoutNames,
 } from '../../lib/chatPopout'
-import type { PopoutBus } from '../../lib/chatPopout'
+import type { ChatKind, PopoutBus } from '../../lib/chatPopout'
 
 const POLL_MS = 1000
 const BLOCKED_NOTICE_MS = 6000
@@ -17,7 +17,8 @@ interface UseChatPopoutReturn {
   isOpen: boolean
   /** The browser refused the popup; clears itself after a few seconds. */
   blocked: boolean
-  open: () => void
+  /** `channelOverride` is for a caller that learns what to show in the same click (the YouTube chat). */
+  open: (channelOverride?: string) => void
   close: () => void
 }
 
@@ -31,6 +32,7 @@ interface UseChatPopoutReturn {
 export function useChatPopout(
   channel: string | undefined,
   injectedBus?: PopoutBus,
+  kind: ChatKind = 'twitch',
 ): UseChatPopoutReturn {
   const [isOpen, setIsOpen] = useState(false)
   const [blocked, setBlocked] = useState(false)
@@ -42,10 +44,15 @@ export function useChatPopout(
   const popupRef = useRef<Window | null>(null)
   /** The channel the pop-out is known to be showing. */
   const lastChannelRef = useRef<string | undefined>(undefined)
+  /** What the pop-out should be showing; read by the bus handler, which is set up once. */
+  const channelRef = useRef(channel)
+  useEffect(() => {
+    channelRef.current = channel
+  })
 
   // Listen, and ask whether a pop-out is already alive (a reloaded page re-attaches this way).
   useEffect(() => {
-    const bus = injectedBus ?? createPopoutBus()
+    const bus = injectedBus ?? createPopoutBus(kind)
     busRef.current = bus
     const unsubscribe = bus.subscribe((msg) => {
       if (msg.owner !== tabId) return // another tab's pop-out
@@ -53,6 +60,12 @@ export function useChatPopout(
         lastChannelRef.current = msg.channel
         setBlocked(false)
         setIsOpen(true)
+        // A change sent before the window was listening was lost: send what it should show now.
+        const want = channelRef.current
+        if (want && want !== msg.channel) {
+          lastChannelRef.current = want
+          bus.post({ type: 'set-channel', owner: tabId, channel: want })
+        }
       } else if (msg.type === 'closed') {
         popupRef.current = null
         setIsOpen(false)
@@ -64,7 +77,7 @@ export function useChatPopout(
       if (!injectedBus) bus.close()
       busRef.current = null
     }
-  }, [injectedBus, tabId])
+  }, [injectedBus, tabId, kind])
 
   // Notice a window closed with the OS button, which sends no message reliably.
   useEffect(() => {
@@ -92,24 +105,25 @@ export function useChatPopout(
     busRef.current?.post({ type: 'set-channel', owner: tabId, channel })
   }, [channel, isOpen, tabId])
 
-  const open = useCallback(() => {
-    if (!channel) return
+  const open = useCallback((channelOverride?: string) => {
+    const target = channelOverride ?? channel
+    if (!target) return
     // Must run inside the click handler, or popup blockers refuse it. No
     // `noopener`: it would make this return null and lose the handle.
     const popup = window.open(
-      buildPopoutUrl(channel, tabId),
-      POPOUT_WINDOW_NAME,
-      boundsToFeatures(loadBounds()),
+      buildPopoutUrl(target, tabId, kind),
+      popoutNames(kind).windowName,
+      boundsToFeatures(loadBounds(kind)),
     )
     if (!popup) {
       setBlocked(true)
       return
     }
     popupRef.current = popup
-    lastChannelRef.current = channel
+    lastChannelRef.current = target
     setBlocked(false)
     setIsOpen(true)
-  }, [channel, tabId])
+  }, [channel, tabId, kind])
 
   const close = useCallback(() => {
     try {

@@ -4,8 +4,8 @@ import ChatSource from '../components/chat/ChatSource'
 import ChatTextSize from '../components/chat/ChatTextSize'
 import ScaledChat from '../components/chat/ScaledChat'
 import { useChatScale } from '../components/chat/useChatScale'
-import { createPopoutBus, saveBounds } from '../lib/chatPopout'
-import type { PopoutBus, WindowBounds } from '../lib/chatPopout'
+import { createPopoutBus, popoutNames, saveBounds } from '../lib/chatPopout'
+import type { ChatKind, PopoutBus, WindowBounds } from '../lib/chatPopout'
 
 const BOUNDS_SAMPLE_MS = 1000
 
@@ -22,6 +22,8 @@ function readBounds(): WindowBounds {
 interface ChatPopoutPageProps {
   /** For tests; defaults to a BroadcastChannel bus. */
   bus?: PopoutBus
+  /** Which chat this window holds; the YouTube one reads `:target` instead of `:channel`. Defaults to Twitch. */
+  kind?: ChatKind
 }
 
 /**
@@ -32,8 +34,9 @@ interface ChatPopoutPageProps {
  * place. The text size is a plain saved preference, so it follows a change made
  * in any window and is not part of the owner-scoped messages.
  */
-export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps) {
-  const { channel = '' } = useParams<{ channel: string }>()
+export default function ChatPopoutPage({ bus: injectedBus, kind = 'twitch' }: ChatPopoutPageProps) {
+  const params = useParams<{ channel: string; target: string }>()
+  const channel = (kind === 'youtube' ? params.target : params.channel) ?? ''
   // The PRISM tab that opened this window. Empty when the page was loaded
   // directly, which no tab uses, so such a window answers nobody and obeys nobody.
   const [searchParams] = useSearchParams()
@@ -52,11 +55,11 @@ export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps
   })
 
   useEffect(() => {
-    document.title = `${channel} chat`
-  }, [channel])
+    document.title = kind === 'youtube' ? 'YouTube chat' : `${channel} chat`
+  }, [channel, kind])
 
   useEffect(() => {
-    const bus = injectedBus ?? createPopoutBus()
+    const bus = injectedBus ?? createPopoutBus(kind)
     bus.post({ type: 'hello', owner: ownerRef.current, channel: channelRef.current })
 
     const unsubscribe = bus.subscribe((msg) => {
@@ -69,7 +72,7 @@ export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps
           // Keep the owner in the URL, or a reload of this window would orphan it.
           navigateRef.current(
             {
-              pathname: `/chat/${encodeURIComponent(msg.channel)}`,
+              pathname: `${popoutNames(kind).path}/${encodeURIComponent(msg.channel)}`,
               search: ownerRef.current ? `?owner=${encodeURIComponent(ownerRef.current)}` : '',
             },
             { replace: true },
@@ -87,10 +90,10 @@ export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps
       const serialised = JSON.stringify(bounds)
       if (serialised === lastSaved) return
       lastSaved = serialised
-      saveBounds(bounds)
+      saveBounds(bounds, kind)
     }
     const onPageHide = () => {
-      saveBounds(readBounds())
+      saveBounds(readBounds(), kind)
       bus.post({ type: 'closed', owner: ownerRef.current })
     }
 
@@ -106,7 +109,7 @@ export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps
       window.removeEventListener('pagehide', onPageHide)
       if (!injectedBus) bus.close()
     }
-  }, [injectedBus])
+  }, [injectedBus, kind])
 
   return (
     <div className="h-screen w-screen flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
@@ -126,7 +129,7 @@ export default function ChatPopoutPage({ bus: injectedBus }: ChatPopoutPageProps
       </div>
       <div className="flex-1 min-h-0">
         <ScaledChat scale={chatScale.scale} always>
-          <ChatSource channel={channel} />
+          <ChatSource channel={channel} kind={kind} />
         </ScaledChat>
       </div>
     </div>
