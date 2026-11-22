@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { formatCount, formatPublished } from '../../lib/videoFormat'
 import type { VideoPageData } from '../../lib/videoPageApi'
 import TagChip from './TagChip'
+import AlsoOnTwitch from './AlsoOnTwitch'
 
 /**
  * The video's title, on its own so the page can put the columns under it. While the details load it holds the
@@ -47,6 +48,7 @@ export default function VideoMeta({ data, maxTags = 8, showTitle = true, onTopic
         <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
           {data.channelTitle}
         </span>
+        <AlsoOnTwitch channelId={data.channelId} />
         {stats.map((s) => (
           <span key={s}>{s}</span>
         ))}
