@@ -185,7 +185,7 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
         className={
           sideways
             ? `${LANDSCAPE_CHAT_BASE} ${landscapeOpen ? LANDSCAPE_CHAT_OPEN : LANDSCAPE_CHAT_CLOSED}`
-            : 'min-w-0 [grid-area:chat] lg:sticky lg:top-4 lg:h-[calc(100vh-var(--header-height)-1rem)] lg:self-start'
+            : 'min-w-0 [grid-area:chat] lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:h-[calc(100vh-var(--header-height)-2rem)] lg:self-start'
         }
       >
         {showChat ? (

@@ -67,7 +67,9 @@ export function Header() {
   return (
     <header
       ref={headerRef}
-      className="fill-hide relative z-40"
+      // Pinned to the top while the page scrolls on a desktop-sized window (768 px up); on a phone it scrolls away, so it does
+      // not use up a tall strip of a small screen. Still in the page flow, so nothing under it moves.
+      className="fill-hide relative md:sticky md:top-0 z-40"
       style={{
         borderBottom: '1px solid var(--border)',
         background: 'linear-gradient(180deg, var(--bg-sidebar), rgba(8, 8, 12, 0.8))',

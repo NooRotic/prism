@@ -194,12 +194,15 @@ describe('OfflineLayout', () => {
       expect(root().className).toContain('min(var(--offline-chat-width),50%)')
     })
 
-    it('pins the chat just below the top edge, not under a header that has scrolled away', () => {
+    it('pins the chat just below the header, which stays at the top on a desktop-sized window', () => {
       render(layout(null))
       const cell = screen.getByTestId('chat-cell')
       expect(cell.className).toContain('lg:sticky')
-      expect(cell.className).toContain('lg:top-4')
-      expect(cell.className).not.toContain('top-[var(--header-height)]')
+      // A sticky header covers the top of the page, so the chat starts a little under it...
+      expect(cell.className).toContain('lg:top-[calc(var(--header-height)+1rem)]')
+      expect(cell.className).not.toContain('lg:top-4 ')
+      // ...and is no taller than what is left of the window, so its bottom edge stays on screen.
+      expect(cell.className).toContain('lg:h-[calc(100vh-var(--header-height)-2rem)]')
     })
   })
 
