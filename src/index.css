@@ -391,3 +391,20 @@ html.counted .counted-note {
     animation: none;
   }
 }
+
+/* The "Link accounts" button: a spectrum outline that stays still until the pointer or keyboard focus is on it. */
+.prism-pill {
+  background-image: var(--prism-gradient);
+  background-size: 200% 100%;
+}
+.prism-pill:hover,
+.prism-pill:focus-within {
+  animation: prism-shift 4s linear infinite;
+  box-shadow: 0 0 12px rgba(154, 107, 255, 0.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .prism-pill:hover,
+  .prism-pill:focus-within {
+    animation: none;
+  }
+}
