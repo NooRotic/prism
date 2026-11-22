@@ -53,6 +53,14 @@ afterEach(() => {
 })
 
 describe('fetchLiveSubscriptions', () => {
+  it('can skip the avatar lookup: then it costs one call for uploads and one for videos', async () => {
+    serve({ uploads: { [uploadsOf(ch(1))]: ['v1'] }, videos: [video('v1', ch(1))] })
+    const r = await fetchLiveSubscriptions([sub(1)], { avatars: false })
+    expect(r).toMatchObject({ status: 'ok', streams: [{ videoId: 'v1', avatarUrl: '' }] })
+    const paths = fetchMock.mock.calls.map((c) => new URL(String(c[0])).pathname.split('/').pop())
+    expect(paths).toEqual(['playlistItems', 'videos'])
+  })
+
   it('returns the subscribed channels that are live right now, with viewers, start time and avatar', async () => {
     serve({
       uploads: { [uploadsOf(ch(1))]: ['v1', 'old1'], [uploadsOf(ch(2))]: ['old2'] },
