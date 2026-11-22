@@ -1,0 +1,132 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import LinkedAccounts from '../LinkedAccounts'
+import { fetchYoutubeChannel } from '../../../lib/youtubeChannelApi'
+import { findByTwitch, saveLink } from '../../../lib/linkedAccounts'
+
+vi.mock('../../../lib/youtubeChannelApi', () => ({ fetchYoutubeChannel: vi.fn() }))
+vi.mock('../../../lib/youtubeApi', () => ({ isYouTubeApiAvailable: () => true }))
+
+const channel = {
+  channelId: 'UCX6OQ3DkcsbYNE6H8uQQuVA',
+  title: 'Mr Beast',
+  handle: '@MrBeast',
+  description: 'I also stream: twitch.tv/mrbeast',
+  thumbnail: '',
+}
+
+function renderIt(description = 'Videos at youtube.com/@MrBeast') {
+  return render(
+    <MemoryRouter>
+      <LinkedAccounts login="MrBeast" description={description} />
+    </MemoryRouter>,
+  )
+}
+const openModal = () => fireEvent.click(screen.getByRole('button', { name: /Link accounts/ }))
+const dialog = () => screen.getByRole('dialog', { name: 'Link accounts' })
+const fill = (label: RegExp, value: string) => fireEvent.change(within(dialog()).getByLabelText(label), { target: { value } })
+const save = () => fireEvent.click(within(dialog()).getByRole('button', { name: 'Check and save' }))
+
+beforeEach(() => {
+  localStorage.clear()
+  vi.mocked(fetchYoutubeChannel).mockReset()
+})
+
+describe('LinkedAccounts', () => {
+  it('offers only the Link accounts button when nothing is linked', () => {
+    renderIt()
+    expect(screen.getByRole('button', { name: /Link accounts/ })).toBeInTheDocument()
+    expect(screen.queryByText(/Also on/)).not.toBeInTheDocument()
+  })
+
+  it('links a YouTube channel and marks it confirmed when both bios name each other', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel })
+    renderIt()
+    openModal()
+    fill(/YouTube/, 'https://www.youtube.com/@MrBeast')
+    save()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(fetchYoutubeChannel).toHaveBeenCalledWith({ handle: 'MrBeast' })
+    expect(findByTwitch('mrbeast')).toMatchObject({ confirmed: true, youtube: { channelId: channel.channelId, title: 'Mr Beast' } })
+    const chip = screen.getByRole('link', { name: /YouTube/ })
+    expect(chip).toHaveAttribute('href', '/youtube?q=latest+MrBeast')
+    expect(screen.getByText(/Also on/)).toBeInTheDocument()
+    expect(screen.getByText(/confirmed/i)).toBeInTheDocument()
+  })
+
+  it('saves it as the viewer\'s own link, and says so, when the bios do not name each other', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel })
+    renderIt('no links in my bio')
+    openModal()
+    fill(/YouTube/, '@MrBeast')
+    save()
+    await waitFor(() => expect(findByTwitch('mrbeast')?.confirmed).toBe(false))
+    expect(screen.getByText(/linked by you/i)).toBeInTheDocument()
+  })
+
+  it('refuses text that is not a YouTube channel link, without a call', () => {
+    renderIt()
+    openModal()
+    fill(/YouTube/, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+    save()
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent(/YouTube channel/i)
+    expect(fetchYoutubeChannel).not.toHaveBeenCalled()
+    expect(findByTwitch('mrbeast')).toBeNull()
+  })
+
+  it.each([
+    [{ status: 'notfound' as const }, /No YouTube channel found/i],
+    [{ status: 'error' as const }, /Could not reach YouTube/i],
+  ])('says so, and saves nothing, when YouTube answers %j', async (answer, text) => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue(answer)
+    renderIt()
+    openModal()
+    fill(/YouTube/, '@nobody')
+    save()
+    expect(await within(dialog()).findByRole('alert')).toHaveTextContent(text)
+    expect(findByTwitch('mrbeast')).toBeNull()
+  })
+
+  it('links a Kick channel on its own, without a check, as the viewer\'s own link', async () => {
+    renderIt()
+    openModal()
+    fill(/Kick/, 'https://kick.com/MrBeast')
+    save()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(fetchYoutubeChannel).not.toHaveBeenCalled()
+    const chip = screen.getByRole('link', { name: /Kick/ })
+    expect(chip).toHaveAttribute('href', 'https://kick.com/mrbeast')
+    expect(chip).toHaveAttribute('target', '_blank')
+    expect(chip.getAttribute('rel')).toContain('noopener')
+  })
+
+  it('asks for at least one link', () => {
+    renderIt()
+    openModal()
+    save()
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent(/YouTube or Kick/i)
+  })
+
+  it('shows links saved earlier, fills the modal with them, and can remove them', () => {
+    saveLink({ twitch: 'mrbeast', youtube: { channelId: channel.channelId, title: 'Mr Beast', handle: '@MrBeast' }, confirmed: true, linkedAt: 1 })
+    renderIt()
+    expect(screen.getByRole('link', { name: /YouTube/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Edit links/ }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Remove links' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /YouTube/ })).not.toBeInTheDocument()
+    expect(findByTwitch('mrbeast')).toBeNull()
+  })
+
+  it('closes on Escape and on Cancel, saving nothing', () => {
+    renderIt()
+    openModal()
+    fireEvent.keyDown(dialog(), { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    openModal()
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(findByTwitch('mrbeast')).toBeNull()
+  })
+})

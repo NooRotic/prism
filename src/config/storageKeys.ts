@@ -47,6 +47,8 @@ export const STORAGE_KEYS = {
   LOCAL_YOUTUBE_LIVE_LAST: 'prism_youtube_live_last',
   /** The YouTube grid's recent searches (JSON array of strings, newest first). */
   LOCAL_YOUTUBE_SEARCH_HISTORY: 'prism_youtube_search_history',
+  /** "Also on YouTube / Kick": the viewer's linked creator accounts (JSON array of link records, newest first). */
+  LOCAL_LINKED_ACCOUNTS: 'prism_linked_accounts',
   /** Channel rail edge: 'left' or 'right'. */
   LOCAL_RAIL_POSITION: 'prism_rail_position',
   /** Chat dock state: JSON `{ side: 'left' | 'right', hidden: boolean }`. */
