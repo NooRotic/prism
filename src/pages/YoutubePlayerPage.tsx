@@ -97,14 +97,14 @@ export default function YoutubePlayerPage() {
   const replay = useCallback(() => setPicked(null), [])
   const activeTopic = picked?.videoId === videoId ? picked.topic : null
 
+  const title = <VideoTitle data={data} unavailable={pageStatus === 'unavailable'} />
+
   // Everything under the player, the same for both layouts.
   const below = (
     <>
       <QuotaNotice />
 
       <ContextStrip source={context.source} status={context.status} strip={context.strip} currentId={videoId} />
-
-      <VideoTitle data={data} unavailable={pageStatus === 'unavailable'} />
 
       {/* Left: channel, tags, description, comments. Right: related videos, from the title down.
           The keys give each video fresh component state: folded tags and description. */}
@@ -155,7 +155,8 @@ export default function YoutubePlayerPage() {
   if (isLive) {
     return (
       <div className="flex flex-col gap-5 w-full pt-4 pb-8">
-        <div className="w-full px-4 md:px-6 lg:px-8">
+        <div className="w-full px-4 md:px-6 lg:px-8 flex flex-col gap-3">
+          <div className="fill-hide w-full max-w-[1600px] mx-auto">{title}</div>
           {/* The dock draws the floating-window panel itself, as on the Twitch page. */}
           <ChatDock
             kind="youtube"
@@ -171,6 +172,11 @@ export default function YoutubePlayerPage() {
 
   return (
     <div className="flex flex-col gap-5 w-full max-w-5xl mx-auto px-4 md:px-6 pt-4 pb-8">
+      {/* One row above the player: the title, and the pop-out button at its right. */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">{title}</div>
+        {!activeTopic && <VideoPopoutBar getStartSec={currentYoutubeTime} />}
+      </div>
       {activeTopic ? (
         <TopicVideos key={activeTopic} topic={activeTopic} onReplay={replay} />
       ) : (
@@ -186,8 +192,6 @@ export default function YoutubePlayerPage() {
         {video.isFloating ? <FloatingPanel onBringBack={video.close} /> : playerOrLoading}
       </div>
       )}
-
-      {!activeTopic && <VideoPopoutBar getStartSec={currentYoutubeTime} />}
 
       {below}
     </div>
