@@ -79,8 +79,13 @@ export function useYoutubeLive() {
   // The first check of this visit runs on its own, once subscriptions are known.
   useEffect(() => {
     if (!available || autoCheckDone()) return
-    markAutoCheckDone()
-    void check()
+    // Started on the next tick and marked there, so a dev-mode effect re-run cancels the first start, not the check.
+    const id = setTimeout(() => {
+      if (autoCheckDone()) return
+      markAutoCheckDone()
+      void check()
+    }, 0)
+    return () => clearTimeout(id)
   }, [available, check])
 
   const allowance: CheckAllowance = checkAllowed(now)
