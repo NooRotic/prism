@@ -10,10 +10,8 @@ import { useRelatedVideos } from '../../hooks/useRelatedVideos'
 import { useVideoComments } from '../../hooks/useVideoComments'
 import { useVideoContext } from '../../hooks/useVideoContext'
 import { useVideoPage } from '../../hooks/useVideoPage'
-import { getWatchedSeeds } from '../../lib/catchupStore'
 import { windowAround } from '../../lib/videoContext'
 import { searchTopic, type VideoPageData } from '../../lib/videoPageApi'
-import { markQuotaReached, resetQuotaForTests } from '../../lib/youtubeQuota'
 
 vi.mock('../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../hooks/useVideoPage', () => ({ useVideoPage: vi.fn() }))
@@ -51,13 +49,6 @@ const items = [
   { id: 'aaaaaaaaaaa', title: 'one', thumbnail: '' },
   { id: 'abcdefghijk', title: 'two', thumbnail: '' },
 ]
-
-/** The app after it has handled this page's PLAY_URL: it holds that video's address. */
-const appHolds = (id: string) =>
-  vi.mocked(useApp).mockReturnValue({
-    state: { player: { currentUrl: `https://www.youtube.com/watch?v=${id}`, detection: { type: 'youtube' } } },
-    dispatch: vi.fn(),
-  } as never)
 
 beforeEach(() => {
   localStorage.clear()
