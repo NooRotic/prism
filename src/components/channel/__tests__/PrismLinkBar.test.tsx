@@ -59,7 +59,10 @@ describe('PrismLinkBar', () => {
   it('animates the spectrum only on a confirmed link, so it stands out from a plain one', () => {
     const { unmount } = setup({ confirmed: true })
     expect(screen.getByTestId('prism-spectrum')).toHaveClass('prism-spectrum')
-    expect(screen.getByTestId('prism-badge')).toHaveTextContent('PRISM')
+    // The home icon's line-art prism (beam in, rays out), with no text, on a confirmed link only.
+    const badge = screen.getByTestId('prism-badge')
+    expect(badge.querySelector('[data-prism-mark="icon"]')).not.toBeNull()
+    expect(badge.textContent).toBe('')
     // The bar's own background carries a faint moving spectrum too, not just its border.
     expect(bar()).toHaveClass('prism-tint')
     unmount()
@@ -67,6 +70,7 @@ describe('PrismLinkBar', () => {
     setup({ confirmed: false })
     expect(screen.getByTestId('prism-spectrum')).not.toHaveClass('prism-spectrum')
     expect(bar()).not.toHaveClass('prism-tint')
+    expect(screen.queryByTestId('prism-badge')).not.toBeInTheDocument()
   })
 
   it('lays the cards out in columns about 1.75 times narrower than the old three-up grid (so the thumbnails are too)', async () => {
