@@ -8,7 +8,8 @@ const HOSTS = ['twitch.tv', 'www.twitch.tv', 'm.twitch.tv']
 /** First path segments on twitch.tv that are pages, not channels. */
 const RESERVED = new Set([
   'videos', 'directory', 'settings', 'search', 'downloads', 'jobs', 'turbo', 'subscriptions', 'wallet', 'inventory',
-  'drops', 'friends', 'messages', 'p', 'team', 'popout', 'moderator', 'u',
+  'drops', 'friends', 'messages', 'p', 'team', 'popout', 'moderator', 'u', 'clip', 'clips', 'login', 'signup', 'store',
+  'prime', 'bits', 'broadcast', 'creatorcamp', 'legal', 'privacy', 'following', 'collections', 'event', 'products',
 ])
 
 export function parseTwitchLogin(input: string): string | null {
@@ -33,8 +34,10 @@ export function parseTwitchLogin(input: string): string | null {
 /** The first `twitch.tv/<channel>` address in free text that names a channel (not a page such as /videos). */
 export function firstTwitchMention(text: string): string | null {
   if (!text) return null
-  for (const m of text.matchAll(/(?:https?:\/\/)?(?:www\.|m\.)?twitch\.tv\/[A-Za-z0-9_]+/gi)) {
-    const login = parseTwitchLogin(m[0])
+  // The address must start the text or follow a character that cannot be part of a host name, so clips.twitch.tv and
+  // eviltwitch.tv do not count.
+  for (const m of text.matchAll(/(?:^|[^\w.-])((?:https?:\/\/)?(?:www\.|m\.)?twitch\.tv\/[A-Za-z0-9_]+)/gi)) {
+    const login = parseTwitchLogin(m[1])
     if (login) return login
   }
   return null

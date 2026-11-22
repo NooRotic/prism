@@ -18,6 +18,12 @@ describe('firstTwitchMention', () => {
     expect(firstTwitchMention('Follow me: https://twitch.tv/videos/1 and twitch.tv/Foo_Bar! also twitch.tv/other')).toBe('foo_bar')
   })
 
+  it('skips clip links, look-alike domains and Twitch pages, so the real channel further on is found', () => {
+    expect(firstTwitchMention('clip: https://clips.twitch.tv/AbstruseBraveWolfKappa-abc then twitch.tv/realname')).toBe('realname')
+    expect(firstTwitchMention('m.twitch.tv/clip/SlugName twitch.tv/login twitch.tv/realname')).toBe('realname')
+    expect(firstTwitchMention('eviltwitch.tv/foobar')).toBeNull()
+  })
+
   it('is null without a twitch.tv address', () => {
     expect(firstTwitchMention('no links here, youtube.com/@x')).toBeNull()
     expect(firstTwitchMention('')).toBeNull()

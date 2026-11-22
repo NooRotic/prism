@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { isMutual } from '../../lib/accountBios'
 import { findByTwitch, findByYoutube, linkYoutubeToTwitch, unlinkYoutube } from '../../lib/linkedAccounts'
@@ -25,7 +25,15 @@ const SIGN_IN = 'Sign in to Twitch to link this channel.'
  * (1 unit) so a link both bios name is saved as confirmed. A failed YouTube lookup still saves, as the viewer's claim.
  */
 export default function LinkTwitchModal({ channelId, channelTitle, suggested, onClose }: LinkTwitchModalProps) {
-  const { isAuthenticated, login } = useTwitchAuth()
+  const { isAuthenticated, login, handleAuthError } = useTwitchAuth()
+  /** False once the box is closed: a lookup that finishes after Cancel must not save. */
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
   const existing = findByYoutube(channelId)
   const [text, setText] = useState(existing?.twitch ?? suggested ?? '')
   const [busy, setBusy] = useState(false)
@@ -39,6 +47,7 @@ export default function LinkTwitchModal({ channelId, channelTitle, suggested, on
     e.preventDefault()
     if (busy) return
     setError(null)
+    setNotice(null)
     const wanted = parseTwitchLogin(text)
     if (!wanted) return setError("That doesn't look like a Twitch channel. Use twitch.tv/name or just the name.")
 
@@ -48,15 +57,21 @@ export default function LinkTwitchModal({ channelId, channelTitle, suggested, on
         (u) => ({ ok: true as const, user: u }),
         (err: unknown) => ({
           ok: false as const,
+          err,
           expired: err instanceof SessionExpiredError,
           notFound: err instanceof Error && err.message === 'User not found',
         }),
       ),
       fetchYoutubeChannel({ channelId }),
     ])
+    if (!alive.current) return
     setBusy(false)
     if (!twitch.ok) {
-      if (twitch.expired) return setExpired(true)
+      if (twitch.expired) {
+        // The stored token is already gone; tell the whole app, not just this box.
+        handleAuthError(twitch.err)
+        return setExpired(true)
+      }
       return setError(twitch.notFound ? 'No Twitch channel found for that name.' : 'Could not reach Twitch. Try again in a moment.')
     }
     const loginName = twitch.user.login.toLowerCase()
@@ -148,7 +163,7 @@ export default function LinkTwitchModal({ channelId, channelTitle, suggested, on
               </p>
             )}
             {notice && (
-              <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+              <p role="status" className="text-sm" style={{ color: 'var(--text-primary)' }}>
                 {notice}
               </p>
             )}

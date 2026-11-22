@@ -58,6 +58,15 @@ describe('linkYoutubeToTwitch', () => {
   })
 })
 
+describe('saveLink (the Twitch side) keeps the same rule', () => {
+  it('moving a YouTube channel to another Twitch channel strips it from the first', () => {
+    saveLink({ twitch: 'a', youtube: yt, confirmed: false, linkedAt: 1 })
+    saveLink({ twitch: 'b', youtube: yt, confirmed: false, linkedAt: 2 })
+    expect(findByTwitch('a')).toBeNull()
+    expect(findByYoutube('UC1')?.twitch).toBe('b')
+  })
+})
+
 describe('unlinkYoutube', () => {
   it('removes the YouTube part, keeping a Kick-only remainder', () => {
     saveLink({ twitch: 'foo', youtube: yt, kick: { slug: 'k' }, confirmed: true, linkedAt: 1 })

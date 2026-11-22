@@ -8,7 +8,7 @@ import type { TwitchUser } from '../../../types/twitch'
 
 vi.mock('../../../lib/twitchApi', async (orig) => ({ ...(await orig<typeof import('../../../lib/twitchApi')>()), getUserInfo: vi.fn() }))
 vi.mock('../../../lib/youtubeChannelApi', () => ({ fetchYoutubeChannel: vi.fn() }))
-const auth = vi.hoisted(() => ({ isAuthenticated: true, login: vi.fn() }))
+const auth = vi.hoisted(() => ({ isAuthenticated: true, login: vi.fn(), handleAuthError: vi.fn() }))
 vi.mock('../../../hooks/useTwitchAuth', () => ({ useTwitchAuth: () => auth }))
 
 const CH = 'UCX6OQ3DkcsbYNE6H8uQQuVA'
@@ -38,6 +38,7 @@ beforeEach(() => {
   localStorage.clear()
   auth.isAuthenticated = true
   auth.login.mockReset()
+  auth.handleAuthError.mockReset()
   onClose.mockReset()
   vi.mocked(getUserInfo).mockReset()
   vi.mocked(fetchYoutubeChannel).mockReset()
@@ -110,6 +111,23 @@ describe('LinkTwitchModal', () => {
     save()
     expect(await within(dialog()).findByText('Sign in to Twitch to link this channel.')).toBeInTheDocument()
     expect(findByYoutube(CH)).toBeNull()
+    // The whole app learns the session ended, not just this box.
+    expect(auth.handleAuthError).toHaveBeenCalledWith(expect.any(SessionExpiredError))
+  })
+
+  it('saves nothing when the box is cancelled while it is still checking', async () => {
+    let finish: (u: TwitchUser) => void = () => {}
+    vi.mocked(getUserInfo).mockReturnValue(new Promise((r) => (finish = r)))
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue(ytChannel(''))
+    const { unmount } = renderIt()
+    fill('foo')
+    save()
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(onClose).toHaveBeenCalled()
+    unmount()
+    finish(user('foo'))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(findByTwitch('foo')).toBeNull()
   })
 
   it('saves as confirmed when both bios name each other', async () => {
