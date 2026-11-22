@@ -14,6 +14,8 @@ vi.mock('../useYoutubeAccount', () => ({ useYoutubeAccount: () => ({ subscriptio
 
 const subs = [{ id: 'UC1', title: 'One' }]
 const AUTO_KEY = 'prism_youtube_live_auto'
+/** The automatic check starts on the next tick; wait until it has run (its marker is set) before asserting. */
+const autoTickDone = () => waitFor(() => expect(sessionStorage.getItem(AUTO_KEY)).not.toBeNull())
 
 beforeEach(() => {
   localStorage.clear()
@@ -38,15 +40,19 @@ describe('useYoutubeLive: the automatic first check of a visit', () => {
     first.unmount()
     localStorage.removeItem('prism_youtube_live_checks') // even with the allowance free again
     renderHook(() => useYoutubeLive())
-    await act(async () => {})
+    // A new tick would have passed by now; still only the first visit's check.
+    await new Promise((r) => setTimeout(r, 20))
     expect(fetchLiveSubscriptions).toHaveBeenCalledTimes(1)
   })
 
   it('waits for subscriptions, then checks once', async () => {
     subscriptionCount = 0
     const { rerender } = renderHook(() => useYoutubeLive())
-    await act(async () => {})
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20))
+    })
     expect(fetchLiveSubscriptions).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem(AUTO_KEY)).toBeNull()
     subscriptionCount = 1
     rerender()
     await waitFor(() => expect(fetchLiveSubscriptions).toHaveBeenCalledTimes(1))
@@ -58,15 +64,14 @@ describe('useYoutubeLive: the automatic first check of a visit', () => {
   it('obeys the allowance and does not retry later in the visit', async () => {
     recordCheck(Date.now() - 60_000)
     renderHook(() => useYoutubeLive())
-    await act(async () => {})
+    await autoTickDone()
     expect(fetchLiveSubscriptions).not.toHaveBeenCalled()
-    expect(sessionStorage.getItem(AUTO_KEY)).not.toBeNull()
   })
 
   it('is skipped when the quota is reached', async () => {
     markQuotaReached()
     renderHook(() => useYoutubeLive())
-    await act(async () => {})
+    await autoTickDone()
     expect(fetchLiveSubscriptions).not.toHaveBeenCalled()
   })
 
