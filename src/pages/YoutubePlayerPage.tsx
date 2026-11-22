@@ -14,6 +14,8 @@ import { useVideoComments } from '../hooks/useVideoComments'
 import { useVideoContext } from '../hooks/useVideoContext'
 import { useVideoPage } from '../hooks/useVideoPage'
 import FloatingPanel from '../components/chat/FloatingPanel'
+import ChatDock from '../components/chat/ChatDock'
+import { encodeTarget } from '../lib/youtubeChatTarget'
 import { useFloatingPageSource, useFloatingVideo } from '../components/chat/floatingVideoContext'
 import VideoPopoutBar from '../components/chat/VideoPopoutBar'
 import PlayerHost from '../components/player/PlayerHost'
@@ -92,37 +94,9 @@ export default function YoutubePlayerPage() {
   const replay = useCallback(() => setPicked(null), [])
   const activeTopic = picked?.videoId === videoId ? picked.topic : null
 
-  return (
-    <div className="flex flex-col gap-5 w-full max-w-5xl mx-auto px-4 md:px-6 pt-4 pb-8">
-      {activeTopic ? (
-        <TopicVideos key={activeTopic} topic={activeTopic} onReplay={replay} />
-      ) : (
-      /* Player */
-      <div
-        className="w-full aspect-video rounded-lg overflow-hidden relative"
-        style={{
-          backgroundColor: '#000',
-          border: '2px solid var(--accent-youtube)',
-          boxShadow: '0 0 20px rgba(255, 0, 0, 0.1)',
-        }}
-      >
-        {video.isFloating ? (
-          <FloatingPanel onBringBack={video.close} />
-        ) : player.currentUrl && player.detection && player.currentUrl === playUrlFor(videoId) ? (
-          <PlayerHost url={player.currentUrl} detection={player.detection} />
-        ) : (
-          <div className="flex items-center justify-center w-full h-full" style={{ color: 'var(--text-muted)' }}>
-            <div className="flex flex-col items-center gap-2">
-              <Tv size={32} />
-              <span className="text-sm">Loading video...</span>
-            </div>
-          </div>
-        )}
-      </div>
-      )}
-
-      {!activeTopic && <VideoPopoutBar getStartSec={currentYoutubeTime} />}
-
+  // Everything under the player, the same for both layouts.
+  const below = (
+    <>
       <QuotaNotice />
 
       <ContextStrip source={context.source} status={context.status} strip={context.strip} currentId={videoId} />
@@ -143,6 +117,66 @@ export default function YoutubePlayerPage() {
       <RelatedTopics key={videoId} topics={topics} apiAvailable={apiAvailable} onPick={openTopic} />
 
       <DebugPanel />
+    </>
+  )
+
+  // A live video gets its chat in the Twitch page's dock. The layout is settled before the player mounts (the details
+  // say whether it is live), so the player never moves in the tree and never restarts when the chat appears.
+  const isLive = data?.live.state === 'live'
+  const detailsKnown = pageStatus !== 'loading'
+  const chatTarget = isLive
+    ? encodeTarget({ kind: 'video', videoId, ...(data?.channelId ? { channelId: data.channelId } : {}) })
+    : ''
+  const holdsThisVideo = player.currentUrl && player.detection && player.currentUrl === playUrlFor(videoId)
+  const playerOrLoading =
+    detailsKnown && holdsThisVideo && player.currentUrl && player.detection ? (
+      <PlayerHost url={player.currentUrl} detection={player.detection} />
+    ) : (
+      <div className="flex items-center justify-center w-full h-full" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex flex-col items-center gap-2">
+          <Tv size={32} />
+          <span className="text-sm">Loading video...</span>
+        </div>
+      </div>
+    )
+
+  if (isLive) {
+    return (
+      <div className="flex flex-col gap-5 w-full pt-4 pb-8">
+        <div className="w-full px-4 md:px-6 lg:px-8">
+          {/* The dock draws the floating-window panel itself, as on the Twitch page. */}
+          <ChatDock
+            kind="youtube"
+            channel={chatTarget}
+            player={activeTopic ? <TopicVideos key={activeTopic} topic={activeTopic} onReplay={replay} /> : playerOrLoading}
+          />
+        </div>
+        <div className="flex flex-col gap-5 w-full max-w-5xl mx-auto px-4 md:px-6">{below}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5 w-full max-w-5xl mx-auto px-4 md:px-6 pt-4 pb-8">
+      {activeTopic ? (
+        <TopicVideos key={activeTopic} topic={activeTopic} onReplay={replay} />
+      ) : (
+      /* Player */
+      <div
+        className="w-full aspect-video rounded-lg overflow-hidden relative"
+        style={{
+          backgroundColor: '#000',
+          border: '2px solid var(--accent-youtube)',
+          boxShadow: '0 0 20px rgba(255, 0, 0, 0.1)',
+        }}
+      >
+        {video.isFloating ? <FloatingPanel onBringBack={video.close} /> : playerOrLoading}
+      </div>
+      )}
+
+      {!activeTopic && <VideoPopoutBar getStartSec={currentYoutubeTime} />}
+
+      {below}
     </div>
   )
 }
