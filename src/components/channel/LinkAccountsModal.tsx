@@ -11,6 +11,8 @@ interface LinkAccountsModalProps {
   /** That channel's Twitch bio, for the "do the bios name each other" check. */
   description: string
   onClose: () => void
+  /** A same-name YouTube channel to start the YouTube box with, when none is linked yet. */
+  suggested?: string
 }
 
 const inputStyle = { backgroundColor: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }
@@ -20,9 +22,9 @@ const inputStyle = { backgroundColor: 'var(--bg)', border: '1px solid var(--bord
  * other channel it is saved as confirmed, otherwise as the viewer's own claim. A Kick link cannot be checked (Kick's API
  * needs a server-held token), so it is always the viewer's own. Nothing leaves this browser.
  */
-export default function LinkAccountsModal({ login, description, onClose }: LinkAccountsModalProps) {
+export default function LinkAccountsModal({ login, description, onClose, suggested }: LinkAccountsModalProps) {
   const existing = findByTwitch(login)
-  const [ytText, setYtText] = useState(existing?.youtube ? existing.youtube.handle || existing.youtube.channelId : '')
+  const [ytText, setYtText] = useState(existing?.youtube ? existing.youtube.handle || existing.youtube.channelId : (suggested ?? ''))
   const [kickText, setKickText] = useState(existing?.kick ? `kick.com/${existing.kick.slug}` : '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -26,13 +26,18 @@ export async function fetchYoutubeChannel(ref: { handle: string } | { channelId:
   const cacheKey = `${prefix}ytchan_${key}`
   const cached = ttlGet<YoutubeChannel>(cacheKey, DAY_MS)
   if (cached) return { status: 'ok', channel: cached }
+  // "No such channel" is remembered too, so a page that looks for a same-name channel costs a unit once, not on every visit.
+  if (ttlGet<boolean>(`${prefix}ytchan_none_${key}`, DAY_MS)) return { status: 'notfound' }
   try {
     const params: Record<string, string> = { part: 'snippet' }
     if (byHandle) params.forHandle = `@${ref.handle.replace(/^@/, '')}`
     else params.id = ref.channelId
     const data = await youtubeGet('channels', params)
     const it = data.items?.[0]
-    if (!it?.id) return { status: 'notfound' }
+    if (!it?.id) {
+      ttlSet(`${prefix}ytchan_none_${key}`, true)
+      return { status: 'notfound' }
+    }
     const channel: YoutubeChannel = {
       channelId: it.id,
       title: it.snippet?.title ?? '',
