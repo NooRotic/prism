@@ -346,3 +346,40 @@ describe('the /chat/:channel route', () => {
     expect(screen.queryByTestId('channel-rail')).not.toBeInTheDocument()
   })
 })
+
+describe('ChatPopoutPage for the YouTube chat', () => {
+  const renderYoutube = (bus: PopoutBus, target: string) =>
+    render(
+      <MemoryRouter initialEntries={[`/chat-youtube/${encodeURIComponent(target)}?owner=o`]}>
+        <Routes>
+          <Route path="/chat-youtube/:target" element={<ChatPopoutPage bus={bus} kind="youtube" />} />
+        </Routes>
+        <LocationProbe />
+      </MemoryRouter>,
+    )
+
+  it('shows the chat embed for the target in its address and says hello with it', () => {
+    const { bus, posted } = createFakeBus()
+    renderYoutube(bus, 'v:abcdefghijk')
+    expect(screen.getByTitle('YouTube live chat')).toBeInTheDocument()
+    expect(posted).toContainEqual({ type: 'hello', owner: 'o', channel: 'v:abcdefghijk' })
+    expect(document.title).toBe('YouTube chat')
+  })
+
+  it('follows a new target within its own route', () => {
+    const { bus, deliver } = createFakeBus()
+    renderYoutube(bus, 'looking')
+    deliver({ type: 'set-channel', owner: 'o', channel: 'none:Some One' })
+    expect(screen.getByTestId('location').textContent).toBe('/chat-youtube/none%3ASome%20One?owner=o')
+    expect(screen.getByText("Some One isn't live on YouTube right now")).toBeInTheDocument()
+  })
+
+  it('saves its place apart from the Twitch window', () => {
+    const { bus } = createFakeBus()
+    const { unmount } = renderYoutube(bus, 'looking')
+    window.dispatchEvent(new Event('pagehide'))
+    unmount()
+    expect(loadBounds('youtube')).not.toBeNull()
+    expect(loadBounds('twitch')).toBeNull()
+  })
+})

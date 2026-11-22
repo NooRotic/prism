@@ -29,6 +29,7 @@ export default function AppRoutes({ layout }: AppRoutesProps) {
       {/* The chat pop-out is a window of its own, so it sits outside the layout
           and carries none of the page chrome. */}
       <Route path="chat/:channel" element={<ChatPopoutPage />} />
+      <Route path="chat-youtube/:target" element={<ChatPopoutPage kind="youtube" />} />
       {/* The video pop-out's frame: the player and nothing else, for the same reason. */}
       <Route path="popout/player" element={<PopoutPlayerPage />} />
       {/* The owner's admin pages: outside the layout too, so no header, rail or viewer sign-in runs there. */}
