@@ -117,6 +117,7 @@ export default function LinkTwitchModal({ channelId, channelTitle, suggested, on
               </button>
               <button
                 type="button"
+                autoFocus
                 onClick={login}
                 className="rounded px-3 py-1.5 text-sm font-medium cursor-pointer"
                 style={{ backgroundColor: 'var(--accent-twitch)', color: '#fff', border: 'none' }}

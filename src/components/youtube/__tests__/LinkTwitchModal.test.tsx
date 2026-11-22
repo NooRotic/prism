@@ -53,6 +53,13 @@ describe('LinkTwitchModal', () => {
     expect(within(dialog()).queryByRole('button', { name: 'Check and save' })).not.toBeInTheDocument()
   })
 
+  it('closes with Escape when signed out too (focus starts inside the box)', () => {
+    auth.isAuthenticated = false
+    renderIt()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalled()
+  })
+
   it('starts with the suggested name, titled for this YouTube channel', () => {
     renderIt({ suggested: 'foo_bar' })
     expect(within(dialog()).getByText('Link Twitch for Foo on YouTube')).toBeInTheDocument()
