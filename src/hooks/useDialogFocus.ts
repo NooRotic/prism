@@ -19,6 +19,8 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () =
   useEffect(() => {
     const box = ref.current
     if (!box) return
+    // The main button already exists when the box opens; read it now, as the lint rule asks of refs used in cleanup.
+    const fallbackNode = fallback?.current ?? null
     const focusables = () => Array.from(box.querySelectorAll<HTMLElement>(FOCUSABLE))
     if (!box.contains(document.activeElement)) focusables()[0]?.focus()
 
@@ -47,7 +49,7 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () =
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('keydown', onKey)
-      const back = opener && opener.isConnected && opener !== document.body ? opener : fallback?.current
+      const back = opener && opener.isConnected && opener !== document.body ? opener : fallbackNode
       back?.focus()
     }
   }, [ref, opener, fallback])
