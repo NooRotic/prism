@@ -19,9 +19,23 @@ import { readSavedVolume, saveVolume } from '../../lib/playerVolume'
 /** How long sound autoplay gets to start before the player goes back to a muted start. */
 const SOUND_AUTOPLAY_GRACE_MS = 3000
 
-/** True once the visitor has clicked, tapped or pressed a key on this page: the browsers then allow sound autoplay. */
+/** True once the visitor has clicked, tapped or pressed a key in this window. */
+const wasUsed = (win: Window): boolean => win.navigator?.userActivation?.hasBeenActive === true
+
+/**
+ * True once the visitor has used this page, or the window that frames it: the browsers then allow sound autoplay. The
+ * second case is the floating video window, which loads this page in a frame right after the visitor clicks its
+ * "Click to enable sound" button: the click was in the window around the frame, not in the frame, and the frame's
+ * `allow="autoplay"` hands it that permission. A parent on another origin cannot be read, and counts as not used.
+ */
 function hasInteracted(): boolean {
-  return typeof navigator !== 'undefined' && navigator.userActivation?.hasBeenActive === true
+  if (typeof window === 'undefined') return false
+  if (wasUsed(window)) return true
+  try {
+    return window.parent !== window && wasUsed(window.parent)
+  } catch {
+    return false
+  }
 }
 
 export default function YouTubePlayer({

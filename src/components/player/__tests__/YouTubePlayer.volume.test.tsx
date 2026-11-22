@@ -77,6 +77,27 @@ describe('YouTubePlayer mute', () => {
     expect(rp.props.muted).toBe(false)
   })
 
+  it('starts with sound in a frame whose parent window the visitor has clicked (the floating window Click to enable sound button)', () => {
+    setActivation(false)
+    const spy = vi.spyOn(window, 'parent', 'get').mockReturnValue({ navigator: { userActivation: { hasBeenActive: true } } } as unknown as Window)
+    render(<YouTubePlayer url={yt} detection={detection} />)
+    expect(rp.props.muted).toBe(false)
+    spy.mockRestore()
+  })
+
+  it('starts muted in a frame whose parent window has not been clicked, and when the parent cannot be read (another origin)', () => {
+    setActivation(false)
+    const unclicked = vi.spyOn(window, 'parent', 'get').mockReturnValue({ navigator: { userActivation: { hasBeenActive: false } } } as unknown as Window)
+    const first = render(<YouTubePlayer url={yt} detection={detection} />)
+    expect(rp.props.muted).toBe(true)
+    first.unmount()
+    unclicked.mockRestore()
+    const unreadable = vi.spyOn(window, 'parent', 'get').mockReturnValue(new Proxy({}, { get() { throw new DOMException('Blocked a frame', 'SecurityError') } }) as unknown as Window)
+    render(<YouTubePlayer url={yt} detection={detection} />)
+    expect(rp.props.muted).toBe(true)
+    unreadable.mockRestore()
+  })
+
   it('follows the viewer: once they unmute, it stays unmuted through later re-renders (it used to mute them again)', () => {
     setActivation(false)
     const { rerender } = render(<YouTubePlayer url={yt} detection={detection} />)
