@@ -113,6 +113,16 @@ describe('PrismLinkBar', () => {
     expect(titles()).toEqual(['twitch oldest', 'youtube mid', 'twitch newest'])
   })
 
+  it('outlines each card with a thin line in its platform colour (purple Twitch, red YouTube)', async () => {
+    setup()
+    fireEvent.click(bar())
+    await screen.findByText('youtube mid')
+    const youtubeCard = screen.getByRole('link', { name: /youtube mid/ })
+    const twitchCard = screen.getByRole('button', { name: /twitch newest/ })
+    expect(youtubeCard.getAttribute('style')).toMatch(/1px solid[^;]*accent-youtube/)
+    expect(twitchCard.getAttribute('style')).toMatch(/1px solid[^;]*accent-twitch/)
+  })
+
   it('plays a Twitch VOD in the page player, and sends a YouTube video to its own page', async () => {
     setup()
     fireEvent.click(bar())
