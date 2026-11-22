@@ -54,7 +54,7 @@ describe('AlsoOnTwitch', () => {
 
   it('shows on the video page next to the channel name', () => {
     saveLink(link(true))
-    const data: VideoPageData = { id: 'abcdefghijk', title: 'T', channelTitle: 'Justin Wong', channelId: CHANNEL, thumbnail: '', publishedAt: '2026-01-01T00:00:00Z', description: '', tags: [], topics: [] }
+    const data: VideoPageData = { id: 'abcdefghijk', title: 'T', channelTitle: 'Justin Wong', channelId: CHANNEL, thumbnail: '', publishedAt: '2026-01-01T00:00:00Z', description: '', tags: [], topics: [], live: { state: 'none', viewerCount: null, startedAt: null } }
     renderIt(<VideoMeta data={data} />)
     const name = screen.getByText('Justin Wong')
     expect(name.parentElement!.contains(screen.getByRole('link', { name: /Twitch/ }))).toBe(true)
