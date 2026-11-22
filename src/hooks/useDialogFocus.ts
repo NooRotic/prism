@@ -5,9 +5,10 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 /**
  * Focus for a modal dialog: focus moves inside when it opens (unless an `autoFocus` field already took it), Tab and
  * Shift+Tab cycle inside it, Esc closes it wherever focus is, and focus returns to whatever had it before (the button
- * that opened it) when it closes.
+ * that opened it) when it closes. When that opener has left the page (a suggestion that went away once the link was
+ * saved), or was never focused (Safari and Firefox on macOS do not focus a clicked button), focus goes to `fallback`.
  */
-export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () => void): void {
+export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () => void, fallback?: RefObject<HTMLElement | null>): void {
   // Read during the first render, before React applies autoFocus inside the dialog, so this is the opener.
   const [opener] = useState(() => (typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null)))
   const closeRef = useRef(onClose)
@@ -18,6 +19,8 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () =
   useEffect(() => {
     const box = ref.current
     if (!box) return
+    // The main button already exists when the box opens; read it now, as the lint rule asks of refs used in cleanup.
+    const fallbackNode = fallback?.current ?? null
     const focusables = () => Array.from(box.querySelectorAll<HTMLElement>(FOCUSABLE))
     if (!box.contains(document.activeElement)) focusables()[0]?.focus()
 
@@ -46,7 +49,8 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () =
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('keydown', onKey)
-      if (opener?.isConnected) opener.focus()
+      const back = opener && opener.isConnected && opener !== document.body ? opener : fallbackNode
+      back?.focus()
     }
-  }, [ref, opener])
+  }, [ref, opener, fallback])
 }

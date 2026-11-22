@@ -88,4 +88,28 @@ describe('YouTubePlayer muted notice', () => {
     act(() => (rp.props.onEnded as () => void)())
     expect(pill()).toBeNull()
   })
+
+  it('comes back when the browser refuses the unmute (the player reports muted right after the click)', () => {
+    setActivation(false)
+    render(<YouTubePlayer url={yt} detection={detection} />)
+    play()
+    fireEvent.click(screen.getByRole('button', { name: 'Turn sound on' }))
+    expect(pill()).toBeNull()
+    muteChange(true)
+    expect(rp.props.muted).toBe(true)
+    expect(pill()).not.toBeNull()
+  })
+
+  it('treats a mute well after the click as the viewer muting it themselves', () => {
+    setActivation(false)
+    render(<YouTubePlayer url={yt} detection={detection} />)
+    play()
+    fireEvent.click(screen.getByRole('button', { name: 'Turn sound on' }))
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    muteChange(true)
+    expect(pill()).toBeNull()
+  })
 })
+

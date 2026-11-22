@@ -19,6 +19,8 @@ import { readSavedVolume, saveVolume } from '../../lib/playerVolume'
  */
 /** How long sound autoplay gets to start before the player goes back to a muted start. */
 const SOUND_AUTOPLAY_GRACE_MS = 3000
+/** A mute the player reports this soon after "Turn sound on" is the browser refusing the unmute, not the viewer. */
+const UNMUTE_REFUSAL_MS = 2000
 
 /** True once the visitor has clicked, tapped or pressed a key in this window. */
 const wasUsed = (win: Window): boolean => win.navigator?.userActivation?.hasBeenActive === true
@@ -62,6 +64,8 @@ export default function YouTubePlayer({
   // True while the mute is the browser's doing, not the viewer's: then a "Playing muted" pill offers the sound back.
   const [browserMuted, setBrowserMuted] = useState(muted)
   const [playing, setPlaying] = useState(false)
+  /** When "Turn sound on" was clicked, so a refusal right after it brings the pill back. */
+  const unmuteAskedAt = useRef<number | null>(null)
   useEffect(() => {
     if (muted) return
     const timer = setTimeout(() => {
@@ -103,6 +107,14 @@ export default function YouTubePlayer({
           saveVolume(event.currentTarget.volume)
           const reported = event.currentTarget.muted
           if (typeof reported === 'boolean') {
+            const asked = unmuteAskedAt.current
+            unmuteAskedAt.current = null
+            if (reported && !muted && asked !== null && Date.now() - asked < UNMUTE_REFUSAL_MS) {
+              // The browser would not let the sound on (Safari can refuse an unmute sent to the frame): offer it again.
+              setMuted(true)
+              setBrowserMuted(true)
+              return
+            }
             // A change the viewer made with the player's own controls: from now on the mute (or sound) is theirs.
             if (reported !== muted) setBrowserMuted(false)
             setMuted(reported)
@@ -150,6 +162,7 @@ export default function YouTubePlayer({
           <button
             type="button"
             onClick={() => {
+              unmuteAskedAt.current = Date.now()
               setMuted(false)
               setBrowserMuted(false)
             }}

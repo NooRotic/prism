@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useDialogFocus } from '../../hooks/useDialogFocus'
 import { isMutual } from '../../lib/accountBios'
 import { findByTwitch, removeLink, saveLink } from '../../lib/linkedAccounts'
@@ -7,6 +7,8 @@ import { isYouTubeApiAvailable } from '../../lib/youtubeApi'
 import { fetchYoutubeChannel } from '../../lib/youtubeChannelApi'
 
 interface LinkAccountsModalProps {
+  /** Where focus goes on close when the button that opened the box is gone (see useDialogFocus). */
+  returnFocusRef?: RefObject<HTMLElement | null>
   /** The Twitch channel being linked. */
   login: string
   /** That channel's Twitch bio, for the "do the bios name each other" check. */
@@ -23,9 +25,9 @@ const inputStyle = { backgroundColor: 'var(--bg)', border: '1px solid var(--bord
  * other channel it is saved as confirmed, otherwise as the viewer's own claim. A Kick link cannot be checked (Kick's API
  * needs a server-held token), so it is always the viewer's own. Nothing leaves this browser.
  */
-export default function LinkAccountsModal({ login, description, onClose, suggested }: LinkAccountsModalProps) {
+export default function LinkAccountsModal({ login, description, onClose, suggested, returnFocusRef }: LinkAccountsModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
-  useDialogFocus(dialogRef, onClose)
+  useDialogFocus(dialogRef, onClose, returnFocusRef)
   /** False once the box is closed: a lookup that finishes after Esc or Cancel must not save. */
   const alive = useRef(true)
   useEffect(() => {

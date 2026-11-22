@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { PrismMark } from '../brand/PrismMark'
 import { useLinkedByYoutube } from '../../hooks/useLinkedAccount'
 import { dismissYoutubeSuggestion, isYoutubeSuggestionDismissed } from '../../lib/linkedAccounts'
@@ -11,6 +11,7 @@ import LinkTwitchModal from './LinkTwitchModal'
  */
 export default function LinkTwitch({ channelId, channelTitle, description }: { channelId: string; channelTitle: string; description: string }) {
   const [open, setOpen] = useState(false)
+  const mainRef = useRef<HTMLButtonElement>(null)
   const [suggested, setSuggested] = useState<string | undefined>(undefined)
   const [dismissedNow, setDismissedNow] = useState<string | null>(null)
   const link = useLinkedByYoutube(channelId)
@@ -21,6 +22,7 @@ export default function LinkTwitch({ channelId, channelTitle, description }: { c
     <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
       <span className="prism-pill rounded-full p-[1.5px] inline-flex">
         <button
+          ref={mainRef}
           type="button"
           onClick={() => {
             setSuggested(undefined)
@@ -62,7 +64,7 @@ export default function LinkTwitch({ channelId, channelTitle, description }: { c
           </button>
         </span>
       )}
-      {open && <LinkTwitchModal channelId={channelId} channelTitle={channelTitle} suggested={suggested} onClose={() => setOpen(false)} />}
+      {open && <LinkTwitchModal channelId={channelId} channelTitle={channelTitle} suggested={suggested} onClose={() => setOpen(false)} returnFocusRef={mainRef} />}
     </span>
   )
 }

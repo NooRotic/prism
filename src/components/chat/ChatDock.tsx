@@ -116,6 +116,13 @@ export default function ChatDock({ channel, player, kind = 'twitch' }: ChatDockP
         }
       : null
 
+  // Either pop-out window (Twitch's or the linked YouTube one) refused by the browser; shown in both chat layouts.
+  const blockedNotice = (popout.blocked || youtubeChat.blocked) && (
+    <p role="status" className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+      Pop-up blocked. Allow pop-ups for this site to use the chat window.
+    </p>
+  )
+
   // Fill mode: the remembered setting, or fullscreen of this row (which is never
   // saved). The root attribute exists only while this dock is mounted, which is
   // only on the Twitch player page, so no other page is ever affected.
@@ -282,6 +289,7 @@ export default function ChatDock({ channel, player, kind = 'twitch' }: ChatDockP
                 dockControls={false}
                 fillControls={false}
               />
+              {blockedNotice}
               <div className="flex-1 min-h-0">
                 {channel ? (
                   <ScaledChat scale={chatScale.scale}>
@@ -362,15 +370,7 @@ export default function ChatDock({ channel, player, kind = 'twitch' }: ChatDockP
                 videoControl={videoControl}
                 dockControls={!floating}
               />
-              {(popout.blocked || youtubeChat.blocked) && (
-                <p
-                  role="status"
-                  className="px-3 py-2 text-xs"
-                  style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
-                >
-                  Pop-up blocked. Allow pop-ups for this site to use the chat window.
-                </p>
-              )}
+              {blockedNotice}
               {/* The chat fills an absolutely placed box: a percentage height on the iframe would
                   resolve to auto here (the panel has no fixed height) and shrink it to 150px. */}
               <div className="relative flex-1 min-h-0">
