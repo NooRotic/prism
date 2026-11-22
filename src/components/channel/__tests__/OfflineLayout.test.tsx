@@ -5,6 +5,7 @@ import { FloatingVideoContext } from '../../chat/floatingVideoContext'
 import type { FloatingVideoControls } from '../../chat/floatingVideoContext'
 import { useChatPopout } from '../../chat/useChatPopout'
 import OfflineLayout from '../OfflineLayout'
+import { saveLink } from '../../../lib/linkedAccounts'
 
 vi.mock('../../chat/useChatPopout', () => ({ useChatPopout: vi.fn() }))
 
@@ -52,6 +53,15 @@ describe('OfflineLayout', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     Object.defineProperty(window, 'innerHeight', { value: originalInnerHeight, configurable: true })
+  })
+
+  it('offers the YouTube chat pop-out for a streamer with a linked YouTube account, and only then', () => {
+    const { unmount } = render(layout())
+    expect(screen.queryByRole('button', { name: 'Pop out YouTube chat' })).not.toBeInTheDocument()
+    unmount()
+    saveLink({ twitch: 'streamer', youtube: { channelId: 'UC1', title: 'Streamer YT' }, confirmed: false, linkedAt: 1 })
+    render(layout())
+    expect(screen.getByRole('button', { name: 'Pop out YouTube chat' })).toBeInTheDocument()
   })
 
   it('the player box is never shorter than 300px (the embed will not go below it)', () => {
