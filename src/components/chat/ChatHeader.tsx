@@ -5,6 +5,7 @@ import {
   ExternalLink,
   GripVertical,
   Maximize2,
+  MessagesSquare,
   Minimize2,
   Shrink,
   X,
@@ -40,6 +41,8 @@ interface ChatHeaderProps {
    * channel): the Fill and Fullscreen buttons go. Defaults to true.
    */
   fillControls?: boolean
+  /** Pop out the linked streamer's YouTube chat. Omitted or null when the channel has no linked YouTube account. */
+  youtubeChat?: { onClick: () => void } | null
 }
 
 const buttonClass = 'rounded-md p-1 transition-colors hover:bg-white/5'
@@ -61,6 +64,7 @@ export default function ChatHeader({
   videoControl = null,
   dockControls = true,
   fillControls = true,
+  youtubeChat = null,
 }: ChatHeaderProps) {
   const target: DockSide = side === 'left' ? 'right' : 'left'
   // The header exists only while chat is docked, so filling here fills the video
@@ -135,6 +139,17 @@ export default function ChatHeader({
         >
           <ExternalLink size={14} />
         </button>
+        {youtubeChat && (
+          <button
+            type="button"
+            onClick={() => youtubeChat.onClick()}
+            aria-label="Pop out YouTube chat"
+            title="Pop out this streamer's YouTube chat"
+            className={buttonClass}
+          >
+            <MessagesSquare size={14} style={{ color: 'var(--accent-youtube)' }} />
+          </button>
+        )}
         <button
           type="button"
           onClick={onHide}
