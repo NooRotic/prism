@@ -36,12 +36,28 @@ export function getLinks(): LinkRecord[] {
   }
 }
 
+const listeners = new Set<() => void>()
+
+/** Calls `listener` whenever a link is saved or removed here, or changed in another tab. Returns the unsubscribe. */
+export function subscribeLinks(listener: () => void): () => void {
+  listeners.add(listener)
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === null || e.key === STORAGE_KEYS.LOCAL_LINKED_ACCOUNTS) listener()
+  }
+  window.addEventListener('storage', onStorage)
+  return () => {
+    listeners.delete(listener)
+    window.removeEventListener('storage', onStorage)
+  }
+}
+
 function write(list: LinkRecord[]): void {
   try {
     localStorage.setItem(STORAGE_KEYS.LOCAL_LINKED_ACCOUNTS, JSON.stringify(list))
   } catch {
     /* storage unavailable: not remembered */
   }
+  listeners.forEach((l) => l())
 }
 
 export function findByTwitch(login: string): LinkRecord | null {

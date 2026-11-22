@@ -1,15 +1,19 @@
-import type { YouTubeVideo } from './youtubeApi'
+/** What sorting needs from a video: any list that has these two (a YouTube video, a Twitch VOD on a combined card). */
+export interface Sortable {
+  publishedAt: string
+  viewCount?: string
+}
 
 export type SortOrder = 'newest' | 'oldest' | 'views'
 
 export const SORT_LABELS: Record<SortOrder, string> = { newest: 'Newest', oldest: 'Oldest', views: 'Most viewed' }
 
-function dateOf(v: YouTubeVideo): number | null {
+function dateOf(v: Sortable): number | null {
   const t = Date.parse(v.publishedAt)
   return Number.isNaN(t) ? null : t
 }
 
-function viewsOf(v: YouTubeVideo): number | null {
+function viewsOf(v: Sortable): number | null {
   if (v.viewCount === undefined || v.viewCount === '') return null
   const n = Number(v.viewCount)
   return Number.isFinite(n) ? n : null
@@ -19,7 +23,7 @@ function viewsOf(v: YouTubeVideo): number | null {
  * A sorted copy. Sorting costs no quota: it orders what was already fetched. A video with no date (or no view count, for
  * "most viewed") goes last whichever way it sorts, in the order it came; the sort is stable.
  */
-export function sortVideos(videos: YouTubeVideo[], order: SortOrder): YouTubeVideo[] {
+export function sortVideos<T extends Sortable>(videos: T[], order: SortOrder): T[] {
   const key = order === 'views' ? viewsOf : dateOf
   const sign = order === 'oldest' ? 1 : -1
   return videos
