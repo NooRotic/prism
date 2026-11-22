@@ -1,7 +1,21 @@
 import { STORAGE_KEYS } from '../config/storageKeys'
 
-/** Name of the pop-out window (so a second click reuses it) and of the BroadcastChannel. */
+/** Name of the Twitch pop-out window (so a second click reuses it) and of its BroadcastChannel. */
 export const POPOUT_WINDOW_NAME = 'prism-chat-popout'
+
+/** Which chat a pop-out holds. Each has its own window, bus, saved place and route, so two can run side by side. */
+export type ChatKind = 'twitch' | 'youtube'
+
+export function popoutNames(kind: ChatKind): { windowName: string; busName: string; boundsKey: string; path: string } {
+  return kind === 'youtube'
+    ? {
+        windowName: 'prism-chat-popout-youtube',
+        busName: 'prism-chat-popout-youtube',
+        boundsKey: STORAGE_KEYS.LOCAL_YOUTUBE_CHAT_POPOUT_BOUNDS,
+        path: '/chat-youtube',
+      }
+    : { windowName: POPOUT_WINDOW_NAME, busName: POPOUT_WINDOW_NAME, boundsKey: STORAGE_KEYS.LOCAL_CHAT_POPOUT_BOUNDS, path: '/chat' }
+}
 
 /**
  * What the main window and the pop-out say to each other. Every message names
@@ -55,9 +69,9 @@ const noopBus: PopoutBus = {
  * A bus over `BroadcastChannel`, which needs no `window.opener`. Where it does
  * not exist the pop-out still opens; it just cannot follow channel changes.
  */
-export function createPopoutBus(): PopoutBus {
+export function createPopoutBus(kind: ChatKind = 'twitch'): PopoutBus {
   if (typeof BroadcastChannel === 'undefined') return noopBus
-  const channel = new BroadcastChannel(POPOUT_WINDOW_NAME)
+  const channel = new BroadcastChannel(popoutNames(kind).busName)
   return {
     post: (msg) => channel.postMessage(msg),
     subscribe: (cb) => {
@@ -111,9 +125,9 @@ function isValidBounds(bounds: WindowBounds): boolean {
  * valid (a second monitor can sit left of or above the main one); non-finite
  * numbers and sizes under 200px are not.
  */
-export function loadBounds(): WindowBounds | null {
+export function loadBounds(kind: ChatKind = 'twitch'): WindowBounds | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.LOCAL_CHAT_POPOUT_BOUNDS)
+    const raw = localStorage.getItem(popoutNames(kind).boundsKey)
     if (!raw) return null
     const value: unknown = JSON.parse(raw)
     if (typeof value !== 'object' || value === null) return null
@@ -134,10 +148,10 @@ export function loadBounds(): WindowBounds | null {
 }
 
 /** Ignores bounds that are not valid, so a bad reading never replaces a good saved one. */
-export function saveBounds(bounds: WindowBounds): void {
+export function saveBounds(bounds: WindowBounds, kind: ChatKind = 'twitch'): void {
   if (!isValidBounds(bounds)) return
   try {
-    localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_POPOUT_BOUNDS, JSON.stringify(bounds))
+    localStorage.setItem(popoutNames(kind).boundsKey, JSON.stringify(bounds))
   } catch {
     // storage full or unavailable — the window just opens at the default next time
   }
@@ -158,8 +172,8 @@ export function boundsToFeatures(bounds: WindowBounds | null): string {
  * returning Twitch's own pop-out URL from here (which has no owner, so it could
  * not follow channel changes either).
  */
-export function buildPopoutUrl(channel: string, owner: string): string {
-  return `/chat/${encodeURIComponent(channel)}?owner=${encodeURIComponent(owner)}`
+export function buildPopoutUrl(channel: string, owner: string, kind: ChatKind = 'twitch'): string {
+  return `${popoutNames(kind).path}/${encodeURIComponent(channel)}?owner=${encodeURIComponent(owner)}`
 }
 
 function makeId(): string {

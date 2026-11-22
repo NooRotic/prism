@@ -63,6 +63,7 @@ export const STORAGE_KEYS = {
   LOCAL_CHAT_OFFLINE_WIDTH: 'prism_chat_offline_width',
   /** Last size and position of the chat pop-out window (JSON). */
   LOCAL_CHAT_POPOUT_BOUNDS: 'prism_chat_popout_bounds',
+  LOCAL_YOUTUBE_CHAT_POPOUT_BOUNDS: 'prism_youtube_chat_popout_bounds',
   /** Fill mode (video and chat fill the window): the string 'true' when on. */
   LOCAL_FILL_MODE: 'prism_fill_mode',
   /** Chat text size: one of the CHAT_SCALE_STEPS values, e.g. '1.5'. Every window follows it. */
