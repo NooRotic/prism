@@ -39,6 +39,17 @@ describe('Header layout', () => {
     expect(classesOf(bar(container))).toContain('min-h-14')
   })
 
+  // Pinned to the top while the page scrolls on a desktop-sized window; on a phone it scrolls away with the page, so it
+  // does not use up a tall strip of a small screen.
+  it('stays at the top while scrolling from 768 px up, and scrolls away with the page below that', () => {
+    const { container } = renderHeader()
+
+    const header = classesOf(container.querySelector('header'))
+    expect(header).toEqual(expect.arrayContaining(['md:sticky', 'md:top-0', 'z-40']))
+    expect(header).not.toContain('sticky')
+    expect(header).not.toContain('fixed')
+  })
+
   it('lets the tab strip shrink and scroll inside itself rather than push the page sideways', () => {
     renderHeader()
 
