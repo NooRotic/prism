@@ -144,6 +144,35 @@ describe('YoutubePlayerPage on a live video', () => {
     expect(screen.getByText('Loading video...')).toBeInTheDocument()
   })
 
+  it('stops waiting for details that never come: after 4 seconds the player starts', () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(useVideoPage).mockReturnValue({ data: null, status: 'loading' })
+      renderPage()
+      act(() => vi.advanceTimersByTime(3900))
+      expect(screen.queryByTestId('player')).not.toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(200))
+      expect(screen.getByTestId('player')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a live answer after the wait ran out does not move the player into a dock', () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(useVideoPage).mockReturnValue({ data: null, status: 'loading' })
+      const { navigate } = renderPage()
+      act(() => vi.advanceTimersByTime(4100))
+      live()
+      navigate('/youtube/abcdefghijk?from=catchup&x=1') // a re-render on the same video
+      expect(screen.queryByTestId('chat-dock')).not.toBeInTheDocument()
+      expect(screen.getByTestId('player')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('starts the player in the ordinary layout when the details cannot be had', () => {
     vi.mocked(useVideoPage).mockReturnValue({ data: null, status: 'unavailable' })
     renderPage()

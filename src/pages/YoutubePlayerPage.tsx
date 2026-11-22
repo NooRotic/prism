@@ -52,6 +52,9 @@ function playUrlFor(videoId: string): string {
   return demo ? demo.url : `https://www.youtube.com/watch?v=${videoId}`
 }
 
+/** How long the player waits for the video details (which say whether it is live) before starting anyway. */
+const DETAILS_WAIT_MS = 4000
+
 export default function YoutubePlayerPage() {
   const { videoId = '' } = useParams<{ videoId: string }>()
   const { search } = useLocation()
@@ -122,8 +125,17 @@ export default function YoutubePlayerPage() {
 
   // A live video gets its chat in the Twitch page's dock. The layout is settled before the player mounts (the details
   // say whether it is live), so the player never moves in the tree and never restarts when the chat appears.
-  const isLive = data?.live.state === 'live'
-  const detailsKnown = pageStatus !== 'loading'
+  // Details that never come (a stalled request) must not hold the video back: after DETAILS_WAIT_MS the player starts
+  // in the ordinary layout, and that visit keeps it even if "live" arrives later (moving the player would restart it).
+  const [waitedOut, setWaitedOut] = useState<string | null>(null)
+  useEffect(() => {
+    if (pageStatus !== 'loading') return
+    const id = setTimeout(() => setWaitedOut(videoId), DETAILS_WAIT_MS)
+    return () => clearTimeout(id)
+  }, [pageStatus, videoId])
+  const gaveUp = waitedOut === videoId
+  const isLive = data?.live.state === 'live' && !gaveUp
+  const detailsKnown = pageStatus !== 'loading' || gaveUp
   const chatTarget = isLive
     ? encodeTarget({ kind: 'video', videoId, ...(data?.channelId ? { channelId: data.channelId } : {}) })
     : ''
