@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { ResizableHandle } from '../layout/ResizableHandle'
 import { STORAGE_KEYS } from '../../config/storageKeys'
+import { useYoutubeChatPopout } from './useYoutubeChatPopout'
 import ChatHeader from './ChatHeader'
 import ChatSource from './ChatSource'
 import ChatStrip from './ChatStrip'
@@ -84,6 +85,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   const { side, hidden } = placement
   const { handleProps: dragHandleProps } = useDockDrag(setSide)
   const popout = useChatPopout(channel)
+  const youtubeChat = useYoutubeChatPopout(channel)
   const chatScale = useChatScale()
   // What the viewer sees: popped out, else hidden, else docked on `side`.
   const chatVisible = !hidden && !popout.isOpen
@@ -253,6 +255,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
                 onHide={() => setLandscapeChatOpen(false)}
                 onSwapSide={swapSide}
                 onPopOut={popout.open}
+                youtubeChat={youtubeChat.available ? { onClick: youtubeChat.open } : null}
                 fill={fill}
                 onToggleFill={toggleFill}
                 fullscreenSupported={fullscreen.supported}
@@ -332,6 +335,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
                 onHide={hide}
                 onSwapSide={swapSide}
                 onPopOut={popout.open}
+                youtubeChat={youtubeChat.available ? { onClick: youtubeChat.open } : null}
                 fill={fill}
                 onToggleFill={toggleFill}
                 fullscreenSupported={fullscreen.supported}
