@@ -32,11 +32,11 @@ function Body({ item }: { item: CombinedItem }) {
           {p.label}
         </span>
       </div>
-      <div className="p-3 flex flex-col gap-1">
-        <span data-testid="combined-title" className="text-sm font-medium line-clamp-2" style={{ color: 'var(--text-primary)' }}>
+      <div className="p-2 flex flex-col gap-0.5">
+        <span data-testid="combined-title" className="text-xs font-medium line-clamp-2" style={{ color: 'var(--text-primary)' }}>
           {item.title}
         </span>
-        <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <span className="flex flex-wrap items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
           <Eye size={11} />
           {meta.join(' · ')}
         </span>

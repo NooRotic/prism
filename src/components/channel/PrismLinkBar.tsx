@@ -59,12 +59,11 @@ export default function PrismLinkBar({ login }: { login: string }) {
           style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: 'none' }}
         >
           <span className="flex items-center gap-3 min-w-0">
-            {confirmed && (
-              // The home icon's line-art prism: one beam in, the spectrum out to the platforms. No text.
-              <span data-testid="prism-badge" aria-hidden="true" className="shrink-0">
-                <PrismMark variant="icon" hover className="h-9 w-[4.5rem]" />
-              </span>
-            )}
+            {/* The home icon's line-art prism: one beam in, the spectrum out to the platforms. No text. On every linked
+                channel; a link the viewer made shows it dimmer, and only a confirmed one gets the moving spectrum. */}
+            <span data-testid="prism-badge" aria-hidden="true" className="shrink-0" style={{ opacity: confirmed ? 1 : 0.6 }}>
+              <PrismMark variant="icon" hover className="h-9 w-[4.5rem]" />
+            </span>
             <span className="flex flex-col min-w-0">
               <span className="text-base font-extrabold">Twitch + YouTube videos, together</span>
               <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
@@ -105,8 +104,8 @@ export default function PrismLinkBar({ login }: { login: string }) {
             </p>
           )}
 
-          {/* Columns at least 17.5rem (280px) wide: about 1.75 times narrower than the three-up grid this replaced, so the thumbnails are too. */}
-          <div data-testid="combined-grid" className="grid grid-cols-[repeat(auto-fill,minmax(17.5rem,1fr))] gap-3">
+          {/* Columns at least 11rem (176px) wide, so the thumbnails are small even in a zoomed-in window (17.5rem still gave two big columns there). */}
+          <div data-testid="combined-grid" className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
             {items.map((item) => (
               <CombinedVodCard key={`${item.platform}:${item.id}`} item={item} />
             ))}

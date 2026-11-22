@@ -70,15 +70,17 @@ describe('PrismLinkBar', () => {
     setup({ confirmed: false })
     expect(screen.getByTestId('prism-spectrum')).not.toHaveClass('prism-spectrum')
     expect(bar()).not.toHaveClass('prism-tint')
-    expect(screen.queryByTestId('prism-badge')).not.toBeInTheDocument()
+    // The prism mark is on every linked channel; only the moving spectrum and wash are for a confirmed one.
+    expect(screen.getByTestId('prism-badge').querySelector('[data-prism-mark="icon"]')).not.toBeNull()
+    expect(screen.getByTestId('prism-badge')).toHaveStyle({ opacity: '0.6' })
   })
 
   it('lays the cards out in columns about 1.75 times narrower than the old three-up grid (so the thumbnails are too)', async () => {
     setup()
     fireEvent.click(bar())
     await screen.findByText('youtube mid')
-    // minmax(17.5rem, 1fr): 280px cards, where the old grid gave about 490px on a wide page.
-    expect(screen.getByTestId('combined-grid').className).toContain('minmax(17.5rem,1fr)')
+    // minmax(11rem, 1fr): 176px cards. The first compact grid (17.5rem) still gave two big columns in a zoomed-in window.
+    expect(screen.getByTestId('combined-grid').className).toContain('minmax(11rem,1fr)')
   })
 
   it('stays closed and spends nothing until it is clicked', () => {
