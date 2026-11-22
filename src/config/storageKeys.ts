@@ -49,6 +49,8 @@ export const STORAGE_KEYS = {
   LOCAL_YOUTUBE_SEARCH_HISTORY: 'prism_youtube_search_history',
   /** Twitch channels whose suggested same-name YouTube channel the viewer said "not them" to (JSON array of logins). */
   LOCAL_LINK_DISMISSED: 'prism_link_dismissed',
+  /** YouTube channels whose suggested Twitch channel (from a video description) the viewer said "not them" to (JSON array of channel ids). */
+  LOCAL_LINK_DISMISSED_YOUTUBE: 'prism_link_dismissed_youtube',
   /** "Also on YouTube / Kick": the viewer's linked creator accounts (JSON array of link records, newest first). */
   LOCAL_LINKED_ACCOUNTS: 'prism_linked_accounts',
   /** Height in px the viewer dragged the video-and-chat row to with both on the page; absent means the default height. */

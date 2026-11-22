@@ -69,10 +69,21 @@ export function findByYoutube(channelId: string): LinkRecord | null {
   return getLinks().find((l) => l.youtube?.channelId === channelId) ?? null
 }
 
+/** A record with neither a YouTube nor a Kick part says nothing, so it is not kept. */
+const hasAny = (r: LinkRecord) => !!r.youtube || !!r.kick
+/** The record without its YouTube part; "confirmed" was about that part, so it goes too. */
+const withoutYoutube = (r: LinkRecord): LinkRecord => ({ ...r, youtube: undefined, confirmed: false })
+
 /** Saves the link at the front, replacing any earlier record for the same Twitch login. */
 export function saveLink(record: LinkRecord): void {
   const twitch = record.twitch.toLowerCase()
-  write([{ ...record, twitch }, ...getLinks().filter((l) => l.twitch !== twitch)].slice(0, MAX_LINKS))
+  const ytId = record.youtube?.channelId
+  // A YouTube channel belongs to one Twitch channel: any other record holding it loses it (and goes if nothing is left).
+  const others = getLinks()
+    .filter((l) => l.twitch !== twitch)
+    .map((l) => (ytId && l.youtube?.channelId === ytId ? withoutYoutube(l) : l))
+    .filter(hasAny)
+  write([{ ...record, twitch }, ...others].slice(0, MAX_LINKS))
 }
 
 /** Twitch channels whose suggested same-name YouTube channel the viewer rejected ("not them"). */
@@ -101,4 +112,52 @@ export function dismissSuggestion(login: string): void {
 export function removeLink(login: string): void {
   const key = login.toLowerCase()
   write(getLinks().filter((l) => l.twitch !== key))
+}
+
+
+/**
+ * Links a YouTube channel to a Twitch channel from the YouTube side. A Kick link already on that Twitch record is kept;
+ * any other Twitch record holding this YouTube channel loses it (and is dropped if nothing is left), so a YouTube
+ * channel is never linked to two Twitch channels.
+ */
+export function linkYoutubeToTwitch(login: string, youtube: { channelId: string; title: string; handle?: string }, confirmed: boolean): void {
+  const twitch = login.toLowerCase()
+  const list = getLinks()
+  const existing = list.find((l) => l.twitch === twitch)
+  const others = list
+    .filter((l) => l.twitch !== twitch)
+    .map((l) => (l.youtube?.channelId === youtube.channelId ? withoutYoutube(l) : l))
+    .filter(hasAny)
+  const record: LinkRecord = { twitch, youtube, ...(existing?.kick ? { kick: existing.kick } : {}), confirmed, linkedAt: Date.now() }
+  write([record, ...others].slice(0, MAX_LINKS))
+}
+
+/** Removes this YouTube channel from whichever Twitch record holds it, keeping a Kick-only remainder. */
+export function unlinkYoutube(channelId: string): void {
+  write(
+    getLinks()
+      .map((l) => (l.youtube?.channelId === channelId ? withoutYoutube(l) : l))
+      .filter(hasAny),
+  )
+}
+
+function dismissedYoutube(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOCAL_LINK_DISMISSED_YOUTUBE) ?? '[]')
+    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function isYoutubeSuggestionDismissed(channelId: string): boolean {
+  return dismissedYoutube().includes(channelId)
+}
+
+export function dismissYoutubeSuggestion(channelId: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.LOCAL_LINK_DISMISSED_YOUTUBE, JSON.stringify([channelId, ...dismissedYoutube().filter((c) => c !== channelId)].slice(0, MAX_LINKS)))
+  } catch {
+    /* storage unavailable: asked again next time */
+  }
 }

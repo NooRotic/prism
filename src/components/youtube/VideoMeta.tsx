@@ -3,6 +3,7 @@ import { formatCount, formatPublished } from '../../lib/videoFormat'
 import type { VideoPageData } from '../../lib/videoPageApi'
 import TagChip from './TagChip'
 import AlsoOnTwitch from './AlsoOnTwitch'
+import LinkTwitch from './LinkTwitch'
 
 /**
  * The video's title, on its own so the page can put the columns under it. While the details load it holds the
@@ -49,6 +50,7 @@ export default function VideoMeta({ data, maxTags = 8, showTitle = true, onTopic
           {data.channelTitle}
         </span>
         <AlsoOnTwitch channelId={data.channelId} />
+        {data.channelId && <LinkTwitch channelId={data.channelId} channelTitle={data.channelTitle} description={data.description} />}
         {stats.map((s) => (
           <span key={s}>{s}</span>
         ))}
