@@ -18,7 +18,7 @@ import { YouTubeCategoryBar } from './YouTubeCategoryBar'
 import { YouTubeVideoCard } from './YouTubeVideoCard'
 import { YouTubeSearchBar } from './YouTubeSearchBar'
 import QuotaNotice from '../youtube/QuotaNotice'
-import { useGridSearch } from '../../hooks/useGridSearch'
+import { LOAD_ALL_CAP, useGridSearch } from '../../hooks/useGridSearch'
 import { SORT_LABELS, sortVideos, type SortOrder } from '../../lib/sortVideos'
 
 /** Fetch videos for a category, returning normalized YouTubeVideo[] + pagination token. */
@@ -47,7 +47,7 @@ export function YouTubeGrid() {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshCounter, setRefreshCounter] = useState(0)
-  const { search, run: runSearch, clear: clearSearch, order, setOrder } = useGridSearch()
+  const { search, run: runSearch, clear: clearSearch, order, setOrder, loadMore, loadAll, recent, clearRecent, query } = useGridSearch()
 
   // Tracks the current fetch generation — incremented on category change or refresh
   // so in-flight requests from previous generations are discarded
@@ -157,7 +157,7 @@ export function YouTubeGrid() {
   return (
     <div className="flex flex-col gap-4">
       <QuotaNotice />
-      {isYouTubeApiAvailable() && <YouTubeSearchBar onSearch={runSearch} />}
+      {isYouTubeApiAvailable() && <YouTubeSearchBar onSearch={runSearch} query={query} recent={recent} onClearRecent={clearRecent} />}
 
       {/* Category pills bar + Refresh All button */}
       <div className="flex items-center justify-between">
@@ -219,6 +219,15 @@ export function YouTubeGrid() {
           )}
           {search.status === 'ready' && (
             <>
+              <p data-testid="loaded-count" className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                {search.kind === 'channel'
+                  ? search.total !== null && search.total > search.videos.length
+                    ? `Loaded ${search.videos.length.toLocaleString()} of ${search.total.toLocaleString()} videos`
+                    : search.total !== null
+                      ? `Loaded ${search.videos.length.toLocaleString()} of ${Math.max(search.total, search.videos.length).toLocaleString()} videos`
+                      : `Loaded ${search.videos.length.toLocaleString()} videos`
+                  : `${search.videos.length.toLocaleString()} results`}
+              </p>
               {search.videos.length > 1 && (
                 <div role="group" aria-label="Sort by" className="flex flex-wrap items-center gap-2">
                   <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -242,11 +251,55 @@ export function YouTubeGrid() {
                   ))}
                 </div>
               )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortVideos(search.videos, order).map((video) => (
-                <YouTubeVideoCard key={video.id} video={video} />
-              ))}
-            </div>
+              {order === 'oldest' && search.more && (
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  This is the oldest of the {search.videos.length.toLocaleString()} loaded so far, not of everything
+                  {search.kind === 'channel' ? ': load all to reach the first video.' : '.'}
+                </p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sortVideos(search.videos, order).map((video) => (
+                  <YouTubeVideoCard key={video.id} video={video} />
+                ))}
+              </div>
+              {search.moreError && (
+                <p role="alert" className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  Could not load more. What is loaded is still here; try again in a moment.
+                </p>
+              )}
+              {search.capped && (
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  Stopped at {LOAD_ALL_CAP.toLocaleString()} videos.
+                </p>
+              )}
+              {search.more && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={search.loadingMore}
+                    onClick={() => void loadMore()}
+                    className="rounded px-3 py-1.5 text-sm cursor-pointer disabled:cursor-default disabled:opacity-60"
+                    style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+                  >
+                    {search.loadingMore
+                      ? 'Loading…'
+                      : search.kind === 'channel'
+                        ? 'Load 50 more'
+                        : 'More results (100 units of the daily quota)'}
+                  </button>
+                  {search.kind === 'channel' && (
+                    <button
+                      type="button"
+                      disabled={search.loadingMore}
+                      onClick={() => void loadAll()}
+                      className="rounded px-3 py-1.5 text-sm cursor-pointer disabled:cursor-default disabled:opacity-60"
+                      style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+                    >
+                      Load all (up to {LOAD_ALL_CAP.toLocaleString()})
+                    </button>
+                  )}
+                </div>
+              )}
             </>
           )}
         </section>

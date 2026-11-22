@@ -195,29 +195,42 @@ export function normaliseQuery(q: string): string {
   return q.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 }
 
-const searching = new Map<string, Promise<YouTubeSearchResult[]>>()
+export interface TopicPage {
+  videos: YouTubeSearchResult[]
+  nextPageToken: string | null
+}
+
+const searching = new Map<string, Promise<TopicPage>>()
 
 /**
- * Videos for a topic. 100 units, so only on a click; cached 24 h per normalised query (an empty answer too; a failure is not). Empty on any failure.
- * The same query asked while its search is still running shares that one search (a double click costs 100, not 200).
+ * One page (8) of a search. 100 units, so only on a click; every page is cached 24 h per normalised query (an empty page
+ * too; a failure is not) and answers empty on failure. The same page asked while it is still running shares that one
+ * search (a double click costs 100, not 200). The first page is cached under the key `searchTopic` always used, in
+ * either format: an older entry that is just the list of videos reads as a page with no next page.
  */
-export async function searchTopic(q: string): Promise<YouTubeSearchResult[]> {
+export async function searchTopicPage(q: string, pageToken?: string): Promise<TopicPage> {
   const query = normaliseQuery(q)
-  if (!query) return []
-  const cacheKey = `${prefix}topic_${query}`
-  const cached = ttlGet<YouTubeSearchResult[]>(cacheKey, DAY_MS)
-  if (cached) return cached
-  const running = searching.get(query)
+  if (!query) return { videos: [], nextPageToken: null }
+  const cacheKey = `${prefix}topic_${query}${pageToken ? `_p_${pageToken}` : ''}`
+  const cached = ttlGet<TopicPage | YouTubeSearchResult[]>(cacheKey, DAY_MS)
+  if (cached) return Array.isArray(cached) ? { videos: cached, nextPageToken: null } : cached
+  const running = searching.get(cacheKey)
   if (running) return running
-  const search = (async () => {
+  const search = (async (): Promise<TopicPage> => {
     try {
-      const { videos } = await searchYouTubeVideos(q, 8)
-      ttlSet(cacheKey, videos)
-      return videos
+      const { videos, nextPageToken } = await searchYouTubeVideos(q, 8, pageToken)
+      const page = { videos, nextPageToken: nextPageToken ?? null }
+      ttlSet(cacheKey, page)
+      return page
     } catch {
-      return []
+      return { videos: [], nextPageToken: null }
     }
-  })().finally(() => searching.delete(query))
-  searching.set(query, search)
+  })().finally(() => searching.delete(cacheKey))
+  searching.set(cacheKey, search)
   return search
+}
+
+/** Videos for a topic: the first page of `searchTopicPage`. */
+export async function searchTopic(q: string): Promise<YouTubeSearchResult[]> {
+  return (await searchTopicPage(q)).videos
 }
