@@ -99,12 +99,13 @@ function renderPage(path = '/youtube/abcdefghijk?from=catchup', video: FloatingV
 const before = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
 
 describe('YoutubePlayerPage', () => {
-  it('lays out player, strip, title, tags, description, comments, related videos and topics in that order', () => {
+  it('lays out title and pop-out button, player, strip, tags, description, comments, related videos and topics in that order', () => {
     renderPage()
     const order = [
+      screen.getByRole('heading', { name: 'A title' }),
+      screen.getByRole('button', { name: 'Pop out video' }),
       screen.getByTestId('player'),
       screen.getByRole('navigation', { name: 'Playlist position' }),
-      screen.getByRole('heading', { name: 'A title' }),
       screen.getByRole('group', { name: 'Tags' }),
       screen.getByRole('region', { name: 'Description' }),
       screen.getByRole('region', { name: 'Comments' }),
@@ -112,6 +113,10 @@ describe('YoutubePlayerPage', () => {
       screen.getByRole('region', { name: 'Related topics' }),
     ]
     for (let i = 0; i < order.length - 1; i++) expect(before(order[i], order[i + 1])).toBe(true)
+    // One row: the title and the button share a parent.
+    expect(screen.getByRole('heading', { name: 'A title' }).parentElement?.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Pop out video' }),
+    )
   })
 
   it('does not hand the player a leftover Twitch address while it switches to this video', () => {

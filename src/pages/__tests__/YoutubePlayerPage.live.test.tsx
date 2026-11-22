@@ -95,6 +95,8 @@ function renderPage(path = '/youtube/abcdefghijk?from=catchup', video: FloatingV
 }
 
 
+const before = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+
 const live = (over: Partial<VideoPageData> = {}) =>
   vi.mocked(useVideoPage).mockReturnValue({
     status: 'ready',
@@ -116,6 +118,12 @@ describe('YoutubePlayerPage on a live video', () => {
     live()
     renderPage()
     expect(screen.getByRole('heading', { name: 'A title' }).closest('.fill-hide')).not.toBeNull()
+  })
+
+  it('puts the title above the dock', () => {
+    live()
+    renderPage()
+    expect(before(screen.getByRole('heading', { name: 'A title' }), screen.getByTestId('chat-dock'))).toBe(true)
   })
 
   it('sends a bare video target when the channel is not known', () => {
