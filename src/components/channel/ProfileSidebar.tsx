@@ -5,6 +5,7 @@ import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { detectURLType } from '../../lib/urlDetection'
 import ConnectTwitchButton from '../ui/ConnectTwitchButton'
 import StreamUptime from './StreamUptime'
+import LinkedAccounts from './LinkedAccounts'
 
 function formatAccountAge(createdAt: string): string {
   const created = new Date(createdAt)
@@ -424,6 +425,9 @@ export default function ProfileSidebar() {
           {profile.description}
         </p>
       )}
+
+      {/* Where else this creator is (links the viewer made), and the button to make them */}
+      <LinkedAccounts login={profile.login} description={profile.description} />
 
       {/* Account age */}
       <div className="flex items-center gap-2 mt-auto pt-2" style={{ borderTop: '1px solid var(--border)' }}>
