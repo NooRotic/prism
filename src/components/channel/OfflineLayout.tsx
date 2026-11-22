@@ -25,6 +25,7 @@ import {
 import { useFloatingVideo } from '../chat/floatingVideoContext'
 import { useChatPlacement } from '../chat/useChatPlacement'
 import { useChatPopout } from '../chat/useChatPopout'
+import { useYoutubeChatPopout } from '../chat/useYoutubeChatPopout'
 import { useChatScale } from '../chat/useChatScale'
 import { clampChatWidth, loadChatWidth, storeChatWidth } from '../../lib/offlineLayout'
 import { ResizableHandle } from '../layout/ResizableHandle'
@@ -74,6 +75,8 @@ interface OfflineLayoutProps {
 export default function OfflineLayout({ channel, strip, player, children }: OfflineLayoutProps) {
   const { placement, hide, show } = useChatPlacement()
   const popout = useChatPopout(channel)
+  // The streamer may be live on YouTube while offline here; its chat window keeps following this page too.
+  const youtubeChat = useYoutubeChatPopout(channel)
   const chatScale = useChatScale()
   const chatVisible = !placement.hidden && !popout.isOpen
 
@@ -214,6 +217,7 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
                 onHide={sideways ? () => setLandscapeChatOpen(false) : hide}
                 onSwapSide={noop}
                 onPopOut={popout.open}
+                youtubeChat={youtubeChat.available ? { onClick: youtubeChat.open } : null}
                 fill={false}
                 onToggleFill={noop}
                 fullscreenSupported={false}
