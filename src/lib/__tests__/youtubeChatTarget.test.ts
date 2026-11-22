@@ -15,6 +15,12 @@ describe('the YouTube chat target code', () => {
   it('writes the short forms', () => {
     expect(all.map(encodeTarget)).toEqual(['looking', 'v:abcdefghijk', 'none:Some One', 'failed:quota', 'failed:error'])
   })
+  it('carries the channel a video belongs to', () => {
+    const t: YoutubeChatTarget = { kind: 'video', videoId: 'abcdefghijk', channelId: 'UC_x-1' }
+    expect(encodeTarget(t)).toBe('v:abcdefghijk@UC_x-1')
+    expect(decodeTarget('v:abcdefghijk@UC_x-1')).toEqual(t)
+    expect(decodeTarget('v:abcdefghijk@')).toEqual({ kind: 'looking' })
+  })
   it('keeps a name containing a colon', () => {
     expect(decodeTarget(encodeTarget({ kind: 'none', name: 'a:b:c' }))).toEqual({ kind: 'none', name: 'a:b:c' })
   })

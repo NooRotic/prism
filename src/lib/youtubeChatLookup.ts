@@ -18,7 +18,7 @@ export function fastYoutubeChatTarget(link: LinkedYoutube, now: number = Date.no
   const last = readLiveLast()
   if (!last || last.checkedAt === null || now - last.checkedAt > FRESH_MS) return null
   const s = last.streams.find((x) => x.channelId === link.channelId)
-  return s ? { kind: 'video', videoId: s.videoId } : null
+  return s ? { kind: 'video', videoId: s.videoId, channelId: link.channelId } : null
 }
 
 export async function findYoutubeChatTarget(link: LinkedYoutube, now: number = Date.now()): Promise<YoutubeChatTarget> {
@@ -28,5 +28,5 @@ export async function findYoutubeChatTarget(link: LinkedYoutube, now: number = D
   if (r.status === 'quota') return { kind: 'failed', reason: 'quota' }
   if (r.status === 'error') return { kind: 'failed', reason: 'error' }
   const s = r.streams.find((x) => x.channelId === link.channelId)
-  return s ? { kind: 'video', videoId: s.videoId } : { kind: 'none', name: link.title }
+  return s ? { kind: 'video', videoId: s.videoId, channelId: link.channelId } : { kind: 'none', name: link.title }
 }
