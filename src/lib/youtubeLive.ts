@@ -28,7 +28,8 @@ export type LiveCheckResult = { status: 'ok'; streams: LiveStream[] } | { status
 
 const isQuota = (err: unknown) => err instanceof CatchupApiError && err.status === 403 && err.reason === 'quotaExceeded'
 
-export async function fetchLiveSubscriptions(channels: StoredChannel[]): Promise<LiveCheckResult> {
+/** `avatars: false` skips the channels lookup (one call fewer) for callers that show no avatar. */
+export async function fetchLiveSubscriptions(channels: StoredChannel[], opts: { avatars?: boolean } = {}): Promise<LiveCheckResult> {
   try {
     const titles = new Map(channels.map((c) => [c.id, c.title]))
     let quotaOut = false
@@ -66,7 +67,7 @@ export async function fetchLiveSubscriptions(channels: StoredChannel[]): Promise
     const unique = live.filter((v) => !seen.has(v.snippet.channelId) && seen.add(v.snippet.channelId))
 
     const avatars = new Map<string, string>()
-    const channelIds = unique.map((v) => v.snippet.channelId as string)
+    const channelIds = opts.avatars === false ? [] : unique.map((v) => v.snippet.channelId as string)
     for (let i = 0; i < channelIds.length; i += 50) {
       try {
         const data = await call('channels', { part: 'snippet', id: channelIds.slice(i, i + 50).join(',') })
