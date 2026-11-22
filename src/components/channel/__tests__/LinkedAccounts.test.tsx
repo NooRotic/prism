@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import LinkedAccounts from '../LinkedAccounts'
@@ -40,6 +40,18 @@ describe('LinkedAccounts', () => {
     renderIt()
     expect(screen.getByRole('button', { name: /Link accounts/ })).toBeInTheDocument()
     expect(screen.queryByText(/Also on/)).not.toBeInTheDocument()
+  })
+
+  it('draws the eye to Link accounts as a PRISM feature: a spectrum-outlined button with the line-art prism, not plain text', () => {
+    renderIt()
+    const button = screen.getByRole('button', { name: /Link accounts/ })
+    expect(button.querySelector('[data-prism-mark="icon"]')).not.toBeNull()
+    expect(button.parentElement).toHaveClass('prism-pill')
+    // The same on a channel that is already linked (Edit links), so the feature stays easy to find.
+    act(() => saveLink({ twitch: 'mrbeast', youtube: { channelId: channel.channelId, title: 'Mr Beast', handle: '@MrBeast' }, confirmed: true, linkedAt: 1 }))
+    const edit = screen.getByRole('button', { name: /Edit links/ })
+    expect(edit.querySelector('[data-prism-mark="icon"]')).not.toBeNull()
+    expect(edit.parentElement).toHaveClass('prism-pill')
   })
 
   it('links a YouTube channel and marks it confirmed when both bios name each other', async () => {

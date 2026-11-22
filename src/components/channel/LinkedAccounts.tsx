@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Link2 } from 'lucide-react'
+import { PrismMark } from '../brand/PrismMark'
 import { useLinkedAccount } from '../../hooks/useLinkedAccount'
 import { useLinkSuggestion } from '../../hooks/useLinkSuggestion'
 import LinkAccountsModal from './LinkAccountsModal'
@@ -41,15 +41,19 @@ export default function LinkedAccounts({ login, description }: { login: string; 
         </div>
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="flex items-center gap-1.5 text-xs cursor-pointer"
-          style={{ color: 'var(--text-muted)', background: 'none', border: 'none' }}
-        >
-          <Link2 size={12} />
-          {link ? 'Edit links' : 'Link accounts'}
-        </button>
+        {/* A PRISM feature, so it is drawn like one: the line-art prism and a spectrum outline (which moves on hover),
+            not muted text that reads as part of the bio. */}
+        <span className="prism-pill rounded-full p-[1.5px] inline-flex">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="flex items-center gap-2 rounded-full pl-1.5 pr-3 py-0.5 text-sm font-semibold cursor-pointer"
+            style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: 'none' }}
+          >
+            <PrismMark variant="icon" className="h-5 w-10 shrink-0" />
+            {link ? 'Edit links' : 'Link accounts'}
+          </button>
+        </span>
         {/* A YouTube channel with the same name as this Twitch channel: offered, never assumed. Opens the modal with it filled in, so the usual check runs. */}
         {!link && suggestion.status === 'suggest' && suggestion.channel && (
           <span className="inline-flex items-center gap-1 text-xs">
