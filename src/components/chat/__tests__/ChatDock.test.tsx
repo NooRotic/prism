@@ -172,7 +172,7 @@ describe('ChatDock', () => {
 
   it('hands the channel to the pop-out hook', () => {
     renderDock()
-    expect(useChatPopout).toHaveBeenCalledWith('streamer')
+    expect(useChatPopout).toHaveBeenCalledWith('streamer', undefined, 'twitch')
   })
 
   it('the Pop out chat button calls open', () => {

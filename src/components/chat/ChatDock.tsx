@@ -24,6 +24,7 @@ import { fillScopeFor } from './fillMode'
 import { useFloatingVideo } from './floatingVideoContext'
 import { useChatPlacement } from './useChatPlacement'
 import { useChatPopout } from './useChatPopout'
+import type { ChatKind } from '../../lib/chatPopout'
 import { useChatScale } from './useChatScale'
 import { useDockDrag } from './useDockDrag'
 import { useFillMode } from './useFillMode'
@@ -69,6 +70,8 @@ interface ChatDockProps {
   channel: string | undefined
   /** The player, rendered inside the wrapper this dock sizes. */
   player: ReactNode
+  /** Whose chat this is: a Twitch login (default), or for YouTube the encoded target (see youtubeChatTarget). */
+  kind?: ChatKind
 }
 
 /**
@@ -80,12 +83,13 @@ interface ChatDockProps {
  * and the chat takes over the row. The chat keeps its place in the tree through
  * that change, so its iframe is never reloaded.
  */
-export default function ChatDock({ channel, player }: ChatDockProps) {
+export default function ChatDock({ channel, player, kind = 'twitch' }: ChatDockProps) {
   const { placement, hide, show, setSide, swapSide } = useChatPlacement()
   const { side, hidden } = placement
   const { handleProps: dragHandleProps } = useDockDrag(setSide)
-  const popout = useChatPopout(channel)
-  const youtubeChat = useYoutubeChatPopout(channel)
+  const popout = useChatPopout(channel, undefined, kind)
+  // The linked streamer's YouTube chat button belongs to a Twitch chat only.
+  const youtubeChat = useYoutubeChatPopout(kind === 'twitch' ? channel : undefined)
   const chatScale = useChatScale()
   // What the viewer sees: popped out, else hidden, else docked on `side`.
   const chatVisible = !hidden && !popout.isOpen
@@ -276,7 +280,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
               <div className="flex-1 min-h-0">
                 {channel ? (
                   <ScaledChat scale={chatScale.scale}>
-                    <ChatSource channel={channel} />
+                    <ChatSource channel={channel} kind={kind} />
                   </ScaledChat>
                 ) : (
                   <div
@@ -368,7 +372,7 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
                 <div className="absolute inset-0">
                   {channel ? (
                     <ScaledChat scale={chatScale.scale}>
-                      <ChatSource channel={channel} />
+                      <ChatSource channel={channel} kind={kind} />
                     </ScaledChat>
                   ) : (
                     <div
