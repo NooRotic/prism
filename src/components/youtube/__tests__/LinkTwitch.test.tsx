@@ -42,6 +42,16 @@ describe('LinkTwitch', () => {
     expect(screen.queryByText(/Possibly/)).not.toBeInTheDocument()
   })
 
+  it('gives focus to the main button when the suggestion that opened the box is gone (the link got saved)', () => {
+    renderIt('twitch.tv/foo_bar')
+    const suggestion = screen.getByRole('button', { name: 'Possibly twitch.tv/foo_bar?' })
+    suggestion.focus()
+    fireEvent.click(suggestion)
+    act(() => saveLink({ twitch: 'foo_bar', youtube: { channelId: CH, title: 'Foo' }, confirmed: false, linkedAt: 1 }))
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: /Edit links/ })).toHaveFocus()
+  })
+
   it('suggests nothing when the description names no Twitch channel', () => {
     renderIt('twitch.tv/videos/123 and youtube.com/@x')
     expect(screen.queryByText(/Possibly/)).not.toBeInTheDocument()

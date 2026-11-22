@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { useRef, useState } from 'react'
+import { useRef, useState, type RefObject } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { useDialogFocus } from '../useDialogFocus'
 
@@ -82,4 +82,57 @@ describe('useDialogFocus', () => {
     fireEvent.keyDown(screen.getByLabelText('First'), { key: 'Escape', isComposing: true })
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it('falls back to a given button when the opener has left the page, or was never focused (Safari)', () => {
+    const { unmount } = render(<Fallback startFromBody={false} />)
+    const suggestion = screen.getByRole('button', { name: 'Suggestion' })
+    suggestion.focus()
+    fireEvent.click(suggestion)
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Main' })).toHaveFocus()
+    unmount()
+
+    render(<Fallback startFromBody />)
+    fireEvent.click(screen.getByRole('button', { name: 'Suggestion' }))
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Main' })).toHaveFocus()
+  })
 })
+
+function SaveBox({ onClose, onSave, fallback }: { onClose: () => void; onSave: () => void; fallback: RefObject<HTMLButtonElement | null> }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useDialogFocus(ref, onClose, fallback)
+  return (
+    <div ref={ref} role="dialog" aria-label="Box">
+      <button type="button" onClick={onSave}>
+        Save
+      </button>
+    </div>
+  )
+}
+
+function Fallback({ startFromBody }: { startFromBody: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [offer, setOffer] = useState(true)
+  const main = useRef<HTMLButtonElement>(null)
+  return (
+    <>
+      <button ref={main} type="button">
+        Main
+      </button>
+      {offer && (
+        <button
+          type="button"
+          onClick={() => {
+            if (startFromBody) (document.activeElement as HTMLElement | null)?.blur()
+            setOpen(true)
+          }}
+        >
+          Suggestion
+        </button>
+      )}
+      {open && <SaveBox onClose={() => setOpen(false)} onSave={() => setOffer(false)} fallback={main} />}
+    </>
+  )
+}

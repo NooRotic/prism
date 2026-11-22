@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { useDialogFocus } from '../../hooks/useDialogFocus'
 import { isMutual } from '../../lib/accountBios'
@@ -8,6 +8,8 @@ import { getUserInfo, SessionExpiredError } from '../../lib/twitchApi'
 import { fetchYoutubeChannel } from '../../lib/youtubeChannelApi'
 
 interface LinkTwitchModalProps {
+  /** Where focus goes on close when the button that opened the box is gone (see useDialogFocus). */
+  returnFocusRef?: RefObject<HTMLElement | null>
   /** The YouTube channel being linked (the video's channel). */
   channelId: string
   /** Its name as the page shows it; also the saved title when YouTube cannot be asked. */
@@ -25,9 +27,9 @@ const SIGN_IN = 'Sign in to Twitch to link this channel.'
  * channel (so a sign-in is needed: Twitch answers no lookup without one); this YouTube channel's description is read
  * (1 unit) so a link both bios name is saved as confirmed. A failed YouTube lookup still saves, as the viewer's claim.
  */
-export default function LinkTwitchModal({ channelId, channelTitle, suggested, onClose }: LinkTwitchModalProps) {
+export default function LinkTwitchModal({ channelId, channelTitle, suggested, onClose, returnFocusRef }: LinkTwitchModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
-  useDialogFocus(dialogRef, onClose)
+  useDialogFocus(dialogRef, onClose, returnFocusRef)
   const { isAuthenticated, login, handleAuthError } = useTwitchAuth()
   /** False once the box is closed: a lookup that finishes after Cancel must not save. */
   const alive = useRef(true)

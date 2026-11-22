@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PrismMark } from '../brand/PrismMark'
 import { useLinkedAccount } from '../../hooks/useLinkedAccount'
@@ -13,6 +13,7 @@ const chipStyle = { background: 'var(--bg-card-hover)', color: 'var(--text-prima
 /** "Also on YouTube / Kick" for a Twitch channel, and the button that opens the "Link accounts" modal. */
 export default function LinkedAccounts({ login, description }: { login: string; description: string }) {
   const [open, setOpen] = useState(false)
+  const mainRef = useRef<HTMLButtonElement>(null)
   const link = useLinkedAccount(login)
   const suggestion = useLinkSuggestion(login, description)
 
@@ -45,6 +46,7 @@ export default function LinkedAccounts({ login, description }: { login: string; 
             not muted text that reads as part of the bio. */}
         <span className="prism-pill rounded-full p-[1.5px] inline-flex">
           <button
+            ref={mainRef}
             type="button"
             onClick={() => setOpen(true)}
             className="flex items-center gap-2 rounded-full pl-1.5 pr-3 py-0.5 text-sm font-semibold cursor-pointer"
@@ -72,7 +74,7 @@ export default function LinkedAccounts({ login, description }: { login: string; 
           </span>
         )}
       </div>
-      {open && <LinkAccountsModal login={login} description={description} suggested={suggestion.channel?.handle || suggestion.channel?.title} onClose={() => setOpen(false)} />}
+      {open && <LinkAccountsModal login={login} description={description} suggested={suggestion.channel?.handle || suggestion.channel?.title} onClose={() => setOpen(false)} returnFocusRef={mainRef} />}
     </div>
   )
 }
