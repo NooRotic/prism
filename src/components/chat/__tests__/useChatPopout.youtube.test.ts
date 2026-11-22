@@ -32,6 +32,16 @@ describe('useChatPopout for the YouTube chat', () => {
     )
   })
 
+  it('ignores a click event passed straight from onClick (only a string overrides the channel)', () => {
+    const { result } = setup('v:abcdefghijk')
+    ;(result.current.open as (x: unknown) => void)({ type: 'click', target: {} })
+    expect(openSpy).toHaveBeenCalledWith(
+      `/chat-youtube/v%3Aabcdefghijk?owner=${encodeURIComponent(tabId)}`,
+      'prism-chat-popout-youtube',
+      expect.any(String),
+    )
+  })
+
   it('re-sends the current target when the window says hello with an older one', () => {
     const { result, rerender, posted, deliver } = setup('looking')
     result.current.open()
