@@ -75,6 +75,29 @@ export function saveLink(record: LinkRecord): void {
   write([{ ...record, twitch }, ...getLinks().filter((l) => l.twitch !== twitch)].slice(0, MAX_LINKS))
 }
 
+/** Twitch channels whose suggested same-name YouTube channel the viewer rejected ("not them"). */
+function dismissed(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOCAL_LINK_DISMISSED) ?? '[]')
+    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function isDismissed(login: string): boolean {
+  return dismissed().includes(login.toLowerCase())
+}
+
+export function dismissSuggestion(login: string): void {
+  try {
+    const key = login.toLowerCase()
+    localStorage.setItem(STORAGE_KEYS.LOCAL_LINK_DISMISSED, JSON.stringify([key, ...dismissed().filter((l) => l !== key)].slice(0, MAX_LINKS)))
+  } catch {
+    /* storage unavailable: asked again next time */
+  }
+}
+
 export function removeLink(login: string): void {
   const key = login.toLowerCase()
   write(getLinks().filter((l) => l.twitch !== key))

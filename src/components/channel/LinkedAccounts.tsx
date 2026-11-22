@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Link2 } from 'lucide-react'
 import { useLinkedAccount } from '../../hooks/useLinkedAccount'
+import { useLinkSuggestion } from '../../hooks/useLinkSuggestion'
 import LinkAccountsModal from './LinkAccountsModal'
 
 /** PRISM's "latest from <channel>" search for a linked YouTube channel. */
@@ -13,6 +14,7 @@ const chipStyle = { background: 'var(--bg-card-hover)', color: 'var(--text-prima
 export default function LinkedAccounts({ login, description }: { login: string; description: string }) {
   const [open, setOpen] = useState(false)
   const link = useLinkedAccount(login)
+  const suggestion = useLinkSuggestion(login, description)
 
   return (
     <div className="flex flex-col gap-2">
@@ -38,16 +40,35 @@ export default function LinkedAccounts({ login, description }: { login: string; 
           )}
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 self-start text-xs cursor-pointer"
-        style={{ color: 'var(--text-muted)', background: 'none', border: 'none' }}
-      >
-        <Link2 size={12} />
-        {link ? 'Edit links' : 'Link accounts'}
-      </button>
-      {open && <LinkAccountsModal login={login} description={description} onClose={() => setOpen(false)} />}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-1.5 text-xs cursor-pointer"
+          style={{ color: 'var(--text-muted)', background: 'none', border: 'none' }}
+        >
+          <Link2 size={12} />
+          {link ? 'Edit links' : 'Link accounts'}
+        </button>
+        {/* A YouTube channel with the same name as this Twitch channel: offered, never assumed. Opens the modal with it filled in, so the usual check runs. */}
+        {!link && suggestion.status === 'suggest' && suggestion.channel && (
+          <span className="inline-flex items-center gap-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              title="A YouTube channel with the same name. Click to check it and link it."
+              className="cursor-pointer underline"
+              style={{ color: 'var(--accent-youtube)', background: 'none', border: 'none' }}
+            >
+              Possibly &quot;{suggestion.channel.handle || suggestion.channel.title}&quot;?
+            </button>
+            <button type="button" aria-label="Not them" title="Not them" onClick={suggestion.dismiss} className="cursor-pointer" style={{ color: 'var(--text-muted)', background: 'none', border: 'none' }}>
+              ×
+            </button>
+          </span>
+        )}
+      </div>
+      {open && <LinkAccountsModal login={login} description={description} suggested={suggestion.channel?.handle || suggestion.channel?.title} onClose={() => setOpen(false)} />}
     </div>
   )
 }

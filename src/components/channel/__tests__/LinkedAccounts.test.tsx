@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import LinkedAccounts from '../LinkedAccounts'
 import { fetchYoutubeChannel } from '../../../lib/youtubeChannelApi'
-import { findByTwitch, saveLink } from '../../../lib/linkedAccounts'
+import { dismissSuggestion, findByTwitch, isDismissed, saveLink } from '../../../lib/linkedAccounts'
 
 vi.mock('../../../lib/youtubeChannelApi', () => ({ fetchYoutubeChannel: vi.fn() }))
 vi.mock('../../../lib/youtubeApi', () => ({ isYouTubeApiAvailable: () => true }))
@@ -16,7 +16,9 @@ const channel = {
   thumbnail: '',
 }
 
-function renderIt(description = 'Videos at youtube.com/@MrBeast') {
+function renderIt(description = 'Videos at youtube.com/@MrBeast', { suggest = false } = {}) {
+  // These tests are about the modal: keep the automatic same-name lookup out of them unless a test asks for it.
+  if (!suggest) dismissSuggestion('mrbeast')
   return render(
     <MemoryRouter>
       <LinkedAccounts login="MrBeast" description={description} />
@@ -128,5 +130,47 @@ describe('LinkedAccounts', () => {
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(findByTwitch('mrbeast')).toBeNull()
+  })
+})
+
+describe('LinkedAccounts: a same-name YouTube channel', () => {
+  const same = { ...channel, title: 'Mr Beast', handle: '@MrBeast', description: 'I love fighting games!' }
+
+  it('offers it as a Possibly link next to Link accounts, which opens the modal with it filled in', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel: same })
+    renderIt('no links', { suggest: true })
+    const possibly = await screen.findByRole('button', { name: 'Possibly "@MrBeast"?' })
+    expect(fetchYoutubeChannel).toHaveBeenCalledWith({ handle: 'MrBeast' })
+    fireEvent.click(possibly)
+    expect((within(dialog()).getByLabelText(/YouTube/) as HTMLInputElement).value).toBe('@MrBeast')
+    save()
+    await waitFor(() => expect(findByTwitch('mrbeast')).toMatchObject({ confirmed: false }))
+    expect(screen.queryByRole('button', { name: /Possibly/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /YouTube/ })).toBeInTheDocument()
+  })
+
+  it('remembers "Not them" (the x) and stops offering it', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel: same })
+    renderIt('no links', { suggest: true })
+    await screen.findByRole('button', { name: /Possibly/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Not them' }))
+    expect(screen.queryByRole('button', { name: /Possibly/ })).not.toBeInTheDocument()
+    expect(isDismissed('mrbeast')).toBe(true)
+    expect(findByTwitch('mrbeast')).toBeNull()
+  })
+
+  it('links it by itself, as confirmed, when both bios name each other', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel: { ...same, description: 'also at twitch.tv/mrbeast' } })
+    renderIt('Videos at youtube.com/@MrBeast', { suggest: true })
+    await waitFor(() => expect(findByTwitch('mrbeast')?.confirmed).toBe(true))
+    expect(screen.queryByRole('button', { name: /Possibly/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/confirmed/i)).toBeInTheDocument()
+  })
+
+  it('says nothing when there is no same-name channel', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'notfound' })
+    renderIt('no links', { suggest: true })
+    await waitFor(() => expect(fetchYoutubeChannel).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: /Possibly/ })).not.toBeInTheDocument()
   })
 })
