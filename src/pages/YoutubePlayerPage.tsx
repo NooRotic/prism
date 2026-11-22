@@ -151,7 +151,8 @@ export default function YoutubePlayerPage() {
             player={activeTopic ? <TopicVideos key={activeTopic} topic={activeTopic} onReplay={replay} /> : playerOrLoading}
           />
         </div>
-        <div className="flex flex-col gap-5 w-full max-w-5xl mx-auto px-4 md:px-6">{below}</div>
+        {/* Hidden (not unmounted) while the dock fills the window, so nothing scrolls or takes focus behind it. */}
+        <div className="fill-hide flex flex-col gap-5 w-full max-w-5xl mx-auto px-4 md:px-6">{below}</div>
       </div>
     )
   }

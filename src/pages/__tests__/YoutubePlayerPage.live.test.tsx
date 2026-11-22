@@ -112,6 +112,12 @@ describe('YoutubePlayerPage on a live video', () => {
     expect(screen.queryByRole('button', { name: 'Pop out video' })).not.toBeInTheDocument()
   })
 
+  it('hides everything under the dock in fill mode, as the Twitch page does', () => {
+    live()
+    renderPage()
+    expect(screen.getByRole('heading', { name: 'A title' }).closest('.fill-hide')).not.toBeNull()
+  })
+
   it('sends a bare video target when the channel is not known', () => {
     live({ channelId: '' })
     renderPage()
