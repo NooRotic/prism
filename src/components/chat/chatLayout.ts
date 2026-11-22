@@ -23,12 +23,11 @@ export function loadRatio(): number {
 /** Used when the page does not define `--header-height`. Matches the value in index.css. */
 const HEADER_HEIGHT_FALLBACK_PX = 56
 
-/** The chat height the viewer dragged to while the video floats, in px; 0 means the default. */
-export function loadFloatingHeight(): number {
+function loadHeight(key: string): number {
   if (typeof localStorage === 'undefined') return 0
   let stored: string | null
   try {
-    stored = localStorage.getItem(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT)
+    stored = localStorage.getItem(key)
   } catch {
     return 0
   }
@@ -36,14 +35,33 @@ export function loadFloatingHeight(): number {
   return Number.isFinite(val) && val > 0 ? val : 0
 }
 
-/** Remembers the dragged height. 0 (the default) removes the entry rather than storing it. */
-export function storeFloatingHeight(px: number): void {
+function storeHeight(key: string, px: number): void {
   try {
-    if (px > 0) localStorage.setItem(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT, String(Math.round(px)))
-    else localStorage.removeItem(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT)
+    if (px > 0) localStorage.setItem(key, String(Math.round(px)))
+    else localStorage.removeItem(key)
   } catch {
     // storage full or unavailable — the height still holds for this session
   }
+}
+
+/** The chat height the viewer dragged to while the video floats, in px; 0 means the default. */
+export function loadFloatingHeight(): number {
+  return loadHeight(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT)
+}
+
+/** Remembers the dragged height. 0 (the default) removes the entry rather than storing it. */
+export function storeFloatingHeight(px: number): void {
+  storeHeight(STORAGE_KEYS.LOCAL_CHAT_FLOAT_HEIGHT, px)
+}
+
+/** The height the viewer dragged the video-and-chat row to with both on the page, in px; 0 means the default. */
+export function loadRowHeight(): number {
+  return loadHeight(STORAGE_KEYS.LOCAL_ROW_HEIGHT)
+}
+
+/** Remembers the dragged row height. 0 (the default) removes the entry rather than storing it. */
+export function storeRowHeight(px: number): void {
+  storeHeight(STORAGE_KEYS.LOCAL_ROW_HEIGHT, px)
 }
 
 /** The most the chat can grow to: the window below the header, in px. */

@@ -10,14 +10,15 @@ import FloatingPanel from './FloatingPanel'
 import LandscapeChatHandle from './LandscapeChatHandle'
 import ScaledChat from './ScaledChat'
 import {
-  availableChatHeight,
   floatingHeightCss,
   loadFloatingHeight,
   loadRatio,
-  nextFloatingHeight,
+  loadRowHeight,
   nextRatio,
   storeFloatingHeight,
+  storeRowHeight,
 } from './chatLayout'
+import { useHeightDrag } from './useHeightDrag'
 import { fillScopeFor } from './fillMode'
 import { useFloatingVideo } from './floatingVideoContext'
 import { useChatPlacement } from './useChatPlacement'
@@ -62,18 +63,6 @@ const ROW_FLOATING = 'relative'
 // class of its own so that taking it off leaves the row at its ordinary `min-h-[360px]`.
 const ROW_TALLER = 'md:min-h-(--chat-floating-height)'
 const FLOATING_HEIGHT_VAR = '--chat-floating-height'
-
-/**
- * The row's height with the dragged minimum taken off, which is where a drag has to stop
- * counting as "taller". Reading it forces one layout, at the start of a drag.
- */
-function measureDefaultHeight(row: HTMLElement): number {
-  const hadClass = row.classList.contains(ROW_TALLER)
-  if (hadClass) row.classList.remove(ROW_TALLER)
-  const height = row.offsetHeight
-  if (hadClass) row.classList.add(ROW_TALLER)
-  return height
-}
 
 interface ChatDockProps {
   channel: string | undefined
@@ -168,35 +157,15 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
     })
   }, [])
 
-  // Chat height while the video floats: 0 is the default, which the viewer can only exceed.
-  // The bar is for the chat laid over the row in place, so not in fill mode or fullscreen,
-  // where the chat already fills the window.
+  // Two dragged heights, one for each case, remembered apart:
+  //  - the video floats: the chat is laid over the row in place and the bar sits along the chat's bottom edge;
+  //  - both on the page: one bar under the whole row, and the video and the chat grow together.
+  // Neither bar is offered in fill mode or fullscreen, where the dock already fills the window.
   const floatingInPlace = floatingWithChat && scope === null
-  const [floatHeight, setFloatHeight] = useState(loadFloatingHeight)
-  // The drag in progress, kept here rather than read back from the page on every move: a
-  // move can arrive before the last one has been drawn.
-  const heightDrag = useRef<{ height: number; defaultHeight: number } | null>(null)
-
-  const handleHeightResize = useCallback((deltaY: number) => {
-    const row = containerRef.current
-    if (!row) return
-    if (!heightDrag.current) {
-      heightDrag.current = { height: row.offsetHeight, defaultHeight: measureDefaultHeight(row) }
-    }
-    const drag = heightDrag.current
-    drag.height = nextFloatingHeight(drag.height, deltaY, availableChatHeight())
-    setFloatHeight(drag.height)
-  }, [])
-
-  const handleHeightResizeEnd = useCallback(() => {
-    const drag = heightDrag.current
-    heightDrag.current = null
-    if (!drag) return
-    // At or below the default there is nothing to remember: the default is the floor.
-    const kept = drag.height > drag.defaultHeight + 1 ? drag.height : 0
-    setFloatHeight(kept)
-    storeFloatingHeight(kept)
-  }, [])
+  const rowResizable = !floating && chatVisible && scope === null && !landscapeLayout
+  const floatDrag = useHeightDrag(containerRef, ROW_TALLER, loadFloatingHeight, storeFloatingHeight)
+  const rowDrag = useHeightDrag(containerRef, ROW_TALLER, loadRowHeight, storeRowHeight)
+  const draggedHeight = floatingInPlace ? floatDrag.height : rowResizable ? rowDrag.height : 0
 
   const playerPercent = `${(playerRatio * 100).toFixed(1)}%`
   const chatPercent = `${((1 - playerRatio) * 100).toFixed(1)}%`
@@ -213,12 +182,10 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
   const baseRowClass =
     scope === 'all' ? ROW_FILL_ALL : scope === 'md' ? `${ROW_NORMAL} ${ROW_FILL_MD}` : ROW_NORMAL
   // A fill row is already positioned (fixed); only an ordinary row needs `relative`.
-  const taller = floatingInPlace && floatHeight > 0
-  const rowClass = !floatingInPlace
-    ? baseRowClass
-    : `${baseRowClass} ${ROW_FLOATING}${taller ? ` ${ROW_TALLER}` : ''}`
+  const taller = draggedHeight > 0
+  const rowClass = `${baseRowClass}${floatingInPlace ? ` ${ROW_FLOATING}` : ''}${taller ? ` ${ROW_TALLER}` : ''}`
   const rowStyle = taller
-    ? ({ [FLOATING_HEIGHT_VAR]: floatingHeightCss(floatHeight) } as CSSProperties)
+    ? ({ [FLOATING_HEIGHT_VAR]: floatingHeightCss(draggedHeight) } as CSSProperties)
     : undefined
   const basePlayerClass =
     scope === 'all'
@@ -416,8 +383,8 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
                   <ResizableHandle
                     direction="vertical"
                     label="Resize chat height"
-                    onResize={handleHeightResize}
-                    onResizeEnd={handleHeightResizeEnd}
+                    onResize={floatDrag.onResize}
+                    onResizeEnd={floatDrag.onResizeEnd}
                   />
                 </div>
               )}
@@ -425,6 +392,18 @@ export default function ChatDock({ channel, player }: ChatDockProps) {
           </>
         )}
       </div>
+      {/* Under the whole row, video and chat: drag down and both grow with it. It never covers the player. */}
+      {rowResizable && (
+        <div className="hidden md:flex w-full max-w-[1600px] mx-auto">
+          <ResizableHandle
+            direction="vertical"
+            thickness={14}
+            label="Resize video and chat height"
+            onResize={rowDrag.onResize}
+            onResizeEnd={rowDrag.onResizeEnd}
+          />
+        </div>
+      )}
     </>
   )
 }

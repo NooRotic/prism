@@ -51,6 +51,8 @@ export const STORAGE_KEYS = {
   LOCAL_LINK_DISMISSED: 'prism_link_dismissed',
   /** "Also on YouTube / Kick": the viewer's linked creator accounts (JSON array of link records, newest first). */
   LOCAL_LINKED_ACCOUNTS: 'prism_linked_accounts',
+  /** Height in px the viewer dragged the video-and-chat row to with both on the page; absent means the default height. */
+  LOCAL_ROW_HEIGHT: 'prism_row_height',
   /** Channel rail edge: 'left' or 'right'. */
   LOCAL_RAIL_POSITION: 'prism_rail_position',
   /** Chat dock state: JSON `{ side: 'left' | 'right', hidden: boolean }`. */
