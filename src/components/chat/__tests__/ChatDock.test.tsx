@@ -698,7 +698,7 @@ describe('ChatDock', () => {
         throw new DOMException('QuotaExceededError')
       })
 
-      expect(() => fireEvent.pointerUp(screen.getByRole('separator'))).not.toThrow()
+      expect(() => fireEvent.pointerUp(screen.getAllByRole('separator').find((el) => el.getAttribute('aria-orientation') === 'vertical')!)).not.toThrow()
 
       spy.mockRestore()
     })
