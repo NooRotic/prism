@@ -106,7 +106,8 @@ export function useChatPopout(
   }, [channel, isOpen, tabId])
 
   const open = useCallback((channelOverride?: string) => {
-    const target = channelOverride ?? channel
+    // Buttons pass `open` straight to onClick, which hands it the click event: only a string overrides.
+    const target = typeof channelOverride === 'string' ? channelOverride : channel
     if (!target) return
     // Must run inside the click handler, or popup blockers refuse it. No
     // `noopener`: it would make this return null and lose the handle.
