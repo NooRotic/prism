@@ -42,7 +42,9 @@ export function useYoutubeChatPopout(twitchLogin: string | undefined) {
     return true
   }, [])
 
-  const popout = useChatPopout(target, undefined, 'youtube', onWindowHello)
+  // With no Twitch login (a YouTube page's own dock) this hook is switched off: no target means it never answers or
+  // steers the YouTube chat window, which the page's dock owns.
+  const popout = useChatPopout(login ? target : undefined, undefined, 'youtube', onWindowHello)
 
   const lookUp = useCallback((forKey: string, forLink: LinkedYoutube) => {
     requestedRef.current = forKey

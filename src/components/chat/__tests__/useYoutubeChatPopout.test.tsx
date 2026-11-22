@@ -106,6 +106,14 @@ describe('useYoutubeChatPopout', () => {
     expect(setChannels().at(-1)).toBe('v:bbbbbbbbbbb@UC1')
   })
 
+  it('switched off (no Twitch login, as in a YouTube dock) it never answers the YouTube window', async () => {
+    renderHook(() => useYoutubeChatPopout(undefined))
+    fromWindow({ type: 'hello', channel: 'v:abcdefghijk@UC1' })
+    await act(async () => {})
+    expect(setChannels()).toEqual([])
+    expect(findYoutubeChatTarget).not.toHaveBeenCalled()
+  })
+
   it('looks nothing up while closed', async () => {
     link('a', 'UCa', 'A on YT')
     link('b', 'UCb', 'B on YT')
