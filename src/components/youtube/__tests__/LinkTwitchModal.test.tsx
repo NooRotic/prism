@@ -61,6 +61,13 @@ describe('LinkTwitchModal', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('closes with Escape even when focus has left the box', () => {
+    renderIt()
+    ;(document.activeElement as HTMLElement).blur()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('starts with the suggested name, titled for this YouTube channel', () => {
     renderIt({ suggested: 'foo_bar' })
     expect(within(dialog()).getByText('Link Twitch for Foo on YouTube')).toBeInTheDocument()
@@ -92,6 +99,15 @@ describe('LinkTwitchModal', () => {
     save()
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent('No Twitch channel found for that name.')
     expect(findByYoutube(CH)).toBeNull()
+  })
+
+  it('reads a name Twitch refuses as malformed (400) as no such channel', async () => {
+    vi.mocked(getUserInfo).mockRejectedValue(new Error('Twitch API error: 400 Invalid login names'))
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue(ytChannel(''))
+    renderIt()
+    fill('_foo')
+    save()
+    expect(await within(dialog()).findByRole('alert')).toHaveTextContent('No Twitch channel found for that name.')
   })
 
   it('tells a Twitch outage apart from a missing channel', async () => {

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useDialogFocus } from '../../hooks/useDialogFocus'
 import { isMutual } from '../../lib/accountBios'
 import { findByTwitch, removeLink, saveLink } from '../../lib/linkedAccounts'
 import { parseAccountLink } from '../../lib/parseAccountLink'
@@ -23,6 +24,8 @@ const inputStyle = { backgroundColor: 'var(--bg)', border: '1px solid var(--bord
  * needs a server-held token), so it is always the viewer's own. Nothing leaves this browser.
  */
 export default function LinkAccountsModal({ login, description, onClose, suggested }: LinkAccountsModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, onClose)
   const existing = findByTwitch(login)
   const [ytText, setYtText] = useState(existing?.youtube ? existing.youtube.handle || existing.youtube.channelId : (suggested ?? ''))
   const [kickText, setKickText] = useState(existing?.kick ? `kick.com/${existing.kick.slug}` : '')
@@ -74,9 +77,7 @@ export default function LinkAccountsModal({ login, description, onClose, suggest
         role="dialog"
         aria-modal="true"
         aria-label="Link accounts"
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onClose()
-        }}
+        ref={dialogRef}
         className="w-full max-w-md rounded-lg p-5 flex flex-col gap-4"
         style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}
       >

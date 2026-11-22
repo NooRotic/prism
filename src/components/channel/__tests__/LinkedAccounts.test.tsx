@@ -36,6 +36,17 @@ beforeEach(() => {
 })
 
 describe('LinkedAccounts', () => {
+  it('closes the Link accounts box with Escape even when focus has left it, and gives focus back to the button', () => {
+    renderIt()
+    const button = screen.getByRole('button', { name: /Link accounts/ })
+    button.focus()
+    fireEvent.click(button)
+    ;(document.activeElement as HTMLElement).blur()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Link accounts' })).not.toBeInTheDocument()
+    expect(button).toHaveFocus()
+  })
+
   it('offers only the Link accounts button when nothing is linked', () => {
     renderIt()
     expect(screen.getByRole('button', { name: /Link accounts/ })).toBeInTheDocument()
