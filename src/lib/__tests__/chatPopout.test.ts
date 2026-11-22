@@ -7,6 +7,7 @@ import {
   getTabId,
   loadBounds,
   saveBounds,
+  popoutNames,
 } from '../chatPopout'
 import type { PopoutMessage } from '../chatPopout'
 import { STORAGE_KEYS } from '../../config/storageKeys'
@@ -245,5 +246,34 @@ describe('createPopoutBus', () => {
     expect(() => unsubscribe()).not.toThrow()
     expect(() => bus.close()).not.toThrow()
     expect(cb).not.toHaveBeenCalled()
+  })
+})
+
+describe('per-platform pop-out names', () => {
+  it('keeps the Twitch names exactly as they were', () => {
+    expect(popoutNames('twitch')).toEqual({
+      windowName: 'prism-chat-popout',
+      busName: 'prism-chat-popout',
+      boundsKey: 'prism_chat_popout_bounds',
+      path: '/chat',
+    })
+  })
+  it('gives YouTube its own', () => {
+    expect(popoutNames('youtube')).toEqual({
+      windowName: 'prism-chat-popout-youtube',
+      busName: 'prism-chat-popout-youtube',
+      boundsKey: 'prism_youtube_chat_popout_bounds',
+      path: '/chat-youtube',
+    })
+  })
+  it('builds the YouTube window address', () => {
+    expect(buildPopoutUrl('v:abcdefghijk', 't1', 'youtube')).toBe('/chat-youtube/v%3Aabcdefghijk?owner=t1')
+    expect(buildPopoutUrl('somebody', 't1')).toBe('/chat/somebody?owner=t1')
+  })
+  it('remembers each window in its own place', () => {
+    localStorage.clear()
+    saveBounds({ width: 300, height: 500, left: 10, top: 20 }, 'youtube')
+    expect(loadBounds('twitch')).toBeNull()
+    expect(loadBounds('youtube')).toEqual({ width: 300, height: 500, left: 10, top: 20 })
   })
 })
