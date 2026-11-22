@@ -335,3 +335,59 @@ html.counted .counted-note {
     transition-duration: 1ms;
   }
 }
+
+/* The PRISM spectrum: a slowly moving rainbow marking a confirmed link between a creator's accounts. It is neither
+   Twitch purple nor YouTube red on purpose. The gradient ends on its first colour so the loop has no seam. */
+:root {
+  --prism-gradient: linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe14d, #4dff88, #4dc3ff, #9a6bff, #ff4dd2, #ff4d4d);
+}
+.prism-spectrum {
+  background-image: var(--prism-gradient);
+  background-size: 200% 100%;
+  animation: prism-shift 8s linear infinite;
+  box-shadow:
+    0 0 14px rgba(154, 107, 255, 0.45),
+    0 0 34px rgba(77, 195, 255, 0.25),
+    0 0 56px rgba(255, 77, 210, 0.15);
+}
+@keyframes prism-shift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prism-spectrum {
+    animation: none;
+  }
+}
+
+/* The confirmed bar's own background: the card colour over a faint, slowly moving spectrum. */
+.prism-tint {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--bg-card) 90%, transparent), color-mix(in srgb, var(--bg-card) 90%, transparent)),
+    var(--prism-gradient);
+  background-size:
+    100% 100%,
+    200% 100%;
+  animation: prism-tint-shift 8s linear infinite;
+}
+@keyframes prism-tint-shift {
+  from {
+    background-position:
+      0 0,
+      0 0;
+  }
+  to {
+    background-position:
+      0 0,
+      -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prism-tint {
+    animation: none;
+  }
+}
