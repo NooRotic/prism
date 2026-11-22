@@ -4,46 +4,45 @@ import { getSubscriptions } from '../lib/catchupStore'
 import { isYouTubeApiAvailable } from '../lib/youtubeApi'
 import { fetchLiveSubscriptions, type LiveStream } from '../lib/youtubeLive'
 import { checkAllowed, recordCheck, type CheckAllowance } from '../lib/youtubeLiveBudget'
+import { readLiveLast, subscribeLiveLast, writeLiveLast, type LiveLast } from '../lib/youtubeLiveStore'
 import { isQuotaReached } from '../lib/youtubeQuota'
 import { useYoutubeAccount } from './useYoutubeAccount'
 import { useYoutubeQuotaReached } from './useYoutubeQuota'
 
 export type LiveStatus = 'idle' | 'checking' | 'ok' | 'quota' | 'error'
 
-interface Last {
-  checkedAt: number
-  streams: LiveStream[]
-}
+let autoDoneFallback = false
 
-function readLast(): Last | null {
+/** Whether this tab's visit already had its automatic check. Per tab and kept over a reload (sessionStorage). */
+function autoCheckDone(): boolean {
   try {
-    const v = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOCAL_YOUTUBE_LIVE_LAST) ?? 'null')
-    if (v && typeof v.checkedAt === 'number' && Array.isArray(v.streams)) return v as Last
+    return sessionStorage.getItem(STORAGE_KEYS.SESSION_YOUTUBE_LIVE_AUTO) !== null
   } catch {
-    /* damaged: no last answer */
+    return autoDoneFallback
   }
-  return null
 }
 
-function writeLast(last: Last): void {
+function markAutoCheckDone(): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.LOCAL_YOUTUBE_LIVE_LAST, JSON.stringify(last))
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_YOUTUBE_LIVE_AUTO, '1')
   } catch {
-    /* storage unavailable: the answer just is not remembered */
+    autoDoneFallback = true // storage unavailable: the module flag holds it for this page
   }
 }
 
 /**
- * The rail's YouTube "Check live". Strictly viewer-initiated: nothing runs on mount or on a timer. A check costs about one
- * unit per subscription, so it is limited per browser (see youtubeLiveBudget); the last answer is kept with its age.
+ * The rail's YouTube "Check live". The first check of a visit (a tab; a reload is the same visit) runs on its own, within
+ * the same allowance as a click; every later one is the button. Nothing runs on a timer. A check costs about one unit per
+ * subscription, so it is limited per browser (see youtubeLiveBudget); the last answer is kept with its age, and the
+ * player page adds or drops a stream it sees (youtubeLiveStore), which this follows.
  */
 export function useYoutubeLive() {
   const { subscriptionCount } = useYoutubeAccount()
   const quotaReached = useYoutubeQuotaReached()
   const available = isYouTubeApiAvailable() && subscriptionCount > 0
 
-  const [last, setLast] = useState<Last | null>(readLast)
-  const [status, setStatus] = useState<LiveStatus>(() => (readLast() ? 'ok' : 'idle'))
+  const [last, setLast] = useState<LiveLast | null>(readLiveLast)
+  const [status, setStatus] = useState<LiveStatus>(() => (readLiveLast()?.checkedAt != null ? 'ok' : 'idle'))
   const [now, setNow] = useState(() => Date.now())
   const running = useRef(false)
 
@@ -63,9 +62,7 @@ export function useYoutubeLive() {
     try {
       const result = await fetchLiveSubscriptions(getSubscriptions())
       if (result.status === 'ok') {
-        const next = { checkedAt: Date.now(), streams: result.streams }
-        writeLast(next)
-        setLast(next)
+        writeLiveLast({ checkedAt: Date.now(), streams: result.streams })
         setStatus('ok')
       } else {
         setStatus(result.status)
@@ -75,6 +72,16 @@ export function useYoutubeLive() {
       setNow(Date.now())
     }
   }, [])
+
+  // The store is shared with the player page and other tabs.
+  useEffect(() => subscribeLiveLast(() => setLast(readLiveLast())), [])
+
+  // The first check of this visit runs on its own, once subscriptions are known.
+  useEffect(() => {
+    if (!available || autoCheckDone()) return
+    markAutoCheckDone()
+    void check()
+  }, [available, check])
 
   const allowance: CheckAllowance = checkAllowed(now)
   return {

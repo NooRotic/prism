@@ -81,6 +81,8 @@ export const STORAGE_KEYS = {
   LOCAL_FAVORITE_STREAMS: 'prism_favorite_streams',
   /** Id of this browser tab, so a chat pop-out knows which tab owns it. Survives a reload. */
   SESSION_TAB_ID: 'prism_tab_id',
+  /** Set once the rail's automatic "Check live" has run in this tab's visit. */
+  SESSION_YOUTUBE_LIVE_AUTO: 'prism_youtube_live_auto',
   /** The owner's admin token (identity only, no permissions). Never the viewer token, and gone when the tab closes. */
   SESSION_ADMIN_TOKEN: 'prism_admin_token',
   /** OAuth state nonce for the admin sign-in round trip (always starts with `admin.`). */

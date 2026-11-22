@@ -5,6 +5,7 @@ import { fetchLiveSubscriptions } from '../../lib/youtubeLive'
 import { setSubscriptions } from '../../lib/catchupStore'
 import { markQuotaReached, resetQuotaForTests } from '../../lib/youtubeQuota'
 import { recordCheck } from '../../lib/youtubeLiveBudget'
+import { writeLiveLast } from '../../lib/youtubeLiveStore'
 
 vi.mock('../../lib/youtubeLive', () => ({ fetchLiveSubscriptions: vi.fn() }))
 vi.mock('../../lib/youtubeApi', () => ({ isYouTubeApiAvailable: () => true }))
@@ -14,6 +15,8 @@ const subs = [{ id: 'UC1', title: 'One' }]
 
 beforeEach(() => {
   localStorage.clear()
+  // These tests are about the button: this visit's automatic check has already happened.
+  sessionStorage.setItem('prism_youtube_live_auto', '1')
   resetQuotaForTests()
   vi.mocked(fetchLiveSubscriptions).mockReset()
 })
@@ -25,7 +28,7 @@ describe('useYoutubeLive', () => {
     expect(fetchLiveSubscriptions).not.toHaveBeenCalled()
   })
 
-  it('does nothing until the viewer asks: nothing is fetched on mount', () => {
+  it('after the automatic check of this visit, nothing is fetched on mount', () => {
     setSubscriptions(subs)
     const { result } = renderHook(() => useYoutubeLive())
     expect(result.current.available).toBe(true)
@@ -100,5 +103,15 @@ describe('useYoutubeLive', () => {
     })
     await waitFor(() => expect(result.current.status).toBe('error'))
     expect(result.current.streams).toEqual([stream])
+  })
+
+  it('shows a stream another part of the page wrote to the store, without a check', () => {
+    setSubscriptions(subs)
+    const { result } = renderHook(() => useYoutubeLive())
+    act(() => writeLiveLast({ checkedAt: null, streams: [stream] }))
+    expect(result.current.streams).toEqual([stream])
+    // A sighting is not a check: no age to show, and the status does not claim one ran.
+    expect(result.current.checkedAt).toBeNull()
+    expect(fetchLiveSubscriptions).not.toHaveBeenCalled()
   })
 })
