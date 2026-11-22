@@ -5,6 +5,7 @@ import ChatHeader from '../ChatHeader'
 import { removeLink, saveLink } from '../../../lib/linkedAccounts'
 import { findYoutubeChatTarget } from '../../../lib/youtubeChatLookup'
 import type { YoutubeChatTarget } from '../../../lib/youtubeChatTarget'
+import { getTabId } from '../../../lib/chatPopout'
 
 vi.mock('../../../lib/youtubeChatLookup', () => ({
   fastYoutubeChatTarget: vi.fn(() => null),
@@ -12,13 +13,24 @@ vi.mock('../../../lib/youtubeChatLookup', () => ({
 }))
 
 const posted: Array<{ type: string; channel?: string }> = []
+const listeners = new Set<(m: { type: string; owner: string; channel?: string }) => void>()
 vi.mock('../../../lib/chatPopout', async (orig) => {
   const real = await orig<typeof import('../../../lib/chatPopout')>()
   return {
     ...real,
-    createPopoutBus: () => ({ post: (m: { type: string; channel?: string }) => posted.push(m), subscribe: () => () => {}, close: () => {} }),
+    createPopoutBus: () => ({
+      post: (m: { type: string; channel?: string }) => posted.push(m),
+      subscribe: (cb: (m: { type: string; owner: string; channel?: string }) => void) => {
+        listeners.add(cb)
+        return () => listeners.delete(cb)
+      },
+      close: () => {},
+    }),
   }
 })
+/** Plays a message in as if the YouTube chat window had sent it. */
+const fromWindow = (m: { type: string; channel?: string }) =>
+  act(() => listeners.forEach((cb) => cb({ ...m, owner: getTabId() })))
 
 const link = (twitch: string, channelId: string, title: string) =>
   saveLink({ twitch, youtube: { channelId, title }, confirmed: false, linkedAt: 1 })
@@ -72,6 +84,26 @@ describe('useYoutubeChatPopout', () => {
     expect(findYoutubeChatTarget).toHaveBeenCalledTimes(2)
     expect(vi.mocked(findYoutubeChatTarget).mock.calls[1][0]).toEqual({ channelId: 'UCb', title: 'B on YT' })
     expect(setChannels().at(-1)).toBe('v:bbbbbbbbbbb')
+  })
+
+  it('a reloaded Twitch page re-attaches to a window already showing this streamer: nothing torn down, nothing looked up', async () => {
+    link('streamer', 'UC1', 'Streamer YT')
+    vi.mocked(findYoutubeChatTarget).mockResolvedValue({ kind: 'failed', reason: 'quota' })
+    renderHook(() => useYoutubeChatPopout('streamer'))
+    fromWindow({ type: 'hello', channel: 'v:abcdefghijk@UC1' })
+    await act(async () => {})
+    expect(setChannels()).toEqual([])
+    expect(findYoutubeChatTarget).not.toHaveBeenCalled()
+  })
+
+  it('a re-attached window showing another streamer is moved to this one', async () => {
+    link('streamer', 'UC1', 'Streamer YT')
+    vi.mocked(findYoutubeChatTarget).mockResolvedValue({ kind: 'video', videoId: 'bbbbbbbbbbb', channelId: 'UC1' })
+    renderHook(() => useYoutubeChatPopout('streamer'))
+    fromWindow({ type: 'hello', channel: 'v:aaaaaaaaaaa@UC9' })
+    await act(async () => {})
+    expect(findYoutubeChatTarget).toHaveBeenCalledTimes(1)
+    expect(setChannels().at(-1)).toBe('v:bbbbbbbbbbb@UC1')
   })
 
   it('looks nothing up while closed', async () => {

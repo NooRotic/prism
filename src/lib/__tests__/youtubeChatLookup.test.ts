@@ -42,7 +42,7 @@ describe('fastYoutubeChatTarget', () => {
   it('uses a rail answer from the last 15 minutes that lists the channel live', () => {
     const now = 1_000_000_000
     writeLiveLast({ checkedAt: now - 14 * 60_000, streams: [listed] })
-    expect(fastYoutubeChatTarget(link, now)).toEqual({ kind: 'video', videoId: 'zyxwvutsrqp' })
+    expect(fastYoutubeChatTarget(link, now)).toEqual({ kind: 'video', videoId: 'zyxwvutsrqp', channelId: CH })
   })
   it('does not trust an older answer, or one no check made', () => {
     const now = 1_000_000_000
@@ -56,13 +56,13 @@ describe('fastYoutubeChatTarget', () => {
 describe('findYoutubeChatTarget', () => {
   it('finds the live video in exactly two calls', async () => {
     serve({ live: true })
-    expect(await findYoutubeChatTarget(link)).toEqual({ kind: 'video', videoId: 'abcdefghijk' })
+    expect(await findYoutubeChatTarget(link)).toEqual({ kind: 'video', videoId: 'abcdefghijk', channelId: CH })
     expect(paths()).toEqual(['playlistItems', 'videos'])
   })
   it('makes no call when a fresh rail answer has it', async () => {
     const now = Date.now()
     writeLiveLast({ checkedAt: now, streams: [listed] })
-    expect(await findYoutubeChatTarget(link, now)).toEqual({ kind: 'video', videoId: 'zyxwvutsrqp' })
+    expect(await findYoutubeChatTarget(link, now)).toEqual({ kind: 'video', videoId: 'zyxwvutsrqp', channelId: CH })
     expect(fetchMock).not.toHaveBeenCalled()
   })
   it('says the streamer is not live by the linked name', async () => {

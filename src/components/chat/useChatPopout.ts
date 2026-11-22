@@ -33,9 +33,15 @@ export function useChatPopout(
   channel: string | undefined,
   injectedBus?: PopoutBus,
   kind: ChatKind = 'twitch',
+  /**
+   * Called when a window says hello with what it shows. Return true when that is already right for this page (a
+   * reloaded page re-attaching), so it is kept instead of replaced.
+   */
+  onWindowHello?: (windowChannel: string) => boolean,
 ): UseChatPopoutReturn {
   const [isOpen, setIsOpen] = useState(false)
   const [blocked, setBlocked] = useState(false)
+  const onHelloRef = useRef(onWindowHello)
   // Other PRISM tabs share the bus; this id says which pop-out is ours.
   const [tabId] = useState(getTabId)
 
@@ -48,6 +54,7 @@ export function useChatPopout(
   const channelRef = useRef(channel)
   useEffect(() => {
     channelRef.current = channel
+    onHelloRef.current = onWindowHello
   })
 
   // Listen, and ask whether a pop-out is already alive (a reloaded page re-attaches this way).
@@ -60,9 +67,11 @@ export function useChatPopout(
         lastChannelRef.current = msg.channel
         setBlocked(false)
         setIsOpen(true)
-        // A change sent before the window was listening was lost: send what it should show now.
+        // A change sent before the window was listening was lost: send what it should show now, unless what the
+        // window shows is already right for this page (a reloaded page re-attaching).
         const want = channelRef.current
-        if (want && want !== msg.channel) {
+        const keep = onHelloRef.current?.(msg.channel) ?? false
+        if (want && want !== msg.channel && !keep) {
           lastChannelRef.current = want
           bus.post({ type: 'set-channel', owner: tabId, channel: want })
         }
