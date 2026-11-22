@@ -116,13 +116,15 @@ export async function latestFromChannel(name: string): Promise<LatestResult> {
   }
 }
 
-/** The next page (50) of a channel's uploads, 1 unit, cached 10 min per page. Never throws. */
-export async function moreFromChannel(playlistId: string, pageToken: string): Promise<MoreResult> {
-  const cacheKey = `${prefix}more_${playlistId}_${pageToken}`
+/** A page (50) of a channel's uploads: the next one after `pageToken`, or the first when there is none. 1 unit, cached 10 min per page. Never throws. */
+export async function moreFromChannel(playlistId: string, pageToken?: string): Promise<MoreResult> {
+  const cacheKey = `${prefix}more_${playlistId}_${pageToken ?? ''}`
   const cached = ttlGet<MoreResult>(cacheKey, UPLOADS_TTL_MS)
   if (cached) return cached
   try {
-    const data = await youtubeGet('playlistItems', { part: 'snippet,status', playlistId, maxResults: String(PAGE), pageToken })
+    const params: Record<string, string> = { part: 'snippet,status', playlistId, maxResults: String(PAGE) }
+    if (pageToken) params.pageToken = pageToken
+    const data = await youtubeGet('playlistItems', params)
     const result: MoreResult = { status: 'ok', videos: toVideos(data.items ?? [], ''), nextPageToken: data.nextPageToken ?? null }
     ttlSet(cacheKey, result)
     return result

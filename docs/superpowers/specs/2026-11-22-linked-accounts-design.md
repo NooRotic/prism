@@ -33,3 +33,6 @@ A creator is one person on several platforms. On a Twitch channel page PRISM sho
 
 ## Left to later
 Reverse chip on the YouTube player page ("Also on Twitch", the store already finds by YouTube channel id), the merged VOD view, the server "Suggest for everyone" + admin approval (needs the P2 backend).
+
+## Update 2026-11-22: the combined videos bar
+A linked channel (with a YouTube channel) gets a full-width bar between the profile and the 30-day stats: "Twitch + YouTube videos, together". Both bios naming each other (confirmed) gives it the PRISM spectrum border (a rainbow, deliberately neither Twitch purple nor YouTube red); a link the viewer made gets a plain outline. Clicking opens one list (filter Both / Twitch only / YouTube only, the search grid's Sort by, a loaded count, Load more YouTube) above the existing clips and VOD grids, which are unchanged. Nothing is read from YouTube until it is opened; the Twitch VODs are the ones the page already holds. A Twitch VOD and a YouTube video within 36 hours that share half their title words are tagged "Also on ..." (nothing is hidden). A YouTube card opens PRISM's /youtube/<id> page; a Twitch card plays in the page's player. Not built: a "streams only" filter for YouTube, durations for YouTube (the uploads list does not carry them), Twitch pages beyond the ones loaded.

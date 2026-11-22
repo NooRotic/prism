@@ -11,8 +11,6 @@ interface LinkAccountsModalProps {
   /** That channel's Twitch bio, for the "do the bios name each other" check. */
   description: string
   onClose: () => void
-  /** Called after a link was saved or removed, so the page re-reads the store. */
-  onChange: () => void
 }
 
 const inputStyle = { backgroundColor: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }
@@ -22,7 +20,7 @@ const inputStyle = { backgroundColor: 'var(--bg)', border: '1px solid var(--bord
  * other channel it is saved as confirmed, otherwise as the viewer's own claim. A Kick link cannot be checked (Kick's API
  * needs a server-held token), so it is always the viewer's own. Nothing leaves this browser.
  */
-export default function LinkAccountsModal({ login, description, onClose, onChange }: LinkAccountsModalProps) {
+export default function LinkAccountsModal({ login, description, onClose }: LinkAccountsModalProps) {
   const existing = findByTwitch(login)
   const [ytText, setYtText] = useState(existing?.youtube ? existing.youtube.handle || existing.youtube.channelId : '')
   const [kickText, setKickText] = useState(existing?.kick ? `kick.com/${existing.kick.slug}` : '')
@@ -59,7 +57,6 @@ export default function LinkAccountsModal({ login, description, onClose, onChang
       confirmed,
       linkedAt: Date.now(),
     })
-    onChange()
     onClose()
   }
 
@@ -117,7 +114,6 @@ export default function LinkAccountsModal({ login, description, onClose, onChang
                 type="button"
                 onClick={() => {
                   removeLink(login)
-                  onChange()
                   onClose()
                 }}
                 className="mr-auto text-sm cursor-pointer"

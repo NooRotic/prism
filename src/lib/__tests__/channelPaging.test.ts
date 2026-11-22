@@ -64,6 +64,13 @@ describe('moreFromChannel', () => {
     expect(r.videos.map((v) => v.id)).toEqual(['bbbbbbbbbbb'])
   })
 
+  it('reads the first page when no token is given (a channel known only by its uploads playlist)', async () => {
+    fetchMock.mockResolvedValueOnce(json({ items: [upload('aaaaaaaaaaa')], nextPageToken: 'P2' }))
+    const r = await moreFromChannel('UUabc')
+    expect(urlOf(fetchMock.mock.calls[0]).searchParams.has('pageToken')).toBe(false)
+    expect(r).toMatchObject({ status: 'ok', nextPageToken: 'P2' })
+  })
+
   it('answers the same page from the cache', async () => {
     fetchMock.mockResolvedValueOnce(json({ items: [upload('bbbbbbbbbbb')] }))
     await moreFromChannel('UUabc', 'P2')

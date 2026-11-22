@@ -1,5 +1,6 @@
 import ClipGrid from './ClipGrid'
 import ChannelStatsSlot from './ChannelStatsSlot'
+import PrismLinkBar from './PrismLinkBar'
 import ProfileSidebar from './ProfileSidebar'
 import StatsRow from './StatsRow'
 import VODGrid from './VODGrid'
@@ -18,6 +19,9 @@ export default function ChannelBody({ channel }: { channel: string | undefined }
       <div className={SECTION}>
         <ProfileSidebar />
       </div>
+
+      {/* A linked creator's Twitch + YouTube videos in one list: a bar that opens it. Renders nothing for an unlinked channel. */}
+      {channel && <PrismLinkBar login={channel} />}
 
       {/* Stats: between the profile and the cards. Renders nothing unless this channel has stats. */}
       <ChannelStatsSlot channel={channel} />

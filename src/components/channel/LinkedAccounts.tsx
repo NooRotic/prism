@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Link2 } from 'lucide-react'
-import { findByTwitch } from '../../lib/linkedAccounts'
+import { useLinkedAccount } from '../../hooks/useLinkedAccount'
 import LinkAccountsModal from './LinkAccountsModal'
 
 /** PRISM's "latest from <channel>" search for a linked YouTube channel. */
@@ -12,9 +12,7 @@ const chipStyle = { background: 'var(--bg-card-hover)', color: 'var(--text-prima
 /** "Also on YouTube / Kick" for a Twitch channel, and the button that opens the "Link accounts" modal. */
 export default function LinkedAccounts({ login, description }: { login: string; description: string }) {
   const [open, setOpen] = useState(false)
-  const [revision, setRevision] = useState(0)
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- `revision` is how a save or a removal makes this read the store again
-  const link = useMemo(() => findByTwitch(login), [login, revision])
+  const link = useLinkedAccount(login)
 
   return (
     <div className="flex flex-col gap-2">
@@ -49,7 +47,7 @@ export default function LinkedAccounts({ login, description }: { login: string; 
         <Link2 size={12} />
         {link ? 'Edit links' : 'Link accounts'}
       </button>
-      {open && <LinkAccountsModal login={login} description={description} onClose={() => setOpen(false)} onChange={() => setRevision((r) => r + 1)} />}
+      {open && <LinkAccountsModal login={login} description={description} onClose={() => setOpen(false)} />}
     </div>
   )
 }
