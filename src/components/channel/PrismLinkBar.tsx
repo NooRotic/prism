@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, Sparkles } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useChannelUploads } from '../../hooks/useChannelUploads'
 import { useLinkedAccount } from '../../hooks/useLinkedAccount'
 import { filterBySource, flagLikelyDuplicates, twitchToItem, youtubeToItem, type Source } from '../../lib/combinedVods'
 import { SORT_LABELS, sortVideos, type SortOrder } from '../../lib/sortVideos'
+import { PrismMark } from '../brand/PrismMark'
 import CombinedVodCard from './CombinedVodCard'
 
 const SOURCES: Array<{ key: Source; label: string }> = [
@@ -59,13 +60,9 @@ export default function PrismLinkBar({ login }: { login: string }) {
         >
           <span className="flex items-center gap-3 min-w-0">
             {confirmed && (
-              <span
-                data-testid="prism-badge"
-                className="prism-spectrum flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-black uppercase tracking-widest"
-                style={{ color: '#000', boxShadow: 'none' }}
-              >
-                <Sparkles size={13} />
-                PRISM
+              // The home icon's line-art prism: one beam in, the spectrum out to the platforms. No text.
+              <span data-testid="prism-badge" aria-hidden="true" className="shrink-0">
+                <PrismMark variant="icon" hover className="h-9 w-[4.5rem]" />
               </span>
             )}
             <span className="flex flex-col min-w-0">
