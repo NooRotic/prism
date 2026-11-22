@@ -56,6 +56,27 @@ describe('PrismLinkBar', () => {
     expect(screen.getByTestId('prism-bar')).toHaveAttribute('data-confirmed', 'false')
   })
 
+  it('animates the spectrum only on a confirmed link, so it stands out from a plain one', () => {
+    const { unmount } = setup({ confirmed: true })
+    expect(screen.getByTestId('prism-spectrum')).toHaveClass('prism-spectrum')
+    expect(screen.getByTestId('prism-badge')).toHaveTextContent('PRISM')
+    // The bar's own background carries a faint moving spectrum too, not just its border.
+    expect(bar()).toHaveClass('prism-tint')
+    unmount()
+    localStorage.clear()
+    setup({ confirmed: false })
+    expect(screen.getByTestId('prism-spectrum')).not.toHaveClass('prism-spectrum')
+    expect(bar()).not.toHaveClass('prism-tint')
+  })
+
+  it('lays the cards out in columns about 1.75 times narrower than the old three-up grid (so the thumbnails are too)', async () => {
+    setup()
+    fireEvent.click(bar())
+    await screen.findByText('youtube mid')
+    // minmax(17.5rem, 1fr): 280px cards, where the old grid gave about 490px on a wide page.
+    expect(screen.getByTestId('combined-grid').className).toContain('minmax(17.5rem,1fr)')
+  })
+
   it('stays closed and spends nothing until it is clicked', () => {
     setup()
     expect(bar()).toHaveAttribute('aria-expanded', 'false')

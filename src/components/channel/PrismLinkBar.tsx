@@ -1,14 +1,11 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Sparkles } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useChannelUploads } from '../../hooks/useChannelUploads'
 import { useLinkedAccount } from '../../hooks/useLinkedAccount'
 import { filterBySource, flagLikelyDuplicates, twitchToItem, youtubeToItem, type Source } from '../../lib/combinedVods'
 import { SORT_LABELS, sortVideos, type SortOrder } from '../../lib/sortVideos'
 import CombinedVodCard from './CombinedVodCard'
-
-/** The spectrum: neither Twitch purple nor YouTube red, so it reads as PRISM's own. */
-const SPECTRUM = 'linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe14d, #4dff88, #4dc3ff, #9a6bff, #ff4dd2)'
 
 const SOURCES: Array<{ key: Source; label: string }> = [
   { key: 'all', label: 'Both' },
@@ -46,22 +43,39 @@ export default function PrismLinkBar({ login }: { login: string }) {
 
   return (
     <div className="max-w-[1600px] mx-auto w-full flex flex-col gap-3" data-testid="prism-bar" data-confirmed={String(confirmed)}>
-      {/* The spectrum is the border: a gradient behind the button, which sits 2px in from it. */}
-      <div className="rounded-lg p-[2px]" style={{ background: confirmed ? SPECTRUM : 'var(--border)' }}>
+      {/* A confirmed link gets the moving PRISM spectrum as a 3px border with a glow; the button sits inside it. A link the
+          viewer made gets a plain 2px outline. */}
+      <div
+        data-testid="prism-spectrum"
+        className={`rounded-xl ${confirmed ? 'prism-spectrum p-[3px]' : 'p-[2px]'}`}
+        style={confirmed ? undefined : { background: 'var(--border)' }}
+      >
         <button
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-between gap-3 rounded-[6px] px-4 py-2.5 cursor-pointer text-left"
+          className={`flex w-full items-center justify-between gap-3 rounded-[9px] px-5 py-4 cursor-pointer text-left ${confirmed ? 'prism-tint' : ''}`}
           style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: 'none' }}
         >
-          <span className="flex flex-col">
-            <span className="text-sm font-bold">Twitch + YouTube videos, together</span>
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {confirmed ? '✓ confirmed: both bios link each other' : 'linked by you'} · {link.youtube.title}
+          <span className="flex items-center gap-3 min-w-0">
+            {confirmed && (
+              <span
+                data-testid="prism-badge"
+                className="prism-spectrum flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-black uppercase tracking-widest"
+                style={{ color: '#000', boxShadow: 'none' }}
+              >
+                <Sparkles size={13} />
+                PRISM
+              </span>
+            )}
+            <span className="flex flex-col min-w-0">
+              <span className="text-base font-extrabold">Twitch + YouTube videos, together</span>
+              <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                {confirmed ? '✓ confirmed: both bios link each other' : 'linked by you'} · {link.youtube.title}
+              </span>
             </span>
           </span>
-          <ChevronDown size={18} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+          <ChevronDown size={22} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
         </button>
       </div>
 
@@ -94,7 +108,8 @@ export default function PrismLinkBar({ login }: { login: string }) {
             </p>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* Columns at least 17.5rem (280px) wide: about 1.75 times narrower than the three-up grid this replaced, so the thumbnails are too. */}
+          <div data-testid="combined-grid" className="grid grid-cols-[repeat(auto-fill,minmax(17.5rem,1fr))] gap-3">
             {items.map((item) => (
               <CombinedVodCard key={`${item.platform}:${item.id}`} item={item} />
             ))}
