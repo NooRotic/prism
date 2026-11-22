@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getComments, getPlaylistItems, getVideoPage, searchTopic } from '../videoPageApi'
 import { searchYouTubeVideos } from '../youtubeApi'
 import { isQuotaReached, resetQuotaForTests } from '../youtubeQuota'
+import { ttlSet } from '../ttlCache'
+import { STORAGE_KEYS } from '../../config/storageKeys'
 
 // youtubeApi reads its key once at import, so the search is faked here; the cache around it is what is tested.
 vi.mock('../youtubeApi', () => ({ searchYouTubeVideos: vi.fn() }))
@@ -57,6 +59,44 @@ describe('getVideoPage', () => {
     await getVideoPage('abcdefghijk')
     await getVideoPage('abcdefghijk')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+  it('asks for liveStreamingDetails in the same single call', async () => {
+    fetchMock.mockResolvedValueOnce(json({ items: [videoItem] }))
+    await getVideoPage('abcdefghijk')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(decodeURIComponent(urlOf(fetchMock.mock.calls[0][0]))).toContain('part=snippet,statistics,topicDetails,liveStreamingDetails')
+  })
+  it('reads a live video: state, viewers and start time', async () => {
+    const live = {
+      ...videoItem,
+      snippet: { ...videoItem.snippet, liveBroadcastContent: 'live' },
+      liveStreamingDetails: { concurrentViewers: '123', actualStartTime: '2026-11-22T04:00:00Z' },
+    }
+    fetchMock.mockResolvedValueOnce(json({ items: [live] }))
+    const v = await getVideoPage('abcdefghijk')
+    expect(v?.live).toEqual({ state: 'live', viewerCount: 123, startedAt: '2026-11-22T04:00:00Z' })
+  })
+  it('an ordinary video is not live', async () => {
+    fetchMock.mockResolvedValueOnce(json({ items: [videoItem] }))
+    expect((await getVideoPage('abcdefghijk'))?.live).toEqual({ state: 'none', viewerCount: null, startedAt: null })
+  })
+  it('never caches a live or upcoming video, so its state is read fresh', async () => {
+    for (const state of ['live', 'upcoming']) {
+      localStorage.clear()
+      fetchMock.mockReset()
+      const item = { ...videoItem, snippet: { ...videoItem.snippet, liveBroadcastContent: state } }
+      fetchMock.mockResolvedValue(json({ items: [item] }))
+      await getVideoPage('abcdefghijk')
+      await getVideoPage('abcdefghijk')
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    }
+  })
+  it('treats a cached entry from before live states existed as not live', async () => {
+    const before = { id: 'abcdefghijk', title: 'T', channelTitle: 'C', channelId: 'UC1', thumbnail: 'u', publishedAt: 'p', description: 'D', tags: [], topics: [] }
+    ttlSet(`${STORAGE_KEYS.LOCAL_VIDEO_PAGE_CACHE_PREFIX}video_abcdefghijk`, before)
+    const v = await getVideoPage('abcdefghijk')
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(v?.live).toEqual({ state: 'none', viewerCount: null, startedAt: null })
   })
   it('is null with no key, and null when the video is not found', async () => {
     vi.stubEnv('VITE_YOUTUBE_API_KEY', '')

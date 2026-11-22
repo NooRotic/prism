@@ -25,7 +25,17 @@ export interface VideoPageData {
   description: string
   tags: string[]
   topics: string[]
+  /** Whether it is a live stream right now. Read fresh for live and upcoming videos (they are never cached). */
+  live: VideoLiveState
 }
+
+export interface VideoLiveState {
+  state: 'live' | 'upcoming' | 'none'
+  viewerCount: number | null
+  startedAt: string | null
+}
+
+const NOT_LIVE: VideoLiveState = { state: 'none', viewerCount: null, startedAt: null }
 
 export interface VideoComment {
   id: string
@@ -80,16 +90,29 @@ export { get as youtubeGet }
 
 const thumbOf =(t: any): string => t?.medium?.url ?? t?.default?.url ?? '' // eslint-disable-line @typescript-eslint/no-explicit-any
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function liveStateOf(it: any): VideoLiveState {
+  const b = it.snippet?.liveBroadcastContent
+  if (b !== 'live' && b !== 'upcoming') return NOT_LIVE
+  const viewers = it.liveStreamingDetails?.concurrentViewers
+  return {
+    state: b,
+    viewerCount: viewers === undefined ? null : Number(viewers),
+    startedAt: it.liveStreamingDetails?.actualStartTime ?? null,
+  }
+}
+
 /** Everything the page shows about a video. 1 unit, cached 24 h. Null when there is no key or no such video. */
 export async function getVideoPage(id: string): Promise<VideoPageData | null> {
   const cacheKey = `${prefix}video_${id}`
   const cached = ttlGet<VideoPageData>(cacheKey, DAY_MS)
-  if (cached) return cached
+  // An entry cached before live states existed was not live (live videos are never cached).
+  if (cached) return cached.live ? cached : { ...cached, live: NOT_LIVE }
   // A video YouTube said does not exist is remembered for an hour, so a dead link does not cost a unit per visit.
   const missingKey = `${prefix}missing_${id}`
   if (ttlGet<boolean>(missingKey, MISSING_TTL_MS)) return null
   try {
-    const data = await get('videos', { part: 'snippet,statistics,topicDetails', id })
+    const data = await get('videos', { part: 'snippet,statistics,topicDetails,liveStreamingDetails', id })
     const it = data.items?.[0]
     if (!it) {
       ttlSet(missingKey, true)
@@ -108,8 +131,10 @@ export async function getVideoPage(id: string): Promise<VideoPageData | null> {
       topics: (it.topicDetails?.topicCategories ?? []).map((u: string) =>
         decodeURIComponent(u.split('/').pop() ?? '').replace(/_/g, ' '),
       ),
+      live: liveStateOf(it),
     }
-    ttlSet(cacheKey, result)
+    // A live or upcoming video changes state, so it is asked again on every visit (still 1 unit).
+    if (result.live.state === 'none') ttlSet(cacheKey, result)
     return result
   } catch {
     return null

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useReportLiveSighting } from '../hooks/useReportLiveSighting'
 import { useLocation, useParams } from 'react-router-dom'
 import { Tv } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
@@ -75,6 +76,7 @@ export default function YoutubePlayerPage() {
   useFloatingPageSource(floatSource)
 
   const { data, status: pageStatus } = useVideoPage(videoId)
+  useReportLiveSighting(data)
   const { result: comments } = useVideoComments(videoId)
   const context = useVideoContext(videoId, search)
   const related = useRelatedVideos(videoId)

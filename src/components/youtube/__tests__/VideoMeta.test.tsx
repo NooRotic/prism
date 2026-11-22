@@ -15,6 +15,7 @@ const data = (over: Partial<VideoPageData> = {}): VideoPageData => ({
   description: '',
   tags: [],
   topics: [],
+  live: { state: 'none', viewerCount: null, startedAt: null },
   ...over,
 })
 

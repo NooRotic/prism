@@ -16,6 +16,7 @@ vi.mock('../../lib/catchupApi', () => ({ describeVideos: vi.fn() }))
 
 const page = (id: string): VideoPageData => ({
   id, title: `T-${id}`, channelTitle: 'C', channelId: 'UC', thumbnail: '', publishedAt: '', description: '', tags: [], topics: [],
+  live: { state: 'none', viewerCount: null, startedAt: null },
 })
 const cv = (id: string): CatchupVideo => ({ id, title: id, channel: 'c', publishedAt: '', durationSec: 60, thumbnail: '' })
 
