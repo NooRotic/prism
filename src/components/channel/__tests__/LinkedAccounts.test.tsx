@@ -97,6 +97,19 @@ describe('LinkedAccounts', () => {
     expect(screen.getByText(/linked by you/i)).toBeInTheDocument()
   })
 
+  it('saves nothing when the box is closed while it is still checking', async () => {
+    let finish: (r: Awaited<ReturnType<typeof fetchYoutubeChannel>>) => void = () => {}
+    vi.mocked(fetchYoutubeChannel).mockReturnValue(new Promise((r) => (finish = r)))
+    renderIt('no links in my bio')
+    openModal()
+    fill(/YouTube/, '@MrBeast')
+    save()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Link accounts' })).not.toBeInTheDocument()
+    await act(async () => finish({ status: 'ok', channel }))
+    expect(findByTwitch('mrbeast')).toBeNull()
+  })
+
   it('refuses text that is not a YouTube channel link, without a call', () => {
     renderIt()
     openModal()

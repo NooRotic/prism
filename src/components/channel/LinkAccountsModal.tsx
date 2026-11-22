@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDialogFocus } from '../../hooks/useDialogFocus'
 import { isMutual } from '../../lib/accountBios'
 import { findByTwitch, removeLink, saveLink } from '../../lib/linkedAccounts'
@@ -26,6 +26,14 @@ const inputStyle = { backgroundColor: 'var(--bg)', border: '1px solid var(--bord
 export default function LinkAccountsModal({ login, description, onClose, suggested }: LinkAccountsModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   useDialogFocus(dialogRef, onClose)
+  /** False once the box is closed: a lookup that finishes after Esc or Cancel must not save. */
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
   const existing = findByTwitch(login)
   const [ytText, setYtText] = useState(existing?.youtube ? existing.youtube.handle || existing.youtube.channelId : (suggested ?? ''))
   const [kickText, setKickText] = useState(existing?.kick ? `kick.com/${existing.kick.slug}` : '')
@@ -48,6 +56,7 @@ export default function LinkAccountsModal({ login, description, onClose, suggest
       if (!isYouTubeApiAvailable()) return setError('YouTube lookups are not available here, so a YouTube link cannot be checked.')
       setBusy(true)
       const result = await fetchYoutubeChannel('handle' in yt ? { handle: yt.handle } : { channelId: yt.channelId })
+      if (!alive.current) return
       setBusy(false)
       if (result.status === 'notfound') return setError('No YouTube channel found for that link.')
       if (result.status === 'error') return setError('Could not reach YouTube. Try again in a moment.')

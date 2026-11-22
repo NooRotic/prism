@@ -121,10 +121,12 @@ export default function YouTubePlayer({
           onPlay?.()
         }}
         onPause={() => {
+          setPlaying(false)
           emitState({ paused: true, muted })
           onPause?.()
         }}
         onEnded={() => {
+          setPlaying(false)
           emitState({ paused: true, muted })
           onEnded?.()
         }}

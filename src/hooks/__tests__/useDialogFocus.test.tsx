@@ -74,4 +74,12 @@ describe('useDialogFocus', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(opener).toHaveFocus()
   })
+
+  it('leaves Esc to an input method that is composing text', () => {
+    const onClose = vi.fn()
+    render(<Page onClose={onClose} />)
+    openIt()
+    fireEvent.keyDown(screen.getByLabelText('First'), { key: 'Escape', isComposing: true })
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })

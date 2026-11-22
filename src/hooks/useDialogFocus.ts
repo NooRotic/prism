@@ -22,6 +22,8 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () =
     if (!box.contains(document.activeElement)) focusables()[0]?.focus()
 
     const onKey = (e: KeyboardEvent) => {
+      // Esc while an input method is composing text cancels the composition, not the dialog.
+      if (e.isComposing) return
       if (e.key === 'Escape') {
         e.preventDefault()
         closeRef.current()

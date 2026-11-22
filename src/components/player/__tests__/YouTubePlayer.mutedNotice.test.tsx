@@ -76,4 +76,16 @@ describe('YouTubePlayer muted notice', () => {
     muteChange(false)
     expect(pill()).toBeNull()
   })
+
+  it('steps aside while the video is paused or has ended, and comes back when it plays again', () => {
+    setActivation(false)
+    render(<YouTubePlayer url={yt} detection={detection} />)
+    play()
+    act(() => (rp.props.onPause as () => void)())
+    expect(pill()).toBeNull()
+    play()
+    expect(pill()).not.toBeNull()
+    act(() => (rp.props.onEnded as () => void)())
+    expect(pill()).toBeNull()
+  })
 })

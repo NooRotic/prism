@@ -46,7 +46,7 @@ describe('ChatDock holding a YouTube chat', () => {
     expect(screen.getByTitle('streamer Twitch chat')).toBeInTheDocument()
   })
 
-  it('pops the video out from where the YouTube video is, as the page button does', () => {
+  it('pops a live video out at the live edge, never from the elapsed time (the dock is shown only for live videos)', () => {
     const controls: FloatingVideoControls = {
       supported: true, canOpen: true, isFloating: false, blocked: false, failed: false, open: vi.fn(), close: vi.fn(), registerSource: vi.fn(),
     }
@@ -59,7 +59,8 @@ describe('ChatDock holding a YouTube chat', () => {
       </FloatingVideoContext.Provider>,
     )
     fireEvent.click(screen.getAllByRole('button', { name: 'Pop out video' })[0])
-    expect(controls.open).toHaveBeenCalledWith({ startSec: 42 })
+    expect(controls.open).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(controls.open).mock.calls[0][0]?.startSec).toBeUndefined()
     player.remove()
   })
 })

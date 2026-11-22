@@ -22,3 +22,10 @@ Twitch's own muted notice; any change to how YouTube decides to start muted.
 ## Approaches
 One sensible way each. For 1, inside the player (picked, Claude's call) beats a bar beside it on the page, which the
 dock and pop-out window would not get.
+
+## As built
+- **Goal 3 dropped after review:** the chat dock appears only for live videos, and a live stream's "current time" is
+  the elapsed time, so passing it would start the pop-out a few seconds behind live. The dock's pop-out opens at the
+  live edge, as before; `VideoPopoutBar` (ordinary videos) keeps carrying the playhead.
+- The muted pill also steps aside while paused or ended; Esc during IME composition is left to the input method; the
+  Twitch-side "Link accounts" box no longer saves when closed mid-check.

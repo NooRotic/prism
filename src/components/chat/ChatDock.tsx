@@ -22,7 +22,6 @@ import {
 import { useHeightDrag } from './useHeightDrag'
 import { fillScopeFor } from './fillMode'
 import { useFloatingVideo } from './floatingVideoContext'
-import { currentYoutubeTime } from '../../lib/floatingVideo'
 import { useChatPlacement } from './useChatPlacement'
 import { useChatPopout } from './useChatPopout'
 import type { ChatKind } from '../../lib/chatPopout'
@@ -111,8 +110,9 @@ export default function ChatDock({ channel, player, kind = 'twitch' }: ChatDockP
     floating || video.canOpen
       ? {
           floating,
-          // A YouTube video carries on from where it is (as the page's own pop-out button does); Twitch is live.
-          onClick: floating ? video.close : () => video.open(kind === 'youtube' ? { startSec: currentYoutubeTime() } : undefined),
+          // No start time: the dock holds live video only (Twitch, or a live YouTube stream), which floats at the live
+          // edge. A YouTube "elapsed time" would start it behind live.
+          onClick: floating ? video.close : () => video.open(),
         }
       : null
 
