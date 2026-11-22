@@ -231,6 +231,21 @@ export default function ProfileSidebar() {
                 {broadcasterBadge}
               </span>
             )}
+            {/* Stream tags sit on the name row, after the badge: name, badge, tags. Neutral green tint, no purple
+                (reserved for affiliation). */}
+            {channelInfo?.tags?.map((tag) => (
+              <span
+                key={tag}
+                className="text-xs px-2 py-0.5 rounded-full shrink-0"
+                style={{
+                  backgroundColor: 'rgba(57, 255, 20, 0.08)',
+                  color: 'var(--accent-green)',
+                  border: '1px solid rgba(57, 255, 20, 0.2)',
+                }}
+              >
+                {tag}
+              </span>
+            ))}
           </div>
           {displayMode === 'chatter' && (
             <span
@@ -280,25 +295,6 @@ export default function ProfileSidebar() {
         >
           Return to <LiveDot /> LIVE Stream
         </button>
-      )}
-
-      {/* Stream tags — neutral green tint, no purple (reserved for affiliation) */}
-      {channelInfo?.tags && channelInfo.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {channelInfo.tags.map((tag) => (
-            <span
-              key={tag}
-              className="text-xs px-2 py-0.5 rounded-full"
-              style={{
-                backgroundColor: 'rgba(57, 255, 20, 0.08)',
-                color: 'var(--accent-green)',
-                border: '1px solid rgba(57, 255, 20, 0.2)',
-              }}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
       )}
 
       {/* Current Video panel — shown when the user selects a clip or VOD.

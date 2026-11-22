@@ -51,14 +51,15 @@ function Body({ item }: { item: CombinedItem }) {
 }
 
 const cardClass = 'group flex flex-col rounded-lg overflow-hidden text-left transition-all duration-200 cursor-pointer'
-const cardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }
+/** A thin line in the card's platform colour (purple Twitch, red YouTube), so the two kinds read apart at a glance. */
+const cardStyle = (platform: CombinedItem['platform']) => ({ backgroundColor: 'var(--bg-card)', border: `1px solid ${PLATFORM[platform].color}` })
 
 /** One card for either platform. A YouTube video opens PRISM's YouTube page; a Twitch VOD plays in this page's player. */
 export default function CombinedVodCard({ item }: { item: CombinedItem }) {
   const { dispatch } = useApp()
   if (item.platform === 'youtube') {
     return (
-      <Link to={item.url ?? `/youtube/${item.id}`} className={cardClass} style={cardStyle}>
+      <Link to={item.url ?? `/youtube/${item.id}`} className={cardClass} style={cardStyle('youtube')}>
         <Body item={item} />
       </Link>
     )
@@ -71,7 +72,7 @@ export default function CombinedVodCard({ item }: { item: CombinedItem }) {
         dispatch({ type: 'PLAY_URL', url: item.url, detection: detectURLType(item.url) })
       }}
       className={cardClass}
-      style={cardStyle}
+      style={cardStyle('twitch')}
     >
       <Body item={item} />
     </button>
