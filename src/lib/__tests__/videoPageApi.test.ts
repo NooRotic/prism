@@ -91,12 +91,14 @@ describe('getVideoPage', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2)
     }
   })
-  it('treats a cached entry from before live states existed as not live', async () => {
+  it('looks again at a video saved before live states existed, since it may be a live stream', async () => {
     const before = { id: 'abcdefghijk', title: 'T', channelTitle: 'C', channelId: 'UC1', thumbnail: 'u', publishedAt: 'p', description: 'D', tags: [], topics: [] }
     ttlSet(`${STORAGE_KEYS.LOCAL_VIDEO_PAGE_CACHE_PREFIX}video_abcdefghijk`, before)
+    const live = { ...videoItem, snippet: { ...videoItem.snippet, liveBroadcastContent: 'live' } }
+    fetchMock.mockResolvedValueOnce(json({ items: [live] }))
     const v = await getVideoPage('abcdefghijk')
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(v?.live).toEqual({ state: 'none', viewerCount: null, startedAt: null })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(v?.live.state).toBe('live')
   })
   it('is null with no key, and null when the video is not found', async () => {
     vi.stubEnv('VITE_YOUTUBE_API_KEY', '')

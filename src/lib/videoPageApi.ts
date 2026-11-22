@@ -106,8 +106,9 @@ function liveStateOf(it: any): VideoLiveState {
 export async function getVideoPage(id: string): Promise<VideoPageData | null> {
   const cacheKey = `${prefix}video_${id}`
   const cached = ttlGet<VideoPageData>(cacheKey, DAY_MS)
-  // An entry cached before live states existed was not live (live videos are never cached).
-  if (cached) return cached.live ? cached : { ...cached, live: NOT_LIVE }
+  // An entry saved before live states existed may be a stream that is live now: it is read again (once; the new
+  // answer replaces it, or is not saved at all when it is live).
+  if (cached?.live) return cached
   // A video YouTube said does not exist is remembered for an hour, so a dead link does not cost a unit per visit.
   const missingKey = `${prefix}missing_${id}`
   if (ttlGet<boolean>(missingKey, MISSING_TTL_MS)) return null
