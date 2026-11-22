@@ -15,11 +15,11 @@ export default function AlsoOnTwitch({ channelId }: { channelId: string | undefi
         to={`/twitch/${link.twitch}`}
         title={`${link.twitch} on Twitch`}
         className="rounded-full px-2.5 py-0.5"
-        style={{ background: 'var(--bg-card-hover)', color: 'var(--text-primary)', border: '1px solid var(--accent-twitch)' }}
+        style={{ background: 'var(--bg-card-hover)', color: 'var(--accent-twitch-text)', border: '1px solid var(--accent-twitch)' }}
       >
         Twitch
       </Link>
-      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
         {link.confirmed ? '✓ confirmed (both bios link each other)' : 'linked by you'}
       </span>
     </span>

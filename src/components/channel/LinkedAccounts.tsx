@@ -25,10 +25,10 @@ export default function LinkedAccounts({ login, description }: { login: string; 
           </span>
           {link.youtube && (
             <>
-              <Link to={youtubeHref(link.youtube)} title={`${link.youtube.title} on YouTube`} className="rounded-full px-2.5 py-0.5 text-xs" style={{ ...chipStyle, borderColor: 'var(--accent-youtube)' }}>
+              <Link to={youtubeHref(link.youtube)} title={`${link.youtube.title} on YouTube`} className="rounded-full px-2.5 py-0.5 text-xs" style={{ ...chipStyle, color: 'var(--accent-youtube-text)', borderColor: 'var(--accent-youtube)' }}>
                 YouTube
               </Link>
-              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                 {link.confirmed ? '✓ confirmed (both bios link each other)' : 'linked by you'}
               </span>
             </>

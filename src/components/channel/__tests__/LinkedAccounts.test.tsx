@@ -54,6 +54,13 @@ describe('LinkedAccounts', () => {
     expect(edit.parentElement).toHaveClass('prism-pill')
   })
 
+  it('shows the YouTube chip in YouTube red and the link status with stronger contrast', () => {
+    saveLink({ twitch: 'mrbeast', youtube: { channelId: channel.channelId, title: 'Mr Beast', handle: '@MrBeast' }, confirmed: false, linkedAt: 1 })
+    renderIt()
+    expect(screen.getByRole('link', { name: /YouTube/ })).toHaveStyle({ color: 'var(--accent-youtube-text)' })
+    expect(screen.getByText(/linked by you/i)).toHaveStyle({ color: 'var(--text-secondary)' })
+  })
+
   it('links a YouTube channel and marks it confirmed when both bios name each other', async () => {
     vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel })
     renderIt()

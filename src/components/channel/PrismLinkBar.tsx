@@ -14,6 +14,20 @@ const SOURCES: Array<{ key: Source; label: string }> = [
   { key: 'youtube', label: 'YouTube only' },
 ]
 
+/** The platform buttons wear their platform: a faint tint and outline, then solid colour when chosen. */
+const PLATFORM_TINT = {
+  twitch: { solid: 'var(--accent-twitch)', text: 'var(--accent-twitch-text)', wash: 'rgba(145, 70, 255, 0.16)' },
+  youtube: { solid: 'var(--accent-youtube)', text: 'var(--accent-youtube-text)', wash: 'rgba(255, 0, 0, 0.14)' },
+} as const
+
+const sourceStyle = (key: Source, active: boolean) => {
+  if (key === 'all') return pill(active)
+  const t = PLATFORM_TINT[key]
+  return active
+    ? { backgroundColor: t.solid, color: '#fff', border: `1px solid ${t.solid}` }
+    : { backgroundColor: t.wash, color: t.text, border: `1px solid ${t.solid}` }
+}
+
 const pill = (active: boolean) => ({
   background: active ? 'var(--text-primary)' : 'var(--bg-card)',
   color: active ? 'var(--bg)' : 'var(--text-secondary)',
@@ -48,8 +62,7 @@ export default function PrismLinkBar({ login }: { login: string }) {
           viewer made gets a plain 2px outline. */}
       <div
         data-testid="prism-spectrum"
-        className={`rounded-xl ${confirmed ? 'prism-spectrum p-[3px]' : 'p-[2px]'}`}
-        style={confirmed ? undefined : { background: 'var(--border)' }}
+        className={`rounded-xl ${confirmed ? 'prism-spectrum p-[3px]' : 'prism-pill p-[2px]'}`}
       >
         <button
           type="button"
@@ -62,12 +75,18 @@ export default function PrismLinkBar({ login }: { login: string }) {
             {/* The home icon's line-art prism: one beam in, the spectrum out to the platforms. No text. On every linked
                 channel; a link the viewer made shows it dimmer, and only a confirmed one gets the moving spectrum. */}
             <span data-testid="prism-badge" aria-hidden="true" className="shrink-0" style={{ opacity: confirmed ? 1 : 0.6 }}>
-              <PrismMark variant="icon" hover className="h-9 w-[4.5rem]" />
+              <PrismMark variant="icon" hover className="h-7 w-14 sm:h-9 sm:w-[4.5rem]" />
             </span>
             <span className="flex flex-col min-w-0">
-              <span className="text-base font-extrabold">Twitch + YouTube videos, together</span>
-              <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
-                {confirmed ? '✓ confirmed: both bios link each other' : 'linked by you'} · {link.youtube.title}
+              <span className="text-base font-extrabold">
+                <span style={{ color: 'var(--accent-twitch-text)' }}>Twitch</span> + <span style={{ color: 'var(--accent-youtube-text)' }}>YouTube</span> videos, together
+              </span>
+              <span className="text-sm break-words" style={{ color: 'var(--text-secondary)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>{confirmed ? '✓ confirmed: both bios link each other' : 'linked by you'}</span>
+                {' · '}
+                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  {link.youtube.title}
+                </span>
               </span>
             </span>
           </span>
@@ -80,7 +99,7 @@ export default function PrismLinkBar({ login }: { login: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <div role="group" aria-label="Show" className="flex gap-2">
               {SOURCES.map((s) => (
-                <button key={s.key} type="button" aria-pressed={source === s.key} onClick={() => setSource(s.key)} className="rounded px-2.5 py-1 text-sm cursor-pointer" style={pill(source === s.key)}>
+                <button key={s.key} type="button" aria-pressed={source === s.key} onClick={() => setSource(s.key)} className="rounded px-2.5 py-1 text-sm cursor-pointer" style={sourceStyle(s.key, source === s.key)}>
                   {s.label}
                 </button>
               ))}
@@ -104,8 +123,8 @@ export default function PrismLinkBar({ login }: { login: string }) {
             </p>
           )}
 
-          {/* Columns at least 11rem (176px) wide, so the thumbnails are small even in a zoomed-in window (17.5rem still gave two big columns there). */}
-          <div data-testid="combined-grid" className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+          {/* Columns at least 11rem (176px) wide, so the thumbnails are small even in a zoomed-in window; capped at 45% of the row so a phone still gets two columns. */}
+          <div data-testid="combined-grid" className="grid grid-cols-[repeat(auto-fill,minmax(min(11rem,45%),1fr))] gap-3">
             {items.map((item) => (
               <CombinedVodCard key={`${item.platform}:${item.id}`} item={item} />
             ))}
