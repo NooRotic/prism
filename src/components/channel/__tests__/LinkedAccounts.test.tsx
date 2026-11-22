@@ -36,6 +36,17 @@ beforeEach(() => {
 })
 
 describe('LinkedAccounts', () => {
+  it('closes the Link accounts box with Escape even when focus has left it, and gives focus back to the button', () => {
+    renderIt()
+    const button = screen.getByRole('button', { name: /Link accounts/ })
+    button.focus()
+    fireEvent.click(button)
+    ;(document.activeElement as HTMLElement).blur()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Link accounts' })).not.toBeInTheDocument()
+    expect(button).toHaveFocus()
+  })
+
   it('offers only the Link accounts button when nothing is linked', () => {
     renderIt()
     expect(screen.getByRole('button', { name: /Link accounts/ })).toBeInTheDocument()
@@ -84,6 +95,19 @@ describe('LinkedAccounts', () => {
     save()
     await waitFor(() => expect(findByTwitch('mrbeast')?.confirmed).toBe(false))
     expect(screen.getByText(/linked by you/i)).toBeInTheDocument()
+  })
+
+  it('saves nothing when the box is closed while it is still checking', async () => {
+    let finish: (r: Awaited<ReturnType<typeof fetchYoutubeChannel>>) => void = () => {}
+    vi.mocked(fetchYoutubeChannel).mockReturnValue(new Promise((r) => (finish = r)))
+    renderIt('no links in my bio')
+    openModal()
+    fill(/YouTube/, '@MrBeast')
+    save()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Link accounts' })).not.toBeInTheDocument()
+    await act(async () => finish({ status: 'ok', channel }))
+    expect(findByTwitch('mrbeast')).toBeNull()
   })
 
   it('refuses text that is not a YouTube channel link, without a call', () => {

@@ -108,7 +108,12 @@ export default function ChatDock({ channel, player, kind = 'twitch' }: ChatDockP
   const floatingWithChat = floating && chatVisible
   const videoControl =
     floating || video.canOpen
-      ? { floating, onClick: floating ? video.close : video.open }
+      ? {
+          floating,
+          // No start time: the dock holds live video only (Twitch, or a live YouTube stream), which floats at the live
+          // edge. A YouTube "elapsed time" would start it behind live.
+          onClick: floating ? video.close : () => video.open(),
+        }
       : null
 
   // Fill mode: the remembered setting, or fullscreen of this row (which is never
@@ -357,7 +362,7 @@ export default function ChatDock({ channel, player, kind = 'twitch' }: ChatDockP
                 videoControl={videoControl}
                 dockControls={!floating}
               />
-              {popout.blocked && (
+              {(popout.blocked || youtubeChat.blocked) && (
                 <p
                   role="status"
                   className="px-3 py-2 text-xs"

@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ChatDock from '../ChatDock'
 import { useChatPopout } from '../useChatPopout'
 import { useFullscreen } from '../useFullscreen'
 import { saveLink } from '../../../lib/linkedAccounts'
+import { FloatingVideoContext, type FloatingVideoControls } from '../floatingVideoContext'
 
 vi.mock('../useChatPopout', () => ({ useChatPopout: vi.fn() }))
 vi.mock('../useFullscreen', () => ({ useFullscreen: vi.fn() }))
@@ -43,5 +44,23 @@ describe('ChatDock holding a YouTube chat', () => {
   it('still holds the Twitch chat by default', () => {
     render(<ChatDock channel="streamer" player={<div>player</div>} />)
     expect(screen.getByTitle('streamer Twitch chat')).toBeInTheDocument()
+  })
+
+  it('pops a live video out at the live edge, never from the elapsed time (the dock is shown only for live videos)', () => {
+    const controls: FloatingVideoControls = {
+      supported: true, canOpen: true, isFloating: false, blocked: false, failed: false, open: vi.fn(), close: vi.fn(), registerSource: vi.fn(),
+    }
+    const player = document.createElement('youtube-video') as HTMLElement & { currentTime?: number }
+    player.currentTime = 42
+    document.body.appendChild(player)
+    render(
+      <FloatingVideoContext.Provider value={controls}>
+        <ChatDock kind="youtube" channel={TARGET} player={<div>player</div>} />
+      </FloatingVideoContext.Provider>,
+    )
+    fireEvent.click(screen.getAllByRole('button', { name: 'Pop out video' })[0])
+    expect(controls.open).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(controls.open).mock.calls[0][0]?.startSec).toBeUndefined()
+    player.remove()
   })
 })

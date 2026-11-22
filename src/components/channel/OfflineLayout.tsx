@@ -236,7 +236,7 @@ export default function OfflineLayout({ channel, strip, player, children }: Offl
                 dockControls={false}
                 fillControls={false}
               />
-              {popout.blocked && (
+              {(popout.blocked || youtubeChat.blocked) && (
                 <p
                   role="status"
                   className="px-3 py-2 text-xs"

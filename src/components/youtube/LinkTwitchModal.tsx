@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import { useDialogFocus } from '../../hooks/useDialogFocus'
 import { isMutual } from '../../lib/accountBios'
 import { findByTwitch, findByYoutube, linkYoutubeToTwitch, unlinkYoutube } from '../../lib/linkedAccounts'
 import { parseTwitchLogin } from '../../lib/parseTwitchLink'
@@ -25,6 +26,8 @@ const SIGN_IN = 'Sign in to Twitch to link this channel.'
  * (1 unit) so a link both bios name is saved as confirmed. A failed YouTube lookup still saves, as the viewer's claim.
  */
 export default function LinkTwitchModal({ channelId, channelTitle, suggested, onClose }: LinkTwitchModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, onClose)
   const { isAuthenticated, login, handleAuthError } = useTwitchAuth()
   /** False once the box is closed: a lookup that finishes after Cancel must not save. */
   const alive = useRef(true)
@@ -59,7 +62,8 @@ export default function LinkTwitchModal({ channelId, channelTitle, suggested, on
           ok: false as const,
           err,
           expired: err instanceof SessionExpiredError,
-          notFound: err instanceof Error && err.message === 'User not found',
+          // Twitch answers an empty list for a name nobody has, and a 400 for a name nobody could have.
+          notFound: err instanceof Error && (err.message === 'User not found' || err.message.startsWith('Twitch API error: 400')),
         }),
       ),
       fetchYoutubeChannel({ channelId }),
@@ -106,9 +110,7 @@ export default function LinkTwitchModal({ channelId, channelTitle, suggested, on
         role="dialog"
         aria-modal="true"
         aria-label="Link Twitch"
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onClose()
-        }}
+        ref={dialogRef}
         className="w-full max-w-md rounded-lg p-5 flex flex-col gap-4"
         style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}
       >
