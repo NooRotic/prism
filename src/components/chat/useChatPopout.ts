@@ -18,7 +18,7 @@ interface UseChatPopoutReturn {
   /** The browser refused the popup; clears itself after a few seconds. */
   blocked: boolean
   /** `channelOverride` is for a caller that learns what to show in the same click (the YouTube chat). */
-  open: (channelOverride?: string) => void
+  open: (channelOverride?: string) => boolean
   close: () => void
 }
 
@@ -114,10 +114,11 @@ export function useChatPopout(
     busRef.current?.post({ type: 'set-channel', owner: tabId, channel })
   }, [channel, isOpen, tabId])
 
-  const open = useCallback((channelOverride?: string) => {
+  /** Opens the window; false when there was nothing to show or the browser blocked it. */
+  const open = useCallback((channelOverride?: string): boolean => {
     // Buttons pass `open` straight to onClick, which hands it the click event: only a string overrides.
     const target = typeof channelOverride === 'string' ? channelOverride : channel
-    if (!target) return
+    if (!target) return false
     // Must run inside the click handler, or popup blockers refuse it. No
     // `noopener`: it would make this return null and lose the handle.
     const popup = window.open(
@@ -127,12 +128,13 @@ export function useChatPopout(
     )
     if (!popup) {
       setBlocked(true)
-      return
+      return false
     }
     popupRef.current = popup
     lastChannelRef.current = target
     setBlocked(false)
     setIsOpen(true)
+    return true
   }, [channel, tabId, kind])
 
   const close = useCallback(() => {

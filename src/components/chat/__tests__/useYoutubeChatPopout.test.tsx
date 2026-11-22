@@ -60,6 +60,15 @@ describe('useYoutubeChatPopout', () => {
     expect(result.current.available).toBe(false)
   })
 
+  it('says the pop-up was blocked and spends no lookup when the window does not open', () => {
+    link('streamer', 'UC1', 'Streamer YT')
+    openSpy.mockReturnValue(null)
+    const { result } = renderHook(() => useYoutubeChatPopout('streamer'))
+    act(() => result.current.open())
+    expect(result.current.blocked).toBe(true)
+    expect(findYoutubeChatTarget).not.toHaveBeenCalled()
+  })
+
   it('opens the window inside the click, before the lookup answers, then sends what it found', async () => {
     link('streamer', 'UC1', 'Streamer YT')
     const d = deferred()

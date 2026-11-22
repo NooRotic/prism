@@ -60,12 +60,12 @@ export function useYoutubeChatPopout(twitchLogin: string | undefined) {
     const forLink = { channelId, title }
     const fast = fastYoutubeChatTarget(forLink)
     const first = encodeTarget(fast ?? { kind: 'looking' })
+    // A blocked pop-up has nowhere to show an answer, so it spends no lookup (the caller shows "Pop-up blocked").
+    if (!openWindow(first)) return
     if (fast) {
       requestedRef.current = key
       setFound({ key, value: first })
-    }
-    openWindow(first)
-    if (!fast) lookUp(key, forLink)
+    } else lookUp(key, forLink)
   }, [channelId, title, key, openWindow, lookUp])
 
   // Follow the Twitch page while the window is open.
