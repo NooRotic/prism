@@ -43,7 +43,6 @@ describe('visit counting block in index.html', () => {
     expect(r.paq).toContainEqual(['setDoNotTrack', true])
     expect(r.paq).toContainEqual(['setSiteId', '4'])
     expect(r.paq).toContainEqual(['setTrackerUrl', 'https://stats.pollardjr.com/matomo.php'])
-    expect(r.paq).toContainEqual(['trackPageView'])
     expect(r.scripts).toEqual(['https://stats.pollardjr.com/matomo.js'])
     expect(r.counted).toBe(true)
   })
@@ -64,10 +63,14 @@ describe('visit counting block in index.html', () => {
     expect(r.counted).toBe(false)
   })
 
-  it('leaves the address fragment out, before anything is counted (it can hold a sign-in token or an /import list)', () => {
-    const names = run({ hostname: 'prism.nooroticx.tv' }).paq!.map(([name, value]) => (name === 'discardHashTag' ? `${name}:${value}` : name))
-    expect(names).toContain('discardHashTag:true')
-    expect(names.indexOf('discardHashTag:true')).toBeLessThan(names.indexOf('trackPageView'))
+  it('leaves the address fragment out (it can hold a sign-in token or an /import list)', () => {
+    expect(run({ hostname: 'prism.nooroticx.tv' }).paq).toContainEqual(['discardHashTag', true])
+  })
+
+  it('sends nothing by itself: the app decides what address is counted, and a page it does not count sends nothing', () => {
+    const names = run({ hostname: 'prism.nooroticx.tv' }).paq!.map(([name]) => name)
+    expect(names).not.toContain('trackPageView')
+    expect(names).not.toContain('enableLinkTracking')
   })
 
   it('hides the "what is counted" note unless the page is counting', () => {

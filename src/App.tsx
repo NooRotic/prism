@@ -13,6 +13,7 @@ import { OnboardingIntro } from './components/intro/OnboardingIntro'
 import { useTwitchAuth } from './hooks/useTwitchAuth'
 import { useAuthProfile } from './hooks/useAuthProfile'
 import { usePageHit } from './hooks/usePageHit'
+import { usePageView } from './hooks/usePageView'
 import { STORAGE_KEYS } from './config/storageKeys'
 import { isPlayerPagePath } from './lib/routes'
 
@@ -111,9 +112,13 @@ function AppLayout() {
   )
 }
 
-/** Counts page opens for the owner's usage numbers. Outside the layout, so the chat pop-out window is counted too. */
+/**
+ * Counts page opens for the owner: PRISM's own counter (outside the layout, so the chat pop-out window is counted too) and
+ * Matomo. Before the pages in the tree, so a page view is queued ahead of the events of its page.
+ */
 function HitReporter() {
   usePageHit()
+  usePageView()
   return null
 }
 

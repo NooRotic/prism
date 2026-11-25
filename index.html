@@ -45,7 +45,8 @@
       // so a local build or any other host does nothing. A visitor who sends Do Not Track or Global Privacy Control is not counted
       // and no request is made. The part of the address after the # is never sent: it holds the Twitch sign-in token on the way back
       // from signing in, and the handed-over list on /import (Matomo sends it unless told not to). It adds the class "counted" to
-      // <html>, which shows the one-line note (.counted-note in index.css).
+      // <html>, which shows the one-line note (.counted-note in index.css). It only sets Matomo up: the app sends the page views and
+      // starts link tracking (src/hooks/usePageView.ts), because the browser's own address can hold a pasted stream.
       // Tests: src/lib/__tests__/matomoBlock.test.ts.
       (function () {
         var sites = { 'prism.nooroticx.tv': '4' };
@@ -57,8 +58,6 @@
         _paq.push(['disableCookies']);
         _paq.push(['setDoNotTrack', true]);
         _paq.push(['discardHashTag', true]);
-        _paq.push(['trackPageView']);
-        _paq.push(['enableLinkTracking']);
         var u = 'https://stats.pollardjr.com/';
         _paq.push(['setTrackerUrl', u + 'matomo.php']);
         _paq.push(['setSiteId', sites[location.hostname]]);
