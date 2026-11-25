@@ -15,11 +15,12 @@ it('fades Google’s own overlay out and leaves the picture, once, whenever its 
   root.innerHTML = '<video></video><tv-overlay></tv-overlay><div class="spinner"></div>'
   vi.advanceTimersByTime(5000)
   expect(root.querySelectorAll('style')).toHaveLength(1)
-  expect(getComputedStyle(root.querySelector('tv-overlay') as Element).opacity).toBe('0')
-  expect(getComputedStyle(root.querySelector('.spinner') as Element).opacity).toBe('0')
-  expect(getComputedStyle(root.querySelector('video') as Element).opacity).not.toBe('0')
-  // Faded, not taken out: the element is what makes the device send keys.
-  expect(getComputedStyle(root.querySelector('tv-overlay') as Element).display).not.toBe('none')
+  // jsdom applies nothing in a shadow root, so the rule's own text is read. That it fades them was seen in a real browser.
+  const [, selector, body] = /^\s*([^{]+)\{([^}]+)\}\s*$/.exec(root.querySelector('style')?.textContent ?? '') ?? []
+  expect(body.trim()).toBe('opacity: 0 !important;')
+  expect(root.querySelector('tv-overlay')?.matches(selector)).toBe(true)
+  expect(root.querySelector('.spinner')?.matches(selector)).toBe(true)
+  expect(root.querySelector('video')?.matches(selector)).toBe(false)
 })
 
 it('gives up quietly when there is no such element', () => {
