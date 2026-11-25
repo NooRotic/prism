@@ -61,7 +61,7 @@ function Harness({ first, floating }: { first: Partial<CastView>; floating: bool
   )
 }
 
-function renderAt(path: string | { pathname: string; state?: unknown }, first: Partial<CastView> = { available: true }, floating = false) {
+function renderAt(path: string | { pathname: string; search?: string; state?: unknown }, first: Partial<CastView> = { available: true }, floating = false) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Spy />
@@ -202,7 +202,9 @@ describe('what tunes the TV', () => {
   it('not Back and Forward, a link to the page, or the list arriving', () => {
     renderAt('/hls-dash/aaa', CONNECTED)
     navigate(buildStreamPath('https://p.test/x.m3u8'), { state: { castPick: true } })
+    navigate(buildStreamPath('https://p.test/y.m3u8'), { state: { castPick: true } })
     asked.tune.mockClear()
+    act(() => void go(-1)) // to the paste before
     navigate('/hls-dash')
     act(() => void go(-1))
     act(() => void go(-1))
@@ -213,8 +215,9 @@ describe('what tunes the TV', () => {
   })
 
   it('not a reload of a pasted address', () => {
-    const path = buildStreamPath('https://p.test/x.m3u8')
-    renderAt({ pathname: path, state: { castPick: true } }, CONNECTED)
+    const [pathname, search] = buildStreamPath('https://p.test/x.m3u8').split('?')
+    renderAt({ pathname, search: `?${search}`, state: { castPick: true } }, CONNECTED)
+    expect(screen.getByTestId('cast-panel')).toBeInTheDocument()
     expect(asked.tune).not.toHaveBeenCalled()
   })
 
