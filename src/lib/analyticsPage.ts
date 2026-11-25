@@ -7,7 +7,8 @@ export interface AnalyticsPage {
   title: string
 }
 
-const LOGIN = /^[A-Za-z0-9_]{1,25}$/
+/** What a Twitch login looks like. */
+export const LOGIN = /^[A-Za-z0-9_]{1,25}$/
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/
 const STREAM_ID = /^[0-9a-f]{12}$/
 

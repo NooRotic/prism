@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import HlsPage from '../HlsPage'
 import { useApp } from '../../contexts/AppContext'
+import { useStayed } from '../../hooks/useStayed'
 import { useStreamSnapshot, type StreamSnapshotState } from '../../hooks/useStreamSnapshot'
 import { trackEvent } from '../../lib/analytics'
 import { resetFavoritesCache } from '../../lib/favorites'
@@ -42,6 +43,7 @@ vi.mock('../../components/player/StreamStatus', () => ({
 vi.mock('../../components/layout/DebugPanel', () => ({ default: () => null }))
 vi.mock('../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../hooks/useStreamSnapshot', () => ({ useStreamSnapshot: vi.fn() }))
+vi.mock('../../hooks/useStayed', () => ({ useStayed: vi.fn() }))
 
 const entry = (over: Partial<StreamEntry> & { id: string; name: string }): StreamEntry => ({
   groups: [0], country: null, logo: null, kind: 'hls', pinned: false, state: 'working', url: `https://${over.id}.test/live.m3u8`, ...over,
@@ -202,5 +204,18 @@ describe('HlsPage: favorites', () => {
 
     await userEvent.setup().click(within(list).getAllByRole('button', { name: /Alpha One (to|from) favorites/ })[0])
     expect(events('Feature')).toEqual([['favorite', 'Alpha One']])
+  })
+})
+
+describe('HlsPage: how long people stay', () => {
+  it.each([
+    ['a chosen stream', `/hls-dash/${BETA.id}`, 'Beta Two'],
+    ['the default stream, marked as that', '/hls-dash', 'Alpha One (default)'],
+    ['a pasted address, never the address', buildStreamPath(SECRET), 'Pasted address'],
+    ['nothing playing', '/hls-dash/does-not-exist', null],
+  ])('counts the stay for %s', (_name, path, name) => {
+    renderAt(path)
+
+    expect(vi.mocked(useStayed).mock.lastCall).toEqual([name, false])
   })
 })

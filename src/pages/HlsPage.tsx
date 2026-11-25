@@ -4,6 +4,7 @@ import { useApp } from '../contexts/AppContext'
 import { demoToEntry, getHlsDashDemo } from '../config/demoContent'
 import { STORAGE_KEYS } from '../config/storageKeys'
 import { useFavoriteCounts, useFavoriteIds, useToggleFavorite } from '../hooks/useFavorites'
+import { useStayed } from '../hooks/useStayed'
 import { useStreamSnapshot } from '../hooks/useStreamSnapshot'
 import { PASTED_STREAM, trackEvent } from '../lib/analytics'
 import { getFavorites } from '../lib/favorites'
@@ -187,6 +188,7 @@ export default function HlsPage() {
     [streamId, reportedName],
   )
   const onFailed = useCallback(() => trackEvent('HLS / DASH', 'failed', reportedName), [reportedName])
+  useStayed(source === null ? null : streamId === undefined ? `${reportedName} (default)` : reportedName, video.isFloating)
   const star = useCallback(
     (id: string) => {
       const was = getFavorites().has(id)
