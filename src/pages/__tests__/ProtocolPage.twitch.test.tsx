@@ -30,7 +30,10 @@ function setAuth({ signedIn, expired = false }: { signedIn: boolean; expired?: b
     handleAuthError: vi.fn(),
   })
   mockApp.mockReturnValue({
-    state: { auth: { isAuthenticated: signedIn, expired, token: null, user: null, profileError: false } },
+    state: {
+      auth: { isAuthenticated: signedIn, expired, token: null, user: null, profileError: false },
+      navPanel: { open: null },
+    },
     dispatch: vi.fn(),
   } as unknown as ReturnType<typeof useApp>)
 }

@@ -23,6 +23,7 @@ function ProtocolSidebar({ protocol }: { protocol: ProtocolPageProps['protocol']
     typeof window !== 'undefined' && window.innerWidth < 768,
   )
   const { isAuthenticated, login } = useTwitchAuth()
+  const { state, dispatch } = useApp()
   const location = useLocation()
 
   const navItems: { label: string; path: string; color: string }[] = [
@@ -116,31 +117,34 @@ function ProtocolSidebar({ protocol }: { protocol: ProtocolPageProps['protocol']
         {/* Divider */}
         <div className="mx-4 my-3" style={{ borderTop: '1px solid var(--border)' }} />
 
-        {/* Auth-gated links */}
-        <button
-          type="button"
-          onClick={isAuthenticated ? undefined : login}
-          className="flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left"
-          style={{
-            color: 'var(--accent-twitch)',
-            opacity: isAuthenticated ? 1 : 0.55,
-          }}
-        >
-          {!isAuthenticated && <Lock size={12} />}
-          Following
-        </button>
-        <button
-          type="button"
-          onClick={isAuthenticated ? undefined : login}
-          className="flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left"
-          style={{
-            color: 'var(--accent-twitch)',
-            opacity: isAuthenticated ? 1 : 0.55,
-          }}
-        >
-          {!isAuthenticated && <Lock size={12} />}
-          Your Stats
-        </button>
+        {/* Auth-gated links: signed in they open the same slide-down panels as the header's Twitch row (which the
+            header brings up when a panel opens); signed out they ask to connect. */}
+        {([
+          { id: 'following', label: 'Following' },
+          { id: 'your-stats', label: 'Your Stats' },
+        ] as const).map((item) => {
+          const active = isAuthenticated && state.navPanel.open === item.id
+          return (
+            <button
+              key={item.id}
+              type="button"
+              data-nav-trigger
+              onClick={isAuthenticated ? () => dispatch({ type: 'TOGGLE_NAV_PANEL', panel: item.id }) : login}
+              aria-expanded={isAuthenticated ? active : undefined}
+              aria-controls={isAuthenticated ? `nav-panel-${item.id}` : undefined}
+              className="flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left"
+              style={{
+                color: 'var(--accent-twitch)',
+                opacity: isAuthenticated ? 1 : 0.55,
+                backgroundColor: active ? 'rgba(255,255,255,0.05)' : 'transparent',
+                borderLeft: active ? '2px solid var(--accent-twitch)' : '2px solid transparent',
+              }}
+            >
+              {!isAuthenticated && <Lock size={12} />}
+              {item.label}
+            </button>
+          )
+        })}
         </>
       )}
 

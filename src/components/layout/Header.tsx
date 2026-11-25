@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useApp } from '../../contexts/AppContext'
@@ -7,6 +7,7 @@ import { useHeaderRow } from '../../hooks/useHeaderRow'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { useYoutubeAccount } from '../../hooks/useYoutubeAccount'
 import { nextRow, type RowId } from '../../lib/headerRow'
+import { hasDebugPanel } from '../../lib/routes'
 import { SECTIONS, sectionForPath, showsHeaderPaste } from '../../lib/headerSections'
 import { PrismMark } from '../brand/PrismMark'
 import { PasteToggle } from './PasteToggle'
@@ -23,6 +24,7 @@ export function Header() {
   const debugMode = state.player.debugMode
   const wide = useMediaQuery('(min-width: 640px)')
   const { pathname } = useLocation()
+  const debuggable = hasDebugPanel(pathname)
   const current = sectionForPath(pathname)
   const currentColor = SECTIONS.find((s) => s.id === current)?.color ?? 'transparent'
 
@@ -41,6 +43,19 @@ export function Header() {
 
   const { importing } = useYoutubeAccount()
   const row = useHeaderRow(headerRef, rowRef, { navPanelOpen: state.navPanel.open !== null, browseOpen, importing })
+
+  // Following or Your Stats opened from somewhere else (the Twitch page's sidebar) brings the Twitch row up with it,
+  // pinned, so its button shows as the open one. Only at the moment it opens: a row folded later (fill mode, a page
+  // change) stays folded. Category has no button in the row, so it leaves the row alone.
+  const panel = state.navPanel.open
+  const lastPanel = useRef(panel)
+  const openRow = row.state.open
+  const pressInHook = row.press
+  useEffect(() => {
+    const opened = panel !== lastPanel.current
+    lastPanel.current = panel
+    if (opened && (panel === 'following' || panel === 'your-stats') && openRow !== 'twitch') pressInHook('twitch')
+  }, [panel, openRow, pressInHook])
 
   // When a press takes the Twitch row away, its panels go with it: their buttons are about to leave the page.
   const pressRow = (id: RowId, trigger: HTMLElement) => {
@@ -104,7 +119,9 @@ export function Header() {
         <SectionTabs current={current} row={row} onPress={pressRow} />
         <div className="min-w-0 flex-1" />
 
-      <div data-header-actions className="flex shrink-0 items-center gap-1 sm:gap-3">
+      {/* While the paste box is open from 640 px, this group may shrink, so the box gives up room (down to its own minimum)
+          instead of leaving the whole squeeze to the tab strip. */}
+      <div data-header-actions className={`flex shrink-0 items-center gap-1 sm:gap-3 ${pasteOpen ? 'sm:min-w-0 sm:shrink' : ''}`}>
         {showHeaderInput && (
           <PasteToggle
             open={pasteOpen}
@@ -116,8 +133,9 @@ export function Header() {
         {/* Debug toggle lives here, not over the player: anything drawn on top
             of the Twitch embed makes its visibility check fail and disables
             autoplay. Below 640 px there is no room in the bar: it moves into the
-            Accounts row (only ever one of the two exists). */}
-        {wide && (
+            Accounts row (only ever one of the two exists). On a page with no
+            player it has nothing to show, so it is not there. */}
+        {wide && debuggable && (
           <button
             type="button"
             onClick={() => dispatch({ type: 'TOGGLE_DEBUG' })}
@@ -138,7 +156,7 @@ export function Header() {
       <div id="header-paste-list" ref={setPasteList} className="max-h-64 overflow-y-auto px-3 sm:px-6" />
 
       <FoldingRow open={row.state.open !== null} row={row} rowRef={rowRef}>
-        {shownRow === 'accounts' && <AccountsRow showDebugToggle={!wide} />}
+        {shownRow === 'accounts' && <AccountsRow showDebugToggle={!wide && debuggable} />}
         {shownRow === 'twitch' && <TwitchTools browseOpen={browseOpen} onBrowseOpenChange={setBrowseOpen} />}
         {shownRow === 'youtube' && (
           <Link

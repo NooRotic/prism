@@ -19,6 +19,9 @@ function Harness({ holds }: { holds: HeaderRowHolds }) {
         <button type="button" {...row.tabHoverProps('youtube')}>
           YouTube tools
         </button>
+        <button type="button" onClick={(e) => row.press('accounts', e.currentTarget)}>
+          Accounts
+        </button>
         <div ref={rowRef} {...row.rowHoverProps} data-testid="row">
           <button type="button">inside the row</button>
         </div>
@@ -118,6 +121,25 @@ describe('useHeaderRow: press and Esc', () => {
     expect(document.activeElement).toBe(twitchTab())
   })
 
+  // `trigger` remembers the button of the last press. A row that hover opened was opened by no button, so Esc must not
+  // throw focus back to that old one.
+  it('folds a previewed row on Esc without moving focus to an earlier trigger', () => {
+    renderHarness()
+    fireEvent.click(twitchTab())
+    fireEvent.click(twitchTab()) // pressed again: folded, but its button is still the remembered trigger
+    expect(state()).toBe('closed')
+    fireEvent.pointerEnter(screen.getByRole('button', { name: 'YouTube tools' }), { pointerType: 'mouse' })
+    advance(HOVER_OPEN_DELAY_MS)
+    expect(state()).toBe('youtube:previewed')
+    const inside = screen.getByRole('button', { name: 'inside the row' })
+    act(() => inside.focus())
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(state()).toBe('closed')
+    expect(document.activeElement).not.toBe(twitchTab())
+  })
+
   it('pins a row that hover opened instead of folding it', () => {
     renderHarness()
     fireEvent.pointerEnter(twitchTab(), { pointerType: 'mouse' })
@@ -169,14 +191,25 @@ describe('useHeaderRow: outside', () => {
     player.remove()
   })
 
-  it('stays open through an outside click while importing', () => {
+  it('stays open through an outside click while importing, on the Accounts row', () => {
+    const { rerenderWith } = renderHarness()
+    fireEvent.click(screen.getByRole('button', { name: 'Accounts' }))
+    rerenderWith({ ...NO_HOLDS, importing: true })
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'outside' }))
+
+    expect(state()).toBe('accounts:pinned')
+  })
+
+  // An import started on the Catch up page (or in another row) must not pin every other row open.
+  it('does not hold a row other than Accounts while an import runs', () => {
     const { rerenderWith } = renderHarness()
     fireEvent.click(twitchTab())
     rerenderWith({ ...NO_HOLDS, importing: true })
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'outside' }))
 
-    expect(state()).toBe('twitch:pinned')
+    expect(state()).toBe('closed')
   })
 
   // A mouse click leaves focus on the row button it hit; that is not the viewer working the row from the keyboard, and
@@ -191,6 +224,60 @@ describe('useHeaderRow: outside', () => {
     })
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'outside' }))
+
+    expect(state()).toBe('closed')
+  })
+
+  // A hold (a panel, Browse, an import) stops the automatic close. When it lets go the row must fold by itself, not sit
+  // open until the next click outside.
+  it('folds a previewed row when the hold ends and the pointer is long gone', () => {
+    const { rerenderWith } = renderHarness({ ...NO_HOLDS, navPanelOpen: true })
+    fireEvent.pointerEnter(twitchTab(), { pointerType: 'mouse' })
+    advance(HOVER_OPEN_DELAY_MS)
+    fireEvent.pointerLeave(twitchTab(), { pointerType: 'mouse' })
+    advance(1000)
+    expect(state()).toBe('twitch:previewed')
+
+    rerenderWith(NO_HOLDS)
+    advance(HOVER_CLOSE_DELAY_MS)
+
+    expect(state()).toBe('closed')
+  })
+
+  it('keeps a previewed row when the hold ends while the pointer is still over the row', () => {
+    const { rerenderWith } = renderHarness({ ...NO_HOLDS, navPanelOpen: true })
+    fireEvent.pointerEnter(twitchTab(), { pointerType: 'mouse' })
+    advance(HOVER_OPEN_DELAY_MS)
+    fireEvent.pointerEnter(screen.getByTestId('row'), { pointerType: 'mouse' })
+
+    rerenderWith(NO_HOLDS)
+    advance(1000)
+
+    expect(state()).toBe('twitch:previewed')
+  })
+
+  it('never folds a pinned row when a hold ends', () => {
+    const { rerenderWith } = renderHarness({ ...NO_HOLDS, navPanelOpen: true })
+    fireEvent.click(twitchTab())
+
+    rerenderWith(NO_HOLDS)
+    advance(1000)
+
+    expect(state()).toBe('twitch:pinned')
+  })
+
+  it('folds a previewed row when keyboard focus leaves it', () => {
+    renderHarness()
+    fireEvent.pointerEnter(twitchTab(), { pointerType: 'mouse' })
+    advance(HOVER_OPEN_DELAY_MS)
+    fireEvent.keyDown(document, { key: 'Tab' })
+    act(() => screen.getByRole('button', { name: 'inside the row' }).focus())
+    fireEvent.pointerLeave(twitchTab(), { pointerType: 'mouse' })
+    advance(1000)
+    expect(state()).toBe('twitch:previewed')
+
+    act(() => screen.getByRole('button', { name: 'outside' }).focus())
+    advance(HOVER_CLOSE_DELAY_MS)
 
     expect(state()).toBe('closed')
   })

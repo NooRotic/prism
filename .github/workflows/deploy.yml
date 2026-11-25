@@ -2,6 +2,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # A fresh run by hand. A failed run cannot simply be re-run: it would upload a second artifact with the same name.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,6 +16,8 @@ concurrency:
 
 jobs:
   deploy:
+    # A run started by hand could be pointed at another branch; only main is ever published.
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

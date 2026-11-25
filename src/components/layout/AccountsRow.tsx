@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { useYoutubeAccount } from '../../hooks/useYoutubeAccount'
@@ -99,13 +99,8 @@ function TwitchAccount() {
 
 function YoutubeAccount() {
   const youtube = useYoutubeAccount()
-  const [failure, setFailure] = useState<string | null>(null)
-
-  const start = async () => {
-    setFailure(null)
-    const result = await importYoutubeSubscriptions()
-    if (result.status === 'failed') setFailure(result.message)
-  }
+  // The reason an import failed lives with the import, not in this row: another row can replace this one while it runs.
+  const { failure } = youtube
 
   let detail: string
   if (youtube.account) {
@@ -133,7 +128,7 @@ function YoutubeAccount() {
         </span>
       </span>
       {youtube.configured ? (
-        <ActionButton onClick={() => void start()} disabled={youtube.importing}>
+        <ActionButton onClick={() => void importYoutubeSubscriptions()} disabled={youtube.importing}>
           {youtube.importing ? 'Importing…' : youtube.imported ? 'Re-import' : 'Import'}
         </ActionButton>
       ) : (
