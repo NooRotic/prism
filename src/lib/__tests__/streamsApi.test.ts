@@ -3,6 +3,7 @@ import {
   logoUrl,
   parseSnapshot,
   peekStreamSnapshot,
+  refreshStreamSnapshot,
   resetSnapshotCache,
   type StreamSnapshot,
 } from '../streamsApi'
@@ -271,6 +272,35 @@ describe('loadStreamSnapshot', () => {
     expect(await loadStreamSnapshot(controller.signal)).toEqual({ kind: 'unavailable' })
     expect((await loadStreamSnapshot()).kind).toBe('ready')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('refreshStreamSnapshot', () => {
+  it('asks again although a good answer is remembered, and remembers the new one', async () => {
+    stubFetch(WIRE)
+    await loadStreamSnapshot()
+    const fetchMock = stubFetch({ ...WIRE, streams: [WIRE.streams[1]] })
+    const result = await refreshStreamSnapshot()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ kind: 'ready', snapshot: { ...EXPECTED, streams: [EXPECTED.streams[1]] } })
+    expect(peekStreamSnapshot()).toEqual(result)
+  })
+
+  it('keeps the list it has when the new answer is no good', async () => {
+    stubFetch(WIRE)
+    await loadStreamSnapshot()
+    stubFetch('down', 503)
+    expect(await refreshStreamSnapshot()).toEqual({ kind: 'ready', snapshot: EXPECTED })
+    expect(peekStreamSnapshot()).toEqual({ kind: 'ready', snapshot: EXPECTED })
+  })
+
+  it('says unavailable when there is nothing to keep, and asks nothing when the server is switched off', async () => {
+    stubFetch('down', 503)
+    expect(await refreshStreamSnapshot()).toEqual({ kind: 'unavailable' })
+    flags.enabled = false
+    const fetchMock = stubFetch(WIRE)
+    expect(await refreshStreamSnapshot()).toEqual({ kind: 'unavailable' })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
 
