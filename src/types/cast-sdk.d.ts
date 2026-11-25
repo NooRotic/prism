@@ -75,4 +75,64 @@ declare namespace cast.framework {
       constructor(type: string)
     }
   }
+
+  // ── The sender (PRISM's own page) ──────────────────────────────────────────
+
+  class CastContext {
+    static getInstance(): CastContext
+    setOptions(options: { receiverApplicationId: string; autoJoinPolicy: string }): void
+    addEventListener(type: string, listener: (event: { castState?: string; sessionState?: string }) => void): void
+    getCastState(): string
+    getCurrentSession(): CastSession | null
+    requestSession(): Promise<unknown>
+    endCurrentSession(stopCasting: boolean): void
+  }
+
+  class CastSession {
+    getCastDevice(): { friendlyName: string }
+    addMessageListener(namespace: string, listener: (namespace: string, message: string) => void): void
+    sendMessage(namespace: string, data: unknown): Promise<unknown>
+    loadMedia(request: chrome.cast.media.LoadRequest): Promise<unknown>
+  }
+
+  class RemotePlayer {
+    isPaused: boolean
+  }
+
+  class RemotePlayerController {
+    constructor(player: RemotePlayer)
+    addEventListener(type: string, listener: () => void): void
+    playOrPause(): void
+  }
+
+  const CastContextEventType: { CAST_STATE_CHANGED: string; SESSION_STATE_CHANGED: string }
+  const CastState: { NO_DEVICES_AVAILABLE: string }
+  const SessionState: { SESSION_STARTED: string; SESSION_RESUMED: string; SESSION_ENDED: string; SESSION_START_FAILED: string }
+  const RemotePlayerEventType: { IS_PAUSED_CHANGED: string }
+}
+
+declare namespace chrome.cast {
+  const AutoJoinPolicy: { TAB_AND_ORIGIN_SCOPED: string }
+  class Image {
+    constructor(url: string)
+    url: string
+  }
+  namespace media {
+    const StreamType: { LIVE: string; BUFFERED: string }
+    class GenericMediaMetadata {
+      title?: string
+      images?: Image[]
+    }
+    class MediaInfo {
+      constructor(contentId: string, contentType: string)
+      contentUrl?: string
+      streamType?: string
+      metadata?: GenericMediaMetadata
+      customData?: unknown
+    }
+    class LoadRequest {
+      constructor(media: MediaInfo)
+      autoplay?: boolean
+    }
+  }
 }
