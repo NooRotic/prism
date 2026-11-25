@@ -88,7 +88,7 @@ clicking it would otherwise send the pasted address as an outgoing link. This ge
 | Category | Action | Name | When |
 |---|---|---|---|
 | HLS / DASH | chosen | stream name | the address names a listed or demo stream (a card click or a shared link) |
-| HLS / DASH | played | stream name, or `Pasted address` | first `onPlaying` for that stream (both engines report it) |
+| HLS / DASH | played | stream name, or `Pasted address` | first `onPlaying` for that stream. Only `VideoJSPlayer` calls it today; `DashJSPlayer` handles the video's `playing` event but never tells the page, so it gets the same call (it also clears the stall notice, as it already does for HLS) |
 | HLS / DASH | default played | stream name | the same, when the page opened on its default stream |
 | HLS / DASH | failed | stream name, or `Pasted address` | no engine could play it (`markFailed`) |
 | Twitch | opened | login | a channel page opens |
@@ -120,7 +120,10 @@ would otherwise show as zero seconds.
   as well (the owner's password), and that setting covers every site on that Matomo.
 - Not proposed: a second, anonymous Matomo site for those visitors. It is more work and gives numbers that cannot be compared.
 
-This is not legal advice; sources: Mozilla's GPC help page and Wikipedia's DNT and GPC articles, read 2026-11-24.
+This is not legal advice. Sources, from a search summary on 2026-11-24:
+[Do Not Track](https://en.wikipedia.org/wiki/Do_Not_Track) and
+[Global Privacy Control](https://en.wikipedia.org/wiki/Global_Privacy_Control) (Wikipedia),
+[Global Privacy Control](https://support.mozilla.org/en-US/kb/global-privacy-control) (Mozilla).
 
 ## Notice
 
