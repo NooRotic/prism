@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { Tv } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
@@ -47,20 +47,15 @@ function PageOfflineStrip({
 export default function TwitchPlayerPage() {
   const { channel } = useParams<{ channel: string }>()
   const { state, dispatch } = useApp()
-  const { handleAuthError, isAuthenticated } = useTwitchAuth()
+  const { isAuthenticated } = useTwitchAuth()
   const onSessionExpired = useSessionExpiry()
   const { player } = state
-
-  const authErrorHandler = useCallback(
-    () => handleAuthError(null),
-    [handleAuthError],
-  )
 
   // Trigger channel data fetch when route param changes
   const channelForApi = isAuthenticated ? (channel ?? null) : null
   const channelDataOptions = useMemo(
-    () => ({ handleAuthError: authErrorHandler }),
-    [authErrorHandler],
+    () => ({ handleAuthError: onSessionExpired }),
+    [onSessionExpired],
   )
   useChannelData(channelForApi, channelDataOptions)
 
