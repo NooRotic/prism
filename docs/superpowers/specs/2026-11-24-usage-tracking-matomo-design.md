@@ -52,11 +52,15 @@ The owner dropped the "counts, not people" rule for usage tracking, which remove
 2. **`src/lib/analyticsPage.ts`** (new, pure): turns a path into `{ path, title }` or null (table below).
 3. **`src/hooks/usePageView.ts`** (new), called beside `usePageHit` in `HitReporter`, with the same rule for what a page change is
    (a different path, trailing slash ignored). `usePageHit` is untouched.
-4. **`index.html`**: the block keeps its settings (including `discardHashTag`) and its link tracking but no longer sends the page
-   view itself; the hook does, so there is one place that decides what address is sent.
+4. **`index.html`**: the block keeps its settings (including `discardHashTag`) but no longer sends the page view or starts link
+   tracking; the hook does both with the first page view, so there is one place that decides what address is sent, and pages that
+   send no view (admin, pop-outs) send nothing at all. (Link tracking moved here while planning: a click in the pop-out player
+   would have sent its raw address, which holds a pasted stream.)
 5. **`public/404.html`**: before redirecting, keeps `document.referrer` in `sessionStorage` (`prism_entry_referrer`) when it is
    another site. The first page view sends it with `setReferrerUrl` and removes it. Without this, every deep link looks like it
    came from PRISM itself (seen live 2026-11-24). Only the first page view has it; later ones use the previous page's address.
+   When the browser's referrer is PRISM itself (a reload through 404), an empty one is sent: it is the full address, query included,
+   so it can hold a pasted stream (found while planning).
 6. **Call sites** for the events below, one line each.
 7. **The note** (see "Notice").
 
@@ -76,8 +80,8 @@ Query strings and fragments are never sent, with one exception: `utm_source`, `u
 | `/hls-dash/custom` | same | HLS / DASH: pasted address |
 | `/hls-dash/<12 hex>` or a demo id | same | HLS / DASH stream |
 | `/import` | same | Import |
-| anything else under those three sections | `/<section>/other` | <Section>: other |
-| no route | `/not-found` | Not found |
+| one more segment under those three sections that fits no row above | `/<section>/other` | <Section>: other |
+| anything else (no such page) | `/not-found` | Not found |
 | `/admin/*`, `/chat/*`, `/chat-youtube/*`, `/popout/player` | nothing | (the owner's tool; parts of a page already counted) |
 
 Link tracking stays on, but the "Open address" link on a failed stream (`StreamStatus.tsx`) gets Matomo's ignore class, because
@@ -93,14 +97,14 @@ clicking it would otherwise send the pasted address as an outgoing link. This ge
 | HLS / DASH | failed | stream name, or `Pasted address` | no engine could play it (`markFailed`) |
 | Twitch | opened | login | a channel page opens |
 | YouTube | opened | `Channel title (UC...)` | the video's details arrive; once per video |
-| Linking | linked | `twitch/x <-> youtube/Title` (or `kick/y`) | the viewer saves a link (either modal, or accepts a suggestion) |
+| Linking | linked | `twitch/x <-> youtube/Title` (or `kick/y`) | the viewer saves a link (either modal, or accepts a suggestion) and it differs from the one before |
 | Linking | auto-linked | the same | `useLinkSuggestion` saves one by itself because both bios agree |
 | Linking | unlinked | the same | the viewer removes a link |
 | Linking | followed | the same | the viewer opens a linked account's chip (Twitch page), or the linked YouTube chat pop-out |
 | Feature | video pop-out, chat pop-out, YouTube chat pop-out | (none) | the window opened |
-| Feature | paste | the detected type (twitch, youtube, hls, dash, mp4, unknown), never the text | a paste or search is submitted |
+| Feature | paste | the detected type (twitch, youtube, hls, dash, mp4, unknown), or `text` for words that are no address; never the text itself | a paste or search is submitted |
 | Feature | favorite | stream name | a stream is starred (not un-starred) |
-| Stayed | 1 min, 10 min | the same name as "opened", "chosen" or "default played" | the page has been visible that long on one path |
+| Stayed | 1 min, 10 min | the same name as "opened" or "chosen", `Pasted address`, or the stream name followed by ` (default)` | the page has been visible, or its video popped out, that long on one path |
 
 The admin Playlist preview also uses `StreamPlayerPanel`; it reports nothing, because the page passes the callbacks and the preview
 does not. "Stayed" exists because Matomo measures time between actions, so someone who opens one stream and watches for an hour
