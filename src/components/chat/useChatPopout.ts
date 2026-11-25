@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { trackEvent } from '../../lib/analytics'
 import {
   boundsToFeatures,
   buildPopoutUrl,
@@ -134,6 +135,7 @@ export function useChatPopout(
     lastChannelRef.current = target
     setBlocked(false)
     setIsOpen(true)
+    trackEvent('Feature', kind === 'youtube' ? 'YouTube chat pop-out' : 'chat pop-out')
     return true
   }, [channel, tabId, kind])
 

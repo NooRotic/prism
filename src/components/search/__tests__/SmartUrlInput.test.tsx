@@ -3,6 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from '../../../contexts/AppContext'
 import { SmartUrlInput } from '../SmartUrlInput'
+import { trackEvent } from '../../../lib/analytics'
+
+vi.mock('../../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../../lib/analytics')>()), trackEvent: vi.fn() }))
 
 vi.mock('../SearchSuggestions', () => ({
   SearchSuggestions: () => <div data-testid="search-suggestions" />,
@@ -182,5 +185,36 @@ describe('SmartUrlInput routing of pasted links', () => {
   it('drops a Mix (RD...) list, which the API cannot read', async () => {
     await paste('https://www.youtube.com/watch?v=abc12345678&list=RDabc12345678')
     expect(screen.getByTestId('location').textContent).toBe('/youtube/abc12345678')
+  })
+})
+
+describe('SmartUrlInput: what is counted', () => {
+  it.each([
+    ['https://twitch.tv/shroud', 'twitch', 'shroud'],
+    ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'youtube', 'dQw4w9WgXcQ'],
+    ['https://x.test/secret-key.m3u8', 'hls', 'secret'],
+    ['https://x.test/secret-key.mpd', 'dash', 'secret'],
+    ['https://x.test/secret-key', 'unknown', 'secret'],
+    ['shroud', 'text', 'shroud'],
+    ['just chatting', 'text', 'chatting'],
+  ])('counts "%s" as %s, and never what was typed', async (typed, kind, secret) => {
+    vi.mocked(trackEvent).mockClear()
+    renderInput()
+    const user = userEvent.setup()
+    await user.type(screen.getByPlaceholderText('Paste URL or type channel name...'), typed)
+    await user.keyboard('{Enter}')
+
+    expect(vi.mocked(trackEvent).mock.calls).toEqual([['Feature', 'paste', kind]])
+    expect(JSON.stringify(vi.mocked(trackEvent).mock.calls)).not.toContain(secret)
+  })
+
+  it('counts nothing for an empty box', async () => {
+    vi.mocked(trackEvent).mockClear()
+    renderInput()
+    const user = userEvent.setup()
+    await user.click(screen.getByPlaceholderText('Paste URL or type channel name...'))
+    await user.keyboard('{Enter}')
+
+    expect(trackEvent).not.toHaveBeenCalled()
   })
 })

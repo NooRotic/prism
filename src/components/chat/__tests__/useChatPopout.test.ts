@@ -1,8 +1,11 @@
 import { act, renderHook } from '@testing-library/react'
 import { vi } from 'vitest'
 import { useChatPopout } from '../useChatPopout'
+import { trackEvent } from '../../../lib/analytics'
 import { POPOUT_WINDOW_NAME, getTabId, saveBounds } from '../../../lib/chatPopout'
 import { createFakePopoutBus } from '../../../test/fakePopoutBus'
+
+vi.mock('../../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../../lib/analytics')>()), trackEvent: vi.fn() }))
 
 function fakePopup() {
   return { closed: false, close: vi.fn() }
@@ -16,6 +19,7 @@ describe('useChatPopout', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
+    vi.mocked(trackEvent).mockClear()
     tabId = getTabId()
     vi.useFakeTimers()
     popup = fakePopup()
@@ -46,6 +50,17 @@ describe('useChatPopout', () => {
       POPOUT_WINDOW_NAME,
       'popup=yes,width=500,height=800,left=10,top=20',
     )
+  })
+
+  it('counts a window that opened, and not one that was blocked or was already there', () => {
+    openSpy.mockReturnValueOnce(null)
+    const { result, deliver } = setup()
+    act(() => void result.current.open())
+    deliver({ type: 'hello', owner: tabId, channel: 'streamer' })
+    expect(trackEvent).not.toHaveBeenCalled()
+
+    act(() => void result.current.open())
+    expect(vi.mocked(trackEvent).mock.calls).toEqual([['Feature', 'chat pop-out']])
   })
 
   it('open() with nothing saved asks for the default window size', () => {
