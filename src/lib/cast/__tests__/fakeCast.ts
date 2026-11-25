@@ -1,39 +1,47 @@
-// A stand-in for Google's sender SDK, for tests: the parts PRISM uses, driven by the test.
+// A stand-in for Google's sender SDK, for tests: the parts PRISM uses, driven by the test. Where Google's own code is strict
+// (read from its live scripts, 2026-11-25) so is this: one request for a session at a time, a refused second one announced
+// as a failed start, STARTED before the promise resolves, and messages only to the listeners of the session they came on.
 
 type Listener = (event: never) => void
+type Load = { autoplay: boolean; media: Record<string, unknown> }
 
 export interface FakeCast {
   options: unknown
   requestSession: ReturnType<typeof vi.fn<() => Promise<unknown>>>
   endCurrentSession: ReturnType<typeof vi.fn<(stop: boolean) => void>>
-  loadMedia: ReturnType<typeof vi.fn<(request: { autoplay: boolean; media: Record<string, unknown> }) => Promise<unknown>>>
+  loadMedia: ReturnType<typeof vi.fn<(request: Load) => Promise<unknown>>>
   sendMessage: ReturnType<typeof vi.fn<(namespace: string, data: unknown) => Promise<unknown>>>
   playOrPause: ReturnType<typeof vi.fn<() => void>>
   sdkReady(ok?: boolean): void
   hideFramework(): void
   showFramework(): void
+  /** A blocker let the framework through and stopped the rest of the SDK. */
+  hideChromeCast(): void
   castState(state: string): void
+  /** The picker was closed without a choice. */
+  cancelPicker(): void
   sessionStarted(device: string): void
   sessionResumed(device: string): void
   sessionEnded(): void
   message(data: unknown): void
-  paused(on: boolean): void
 }
 
 export function installFakeCast(): FakeCast {
   const contextListeners = new Map<string, Listener[]>()
-  const messageListeners: ((namespace: string, text: string) => void)[] = []
-  const pausedListeners: Listener[] = []
-  const player = { isPaused: false }
+  let asking: { resolve: () => void; reject: (why: string) => void } | null = null
   let device = ''
-  let current: unknown = null
+  let current: { listeners: ((namespace: string, text: string) => void)[] } | null = null
 
   const emit = (type: string, event: unknown) => contextListeners.get(type)?.forEach((l) => l(event as never))
-  const session = {
-    getCastDevice: () => ({ friendlyName: device }),
-    addMessageListener: (_namespace: string, l: (namespace: string, text: string) => void) => messageListeners.push(l),
-    loadMedia: (request: never) => fake.loadMedia(request),
-    sendMessage: (namespace: string, data: unknown) => fake.sendMessage(namespace, data),
+  const newSession = () => {
+    const listeners: ((namespace: string, text: string) => void)[] = []
+    return {
+      listeners,
+      getCastDevice: () => ({ friendlyName: device }),
+      addMessageListener: (_namespace: string, l: (namespace: string, text: string) => void) => listeners.push(l),
+      loadMedia: (request: never) => fake.loadMedia(request),
+      sendMessage: (namespace: string, data: unknown) => fake.sendMessage(namespace, data),
+    }
   }
   const context = {
     setOptions: (options: unknown) => {
@@ -51,12 +59,11 @@ export function installFakeCast(): FakeCast {
     CastState: { NO_DEVICES_AVAILABLE: 'NO_DEVICES_AVAILABLE' },
     SessionState: { SESSION_STARTED: 'STARTED', SESSION_RESUMED: 'RESUMED', SESSION_ENDED: 'ENDED', SESSION_START_FAILED: 'START_FAILED' },
     RemotePlayer: function RemotePlayer() {
-      return player
+      return {}
     },
     RemotePlayerController: function RemotePlayerController() {
-      return { addEventListener: (_type: string, l: Listener) => pausedListeners.push(l), playOrPause: () => fake.playOrPause() }
+      return { playOrPause: () => fake.playOrPause() }
     },
-    RemotePlayerEventType: { IS_PAUSED_CHANGED: 'paused' },
   }
   class Media {
     contentId: string
@@ -79,47 +86,61 @@ export function installFakeCast(): FakeCast {
       this.url = url
     }
   }
-  const holder: { framework?: typeof framework } = { framework }
-  vi.stubGlobal('cast', holder)
-  vi.stubGlobal('chrome', {
+  const castHolder: { framework?: typeof framework } = { framework }
+  const chromeHolder: { cast?: unknown } = {
     cast: {
       AutoJoinPolicy: { TAB_AND_ORIGIN_SCOPED: 'tab_and_origin_scoped' },
       Image,
       media: { MediaInfo: Media, LoadRequest, GenericMediaMetadata: class {}, StreamType: { LIVE: 'LIVE', BUFFERED: 'BUFFERED' } },
     },
-  })
+  }
+  vi.stubGlobal('cast', castHolder)
+  vi.stubGlobal('chrome', chromeHolder)
 
   const begin = (state: string) => (name: string) => {
     device = name
-    current = session
+    current = newSession()
     emit('session', { sessionState: state })
+    asking?.resolve()
+    asking = null
   }
   const fake: FakeCast = {
     options: null,
-    requestSession: vi.fn<() => Promise<unknown>>(() => Promise.resolve()),
+    requestSession: vi.fn<() => Promise<unknown>>(() => {
+      if (asking) {
+        emit('session', { sessionState: 'START_FAILED' })
+        return Promise.reject('Already requesting session')
+      }
+      return new Promise<void>((resolve, reject) => {
+        asking = { resolve, reject }
+      })
+    }),
     endCurrentSession: vi.fn<(stop: boolean) => void>(),
-    loadMedia: vi.fn<(request: { autoplay: boolean; media: Record<string, unknown> }) => Promise<unknown>>(() => Promise.resolve()),
+    loadMedia: vi.fn<(request: Load) => Promise<unknown>>(() => Promise.resolve()),
     sendMessage: vi.fn<(namespace: string, data: unknown) => Promise<unknown>>(() => Promise.resolve()),
     playOrPause: vi.fn<() => void>(),
     sdkReady: (ok = true) => (window as unknown as { __onGCastApiAvailable?: (ok: boolean) => void }).__onGCastApiAvailable?.(ok),
     hideFramework: () => {
-      delete holder.framework
+      delete castHolder.framework
     },
     showFramework: () => {
-      holder.framework = framework
+      castHolder.framework = framework
+    },
+    hideChromeCast: () => {
+      delete chromeHolder.cast
     },
     castState: (state) => emit('cast', { castState: state }),
+    cancelPicker: () => {
+      asking?.reject('cancel')
+      asking = null
+    },
     sessionStarted: begin('STARTED'),
     sessionResumed: begin('RESUMED'),
     sessionEnded: () => {
       current = null
       emit('session', { sessionState: 'ENDED' })
     },
-    message: (data) => messageListeners.at(-1)?.('ns', JSON.stringify(data)),
-    paused: (on) => {
-      player.isPaused = on
-      pausedListeners.forEach((l) => l({} as never))
-    },
+    message: (data) => current?.listeners.forEach((l) => l('ns', JSON.stringify(data))),
   }
   return fake
 }

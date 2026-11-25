@@ -55,6 +55,16 @@ it.each<[string, SnapshotResult]>([
   expect(result.current.list?.generated).toBe('two')
 })
 
+it('keeps the list it has when the new one is empty', async () => {
+  const { result } = renderHook(() => useChannelList())
+  await settle()
+  refresh.mockResolvedValue({ kind: 'ready', snapshot: { generated: 'none', defaultId: null, groups: [], streams: [] } })
+  vi.advanceTimersByTime(31 * MINUTE)
+  act(() => result.current.refreshIfOld())
+  await settle()
+  expect(result.current.list?.generated).toBe('one')
+})
+
 it('keeps the list it has when asking again gives nothing, and can ask once more', async () => {
   const { result } = renderHook(() => useChannelList())
   await settle()

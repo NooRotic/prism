@@ -17,9 +17,12 @@ const BUTTON = `${STRIP_BUTTON_LOOK} h-9 px-4 text-sm`
 const FRAME = 'flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-lg p-4 text-center'
 const FRAME_STYLE = { backgroundColor: '#000', border: '2px solid var(--accent-hls)', color: 'var(--text-secondary)' } as const
 
-/** Where the player was, while the stream plays on a TV: what the TV is on (it follows the remote) and the controls. */
-export default function CastPanel() {
-  const { device, now, paused, togglePause, stop } = useCast()
+/**
+ * Where the player was, while the stream plays on a TV: what the TV is on (it follows the remote) and the controls. `refused`
+ * says why the page's own stream did not go to the TV, when it cannot.
+ */
+export default function CastPanel({ refused }: { refused: string | null }) {
+  const { device, now, togglePause, stop } = useCast()
   const canPause = now !== null && (now.state === 'playing' || now.state === 'paused' || now.state === 'buffering')
   return (
     <div data-testid="cast-panel" className={FRAME} style={FRAME_STYLE}>
@@ -33,10 +36,15 @@ export default function CastPanel() {
       <p role="status" data-testid="cast-state" className="text-sm">
         {now ? WORDS[now.state] : 'Connecting…'}
       </p>
+      {refused && (
+        <p role="status" className="text-sm" style={{ color: 'var(--accent-orange)' }}>
+          {refused}
+        </p>
+      )}
       <div className="flex flex-wrap justify-center gap-3">
         {canPause && (
           <button type="button" onClick={togglePause} className={BUTTON}>
-            {paused ? 'Play' : 'Pause'}
+            {now.state === 'paused' ? 'Play' : 'Pause'}
           </button>
         )}
         <button type="button" onClick={stop} className={BUTTON}>

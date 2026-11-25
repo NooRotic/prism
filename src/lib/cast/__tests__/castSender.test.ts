@@ -72,6 +72,18 @@ describe('loading Google’s script', () => {
     expect(sender.view().available).toBe(false)
   })
 
+  it('stays quiet when a blocker let only half of the SDK through', () => {
+    vi.useFakeTimers()
+    fake.hideChromeCast()
+    const sender = createCastSender()
+    sender.load()
+    expect(() => {
+      fake.sdkReady()
+      vi.advanceTimersByTime(10_000)
+    }).not.toThrow()
+    expect(sender.view().available).toBe(false)
+  })
+
   it('waits for the framework, which can come after Google says it is ready', () => {
     vi.useFakeTimers()
     fake.hideFramework()
@@ -121,8 +133,8 @@ describe('starting', () => {
 
   it('changes nothing when the picker is closed', async () => {
     const sender = ready()
-    fake.requestSession.mockRejectedValueOnce('cancel')
     sender.start(STREAM, null)
+    fake.cancelPicker()
     await Promise.resolve()
     await Promise.resolve()
     expect(sender.view().connected).toBe(false)
@@ -130,11 +142,22 @@ describe('starting', () => {
     expect(fake.loadMedia).not.toHaveBeenCalled()
   })
 
-  it('says where it casts in the log, with no address', async () => {
+  it('says it is connecting, from the press to the session or the closed picker', async () => {
+    const sender = ready()
+    sender.start(STREAM, null)
+    expect(sender.view().connecting).toBe(true)
+    fake.cancelPicker()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(sender.view().connecting).toBe(false)
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV')
+    expect(sender.view().connecting).toBe(false)
+  })
+
+  it('puts no address in the playback log', async () => {
     await connected()
-    const text = JSON.stringify(getPlaybackSnapshot())
-    expect(text).not.toContain('secret')
-    expect(text).not.toContain('h.test')
+    expect(JSON.stringify(getPlaybackSnapshot())).not.toContain('h.test')
   })
 })
 
@@ -157,10 +180,8 @@ describe('what the TV says', () => {
     expect(sender.view().now?.state).toBe('playing')
   })
 
-  it('includes whether it is paused', async () => {
+  it('can be paused', async () => {
     const sender = await connected()
-    fake.paused(true)
-    expect(sender.view().paused).toBe(true)
     sender.togglePause()
     expect(fake.playOrPause).toHaveBeenCalledTimes(1)
   })
@@ -208,7 +229,7 @@ describe('ending', () => {
     sender.stop()
     expect(fake.endCurrentSession).toHaveBeenCalledWith(true)
     fake.sessionEnded()
-    expect(sender.view()).toMatchObject({ connected: false, device: null, now: null, paused: false, endedBySelf: false, stoppedOn: 'b' })
+    expect(sender.view()).toMatchObject({ connected: false, device: null, now: null, endedBySelf: false, stoppedOn: 'b' })
     expect(sessionStorage.getItem(STORAGE_KEYS.SESSION_CASTING)).toBeNull()
     sender.clearEnded()
     expect(sender.view().stoppedOn).toBeNull()

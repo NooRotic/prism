@@ -6,7 +6,7 @@ import type { CastStream } from './messages'
 /** Why a stream cannot go to the TV, in words for the button; null when it can. */
 export function castReason(source: StreamSource): string | null {
   if (source.kind !== 'hls' && source.kind !== 'dash') return 'Only HLS and DASH streams can be cast'
-  if (!source.url.startsWith('https:')) return 'This address is not secure (https), so a TV cannot play it'
+  if (new URL(source.url).protocol !== 'https:') return 'This address is not secure (https), so a TV cannot play it'
   return null
 }
 

@@ -68,7 +68,8 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
       const result = remote(before, event, at, contextNow.current)
       handNow.current = result.state
       if (event.type !== 'tick' || !sameToSee(before, result.state)) setHand(result.state)
-      if (event.type === 'keydown' && result.claimed && !result.effects.some((effect) => effect.type === 'backHint' || effect.type === 'noList')) setNotice(null)
+      // A new press takes a notice away; a key that is only being held does not.
+      if (event.type === 'keydown' && result.claimed && !result.state.lastKey?.repeating) setNotice(null)
       for (const effect of result.effects) {
         if (effect.type === 'tune') tuner.tune(fromEntry(effect.entry))
         else if (effect.type === 'refreshList') refreshIfOld()

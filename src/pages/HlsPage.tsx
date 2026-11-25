@@ -152,15 +152,19 @@ export default function HlsPage() {
   }, [streamId, searchParams, real, status])
 
   const cast = useCast()
-  const { connected, stoppedOn, load: loadCast, start: startCast, tune: tuneCast, clearEnded } = cast
+  const { connected, stoppedOn, load: loadCast, start: startCast, tune: tuneCast, offer: offerCast, clearEnded } = cast
   useEffect(() => loadCast(), [loadCast])
+  // How a cast ended matters to a page that saw it: one opened later starts as it always did.
+  const [sawCast, setSawCast] = useState(connected)
+  if (connected && !sawCast) setSawCast(true)
+  const ended = sawCast && !connected && cast.endedBySelf
 
   // The pop-out follows this page: it opens on the stream shown and switches when the page moves to another one. While the
-  // stream is on a TV there is nothing here to float.
+  // stream is on a TV, or the page stays silent after that, there is nothing here to float.
   const video = useFloatingVideo()
   const floatSource = useMemo<FramedSource | null>(
-    () => (source && !connected ? { kind: 'stream', url: source.url, streamKind: source.kind } : null),
-    [source, connected],
+    () => (source && !connected && !ended ? { kind: 'stream', url: source.url, streamKind: source.kind } : null),
+    [source, connected, ended],
   )
   useFloatingPageSource(floatSource)
 
@@ -198,43 +202,54 @@ export default function HlsPage() {
     [tuneCast, listedEntry, castGroup],
   )
 
-  const startCasting = () => {
-    if (!source) return
+  // The page's stream for the TV, worked out at the moment of casting; a floating video closes, as one stream is enough.
+  const choiceNow = () => {
+    if (!source || castReason(source) !== null) return null
     const local = playerAnchor.current?.querySelector('video')
     if (video.isFloating) video.close()
-    startCast(toCastStream(source, listedEntry(source.url), local !== null && local !== undefined && local.duration > 0 && Number.isFinite(local.duration)), castGroup)
+    const finite = local ? local.duration > 0 && Number.isFinite(local.duration) : false
+    return { stream: toCastStream(source, listedEntry(source.url), finite), group: castGroup }
   }
+  const startCasting = () => {
+    const choice = choiceNow()
+    if (choice) startCast(choice.stream, choice.group)
+  }
+  // Chrome's own Cast menu can start a cast of this page too.
+  const latestChoice = useRef(choiceNow)
+  useLayoutEffect(() => {
+    latestChoice.current = choiceNow
+  })
+  useEffect(() => {
+    offerCast(() => latestChoice.current())
+    return () => offerCast(null)
+  }, [offerCast])
 
   const pickHandled = useRef<string | null>(null)
   useEffect(() => {
     if (navigationType !== 'PUSH' || (location.state as { castPick?: boolean } | null)?.castPick !== true) return
     if (pickHandled.current === location.key) return
     pickHandled.current = location.key
-    if (connected) tuneTv(source)
-    else clearEnded()
-  }, [navigationType, location, connected, source, tuneTv, clearEnded])
-
-  // A cast that ended by itself while this page was not open has nothing to say to a later visit.
-  useLayoutEffect(() => {
-    if (cast.endedBySelf && !connected) clearEnded()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (connected || cast.connecting) tuneTv(source)
+    if (!connected) clearEnded()
+  }, [navigationType, location, connected, cast.connecting, source, tuneTv, clearEnded])
 
   // Stop was pressed here: the channel the TV was on comes back to the computer, if it is in the list.
-  const returnTo = !connected && stoppedOn !== null && stoppedOn !== streamId && resolveSnapshotStream(stoppedOn, real) ? stoppedOn : null
+  // It is forgotten only once the page is there: the navigation lands after a store update, and the old channel must not start.
+  const returnTo = sawCast && !connected && stoppedOn !== null && stoppedOn !== streamId && resolveSnapshotStream(stoppedOn, real) ? stoppedOn : null
   useLayoutEffect(() => {
     if (connected || stoppedOn === null) return
     if (returnTo !== null) navigate(`/hls-dash/${returnTo}`, { replace: true })
-    clearEnded()
+    else clearEnded()
   }, [connected, stoppedOn, returnTo, navigate, clearEnded])
 
   const choose = useCallback(
     (id: string) => {
-      if (connected) tuneTv(resolveStreamSource(id, NO_PARAMS) ?? resolveSnapshotStream(id, real))
-      else clearEnded()
+      if (connected || cast.connecting) tuneTv(resolveStreamSource(id, NO_PARAMS) ?? resolveSnapshotStream(id, real))
+      if (!connected) clearEnded()
       if (id !== streamId) navigate(`/hls-dash/${id}`)
       playerAnchor.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
     },
-    [navigate, streamId, connected, tuneTv, real, clearEnded],
+    [navigate, streamId, connected, cast.connecting, tuneTv, real, clearEnded],
   )
   const renderCard = useCallback(
     (stream: StreamEntry, selected: boolean) => (
@@ -250,6 +265,9 @@ export default function HlsPage() {
     [choose, favoriteIds, favoriteCounts, toggleFavorite],
   )
 
+  const castButton =
+    source && cast.available ? <CastButton reason={castReason(source)} connecting={cast.connecting} onStart={startCasting} /> : null
+
   // Links made while the paste box sent streams to this page (`/hls-dash?url=...`) still work: the custom path plays them.
   const pastedUrl = streamId ? null : searchParams.get('url')
   if (pastedUrl) return <Navigate to={buildStreamPath(pastedUrl)} replace />
@@ -258,22 +276,25 @@ export default function HlsPage() {
     <div className="mx-auto w-full max-w-[1500px] px-4 pt-4 pb-10 md:px-6">
       <div ref={playerAnchor} className="flex scroll-mt-20 flex-col gap-4 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
-          {source ? (
+          {connected ? (
+            <CastPanel refused={source && castReason(source)} />
+          ) : ended ? (
             <div className="flex flex-col gap-2">
-              {!connected && (
-                <VideoPopoutBar
-                  extra={cast.available ? <CastButton reason={castReason(source)} onStart={startCasting} /> : undefined}
-                />
-              )}
-              {connected ? (
-                <CastPanel />
-              ) : cast.endedBySelf ? (
-                <CastEndedPanel onPlayHere={clearEnded} />
-              ) : returnTo !== null ? (
-                <PlayerPlaceholder>
-                  <p>Loading stream…</p>
-                </PlayerPlaceholder>
-              ) : video.isFloating ? (
+              {castButton && <div className="flex justify-end">{castButton}</div>}
+              <CastEndedPanel onPlayHere={clearEnded} />
+            </div>
+          ) : cast.rejoining ? (
+            <PlayerPlaceholder>
+              <p>Reconnecting to the TV…</p>
+            </PlayerPlaceholder>
+          ) : returnTo !== null ? (
+            <PlayerPlaceholder>
+              <p>Loading stream…</p>
+            </PlayerPlaceholder>
+          ) : source ? (
+            <div className="flex flex-col gap-2">
+              <VideoPopoutBar extra={castButton ?? undefined} />
+              {video.isFloating ? (
                 <div
                   className="aspect-video w-full overflow-hidden rounded-lg"
                   style={{ backgroundColor: '#000', border: '2px solid var(--accent-hls)' }}

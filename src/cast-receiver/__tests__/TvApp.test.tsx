@@ -236,6 +236,18 @@ describe('the guide', () => {
     expect(highlighted()).toHaveTextContent('Channel 1501')
   })
 
+  it('keeps saying there is no list while a key is held', async () => {
+    await open(null)
+    act(() => senderLoad(SENT, DATA))
+    plays(1000)
+    press('ArrowDown')
+    for (let i = 0; i < 6; i++) {
+      wait(i === 0 ? 400 : 50)
+      key('ArrowDown')
+      expect(screen.getByText('The channel list is not available right now')).toBeInTheDocument()
+    }
+  })
+
   it('stays up, on the same channel, when the list changes under it', async () => {
     await playing()
     press('Enter')
@@ -324,6 +336,17 @@ describe('leaving', () => {
     expect(screen.getByText('Press Back again to leave')).toBeInTheDocument()
     press('BrowserBack')
     expect(leave).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps asking while Back is held: leaving is still one press away', async () => {
+    await playing()
+    press('BrowserBack')
+    wait(400)
+    key('BrowserBack')
+    wait(50)
+    key('BrowserBack')
+    expect(screen.getByText('Press Back again to leave')).toBeInTheDocument()
+    expect(leave).not.toHaveBeenCalled()
   })
 
   it('takes the question away after 3 s', async () => {

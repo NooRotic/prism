@@ -12,6 +12,7 @@ describe('castReason', () => {
   it('is nothing for HLS and DASH over https', () => {
     expect(castReason(pasted('https://h.test/a.m3u8'))).toBeNull()
     expect(castReason(pasted('https://h.test/a.mpd'))).toBeNull()
+    expect(castReason(pasted('HTTPS://h.test/a.m3u8'))).toBeNull()
   })
 
   it('says why another kind, or a plain http address, cannot go to the TV', () => {

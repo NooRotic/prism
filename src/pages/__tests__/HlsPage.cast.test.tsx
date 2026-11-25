@@ -28,7 +28,7 @@ vi.mock('../../components/streams/StreamGrid', () => ({
 const entry = (id: string, name: string, groups: number[] = [0]): StreamEntry => ({ id, name, groups, country: null, logo: null, kind: 'hls', pinned: false, state: 'working', url: `https://h.test/${id}.m3u8` })
 const LIST: StreamSnapshot = { generated: '', defaultId: 'aaa', groups: ['News'], streams: [entry('aaa', 'Alpha'), entry('bbb', 'Beta')] }
 
-const asked = { load: vi.fn(), start: vi.fn(), tune: vi.fn(), togglePause: vi.fn(), stop: vi.fn(), clearEnded: vi.fn() }
+const asked = { load: vi.fn(), start: vi.fn(), tune: vi.fn(), togglePause: vi.fn(), stop: vi.fn(), clearEnded: vi.fn(), offer: vi.fn() }
 const closeFloat = vi.fn()
 
 let setCast: (view: Partial<CastView>) => void
@@ -156,7 +156,7 @@ describe('while casting', () => {
   it('pauses, plays and stops', () => {
     renderAt('/hls-dash/aaa', CONNECTED)
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
-    setCast({ ...CONNECTED, paused: true, now: { id: 'bbb', name: 'Beta', state: 'paused' } })
+    setCast({ ...CONNECTED, now: { id: 'bbb', name: 'Beta', state: 'paused' } })
     fireEvent.click(screen.getByRole('button', { name: 'Play' }))
     expect(asked.togglePause).toHaveBeenCalledTimes(2)
     fireEvent.click(screen.getByRole('button', { name: 'Stop casting' }))
@@ -286,6 +286,7 @@ describe('when the cast ends', () => {
 
   it('by itself while on another page, does not greet a later visit', () => {
     renderAt('/hls-dash/aaa', { available: true, endedBySelf: true })
-    expect(asked.clearEnded).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Casting ended')).toBeNull()
+    expect(player()).not.toBeNull()
   })
 })

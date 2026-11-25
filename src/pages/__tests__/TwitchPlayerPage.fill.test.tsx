@@ -82,7 +82,7 @@ describe('TwitchPlayerPage in fill mode', () => {
   })
 })
 
-const CASTING = { ...NO_CAST, connected: true, device: 'TV', now: { id: 'a', name: 'News One', state: 'playing' }, load: () => {}, start: () => {}, tune: () => {}, togglePause: () => {}, stop: () => {}, clearEnded: () => {} } satisfies CastApi
+const CASTING = { ...NO_CAST, connected: true, device: 'TV', now: { id: 'a', name: 'News One', state: 'playing' }, load: () => {}, start: () => {}, tune: () => {}, togglePause: () => {}, stop: () => {}, clearEnded: () => {}, offer: () => {} } satisfies CastApi
 
 it('says above the dock, while casting, that Twitch comes later', () => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})

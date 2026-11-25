@@ -105,7 +105,7 @@ const live = (over: Partial<VideoPageData> = {}) =>
     data: data({ channelId: 'UC1', live: { state: 'live', viewerCount: 5, startedAt: null }, ...over }),
   })
 
-const CASTING = { ...NO_CAST, connected: true, device: 'TV', now: { id: 'a', name: 'News One', state: 'playing' }, load: () => {}, start: () => {}, tune: () => {}, togglePause: () => {}, stop: () => {}, clearEnded: () => {} } satisfies CastApi
+const CASTING = { ...NO_CAST, connected: true, device: 'TV', now: { id: 'a', name: 'News One', state: 'playing' }, load: () => {}, start: () => {}, tune: () => {}, togglePause: () => {}, stop: () => {}, clearEnded: () => {}, offer: () => {} } satisfies CastApi
 
 describe('YoutubePlayerPage while casting', () => {
   it.each([true, false])('says above the player that YouTube comes later (live: %s)', (isLive) => {

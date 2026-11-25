@@ -4,7 +4,7 @@ import { NO_CAST } from '../../../lib/cast/castSender'
 import CastComingSoon from '../CastComingSoon'
 import { CastContext, type CastApi } from '../castContext'
 
-const api = (view: Partial<CastView>): CastApi => ({ ...NO_CAST, ...view, load: vi.fn(), start: vi.fn(), tune: vi.fn(), togglePause: vi.fn(), stop: vi.fn(), clearEnded: vi.fn() })
+const api = (view: Partial<CastView>): CastApi => ({ ...NO_CAST, ...view, load: vi.fn(), start: vi.fn(), tune: vi.fn(), togglePause: vi.fn(), stop: vi.fn(), clearEnded: vi.fn(), offer: vi.fn() })
 
 const tree = (value: CastApi) => (
   <CastContext value={value}>

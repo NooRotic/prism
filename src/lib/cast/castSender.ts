@@ -1,19 +1,27 @@
 import { STORAGE_KEYS } from '../../config/storageKeys'
 import { getFavorites, subscribeFavorites } from '../favorites'
-import { logPlayback } from '../playbackLog'
 import { CAST_APP_ID, CAST_NAMESPACE, contentType, parseNow, type CastLoadData, type CastStream, type ContextMessage, type TvState } from './messages'
 
 export interface CastView {
   /** A device that can run PRISM's TV page was found. */
   available: boolean
+  /** A cast was asked for and the TV has not answered yet. */
+  connecting: boolean
+  /** This tab was casting before a reload, and it is not known yet whether the TV is still there. */
+  rejoining: boolean
   connected: boolean
   device: string | null
   now: { id: string | null; name: string; state: TvState } | null
-  paused: boolean
   /** The last cast ended without Stop being pressed on this page: the computer stays quiet until asked. */
   endedBySelf: boolean
   /** The channel the TV was on when Stop was pressed here. */
   stoppedOn: string | null
+}
+
+/** What to play on the TV, and the group the page was showing. */
+export interface CastChoice {
+  stream: CastStream
+  group: string | null
 }
 
 export interface CastSender {
@@ -23,15 +31,21 @@ export interface CastSender {
   togglePause(): void
   stop(): void
   clearEnded(): void
+  /** What the page would cast, for a cast that Chrome's own menu starts; null takes the offer back. */
+  offer(choice: (() => CastChoice | null) | null): void
   view(): CastView
   subscribe(listener: () => void): () => void
 }
 
-export const NO_CAST: CastView = { available: false, connected: false, device: null, now: null, paused: false, endedBySelf: false, stoppedOn: null }
+export const NO_CAST: CastView = { available: false, connecting: false, rejoining: false, connected: false, device: null, now: null, endedBySelf: false, stoppedOn: null }
 
 const SDK = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1'
 const FRAMEWORK_TRIES = 50
 const FRAMEWORK_WAIT_MS = 100
+/** How long a reloaded page waits for its TV before it plays by itself. */
+const REJOIN_MS = 5_000
+/** A Stop that has not ended the session by now did not work (Google's SDK says nothing about it). */
+const STOP_MS = 10_000
 
 function markCasting(on: boolean): void {
   try {
@@ -50,7 +64,7 @@ function wasCasting(): boolean {
   }
 }
 
-const sdkWindow = () => window as unknown as { chrome?: unknown; cast?: { framework?: unknown }; __onGCastApiAvailable?: (ok: boolean) => void }
+const sdkWindow = () => window as unknown as { chrome?: { cast?: unknown }; cast?: { framework?: unknown }; __onGCastApiAvailable?: (ok: boolean) => void }
 
 /** PRISM's side of a cast. Google's script is fetched only when `load` is called, or in a tab that was already casting. */
 export function createCastSender(): CastSender {
@@ -59,8 +73,10 @@ export function createCastSender(): CastSender {
   let context: cast.framework.CastContext | null = null
   let session: cast.framework.CastSession | null = null
   let controller: cast.framework.RemotePlayerController | null = null
-  let waiting: { stream: CastStream; group: string | null } | null = null
-  let stopping = false
+  /** What the cast that is being asked for will play. */
+  let waiting: CastChoice | null = null
+  let offered: (() => CastChoice | null) | null = null
+  let stopping: ReturnType<typeof setTimeout> | null = null
   let unstar: (() => void) | null = null
   const listeners = new Set<() => void>()
 
@@ -71,7 +87,7 @@ export function createCastSender(): CastSender {
     for (const listener of [...listeners]) listener()
   }
 
-  function loadOnTv({ stream, group }: { stream: CastStream; group: string | null }): void {
+  function loadOnTv({ stream, group }: CastChoice): void {
     if (!session) return
     const media = new chrome.cast.media.MediaInfo(stream.id ?? 'pasted', contentType(stream.kind))
     media.contentUrl = stream.url
@@ -92,7 +108,6 @@ export function createCastSender(): CastSender {
     const active = context?.getCurrentSession() ?? null
     if (!active) return
     session = active
-    const device = active.getCastDevice().friendlyName
     active.addMessageListener(CAST_NAMESPACE, (_namespace, text) => {
       const message = parseNow(text)
       if (message && session === active) set({ now: { id: message.id, name: message.name, state: message.state } })
@@ -103,29 +118,26 @@ export function createCastSender(): CastSender {
       active.sendMessage(CAST_NAMESPACE, message).catch(() => {})
     })
     markCasting(true)
-    logPlayback('info', 'cast', `casting to ${device}`)
-    set({ connected: true, device, endedBySelf: false, stoppedOn: null })
+    set({ connected: true, connecting: false, rejoining: false, device: active.getCastDevice().friendlyName, endedBySelf: false, stoppedOn: null })
   }
 
   function detach(): void {
     const had = session !== null
+    const byStop = stopping !== null
+    if (stopping) clearTimeout(stopping)
+    stopping = null
     session = null
     unstar?.()
     unstar = null
     markCasting(false)
-    if (!had) return
-    logPlayback('info', 'cast', 'casting ended')
-    set({ connected: false, device: null, now: null, paused: false, endedBySelf: !stopping, stoppedOn: stopping ? view.stoppedOn : null })
-    stopping = false
+    if (had) set({ connected: false, device: null, now: null, endedBySelf: !byStop, stoppedOn: byStop ? view.stoppedOn : null })
   }
 
   function init(): void {
     const { framework } = cast
     context = framework.CastContext.getInstance()
     context.setOptions({ receiverApplicationId: CAST_APP_ID, autoJoinPolicy: chrome.cast.AutoJoinPolicy.TAB_AND_ORIGIN_SCOPED })
-    const player = new framework.RemotePlayer()
-    controller = new framework.RemotePlayerController(player)
-    controller.addEventListener(framework.RemotePlayerEventType.IS_PAUSED_CHANGED, () => set({ paused: view.connected && player.isPaused }))
+    controller = new framework.RemotePlayerController(new framework.RemotePlayer())
 
     const showState = (state: string) => set({ available: state !== framework.CastState.NO_DEVICES_AVAILABLE })
     context.addEventListener(framework.CastContextEventType.CAST_STATE_CHANGED, (event) => {
@@ -135,61 +147,88 @@ export function createCastSender(): CastSender {
       const S = framework.SessionState
       if (event.sessionState === S.SESSION_STARTED) {
         attach()
-        if (waiting) loadOnTv(waiting)
+        // Started from Chrome's own menu, nothing waits: the page that is open is what was meant.
+        const choice = waiting ?? offered?.() ?? null
         waiting = null
+        if (choice) loadOnTv(choice)
       } else if (event.sessionState === S.SESSION_RESUMED) {
         attach()
       } else if (event.sessionState === S.SESSION_ENDED) {
         detach()
-      } else if (event.sessionState === S.SESSION_START_FAILED) {
-        waiting = null
       }
+      // A failed start is heard from the request itself: the SDK also says it of a second request it refuses.
     })
     showState(context.getCastState())
   }
 
   function waitForFramework(tries: number): void {
-    if (sdkWindow().cast?.framework) init()
+    const sdk = sdkWindow()
+    if (sdk.cast?.framework && sdk.chrome?.cast) init()
     else if (tries > 0) setTimeout(() => waitForFramework(tries - 1), FRAMEWORK_WAIT_MS)
+  }
+
+  /** The TV was not found again. */
+  function giveUpRejoining(): void {
+    if (!view.rejoining) return
+    markCasting(false)
+    set({ rejoining: false })
   }
 
   function load(): void {
     if (asked || typeof sdkWindow().chrome === 'undefined') return
     asked = true
     sdkWindow().__onGCastApiAvailable = (ok) => {
-      if (ok && context === null) waitForFramework(FRAMEWORK_TRIES)
+      if (!ok) giveUpRejoining()
+      else if (context === null) waitForFramework(FRAMEWORK_TRIES)
     }
     const script = document.createElement('script')
     script.src = SDK
     script.async = true
+    script.onerror = giveUpRejoining
     document.head.append(script)
   }
 
-  if (wasCasting()) load()
+  if (wasCasting() && typeof sdkWindow().chrome !== 'undefined') {
+    view = { ...view, rejoining: true }
+    setTimeout(giveUpRejoining, REJOIN_MS)
+    load()
+  }
 
   return {
     load,
     start(stream, group) {
       if (!context) return
       waiting = { stream, group }
-      context.requestSession().catch(() => {
-        waiting = null // the picker was closed
+      if (view.connecting) return // the picker is open already: it will cast this one
+      set({ connecting: true })
+      const done = () => set({ connecting: false })
+      context.requestSession().then(done, () => {
+        waiting = null // the picker was closed, or the TV did not answer
+        done()
       })
     },
     tune(stream, group) {
-      loadOnTv({ stream, group })
+      if (session) loadOnTv({ stream, group })
+      else if (waiting) waiting = { stream, group }
     },
     togglePause() {
       controller?.playOrPause()
     },
     stop() {
       if (!session || !context) return
-      stopping = true
+      if (stopping) clearTimeout(stopping)
+      stopping = setTimeout(() => {
+        stopping = null
+        set({ stoppedOn: null })
+      }, STOP_MS)
       set({ stoppedOn: view.now?.id ?? null })
       context.endCurrentSession(true)
     },
     clearEnded() {
       set({ endedBySelf: false, stoppedOn: null })
+    },
+    offer(choice) {
+      offered = choice
     },
     view: () => view,
     subscribe(listener) {

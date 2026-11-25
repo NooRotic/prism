@@ -15,8 +15,9 @@ export function useChannelList(): { list: StreamSnapshot | null; refreshIfOld():
     asking.current = true
     void request().then((result) => {
       asking.current = false
-      if (result.kind !== 'ready') return
-      if (result.snapshot.streams.length > 0) cameAt.current = performance.now()
+      // An empty list is no list: the one in hand stays.
+      if (result.kind !== 'ready' || result.snapshot.streams.length === 0) return
+      cameAt.current = performance.now()
       setList(result.snapshot)
     })
   }, [])

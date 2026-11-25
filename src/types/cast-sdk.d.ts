@@ -96,20 +96,16 @@ declare namespace cast.framework {
     loadMedia(request: chrome.cast.media.LoadRequest): Promise<unknown>
   }
 
-  class RemotePlayer {
-    isPaused: boolean
-  }
+  class RemotePlayer {}
 
   class RemotePlayerController {
     constructor(player: RemotePlayer)
-    addEventListener(type: string, listener: () => void): void
     playOrPause(): void
   }
 
   const CastContextEventType: { CAST_STATE_CHANGED: string; SESSION_STATE_CHANGED: string }
   const CastState: { NO_DEVICES_AVAILABLE: string }
   const SessionState: { SESSION_STARTED: string; SESSION_RESUMED: string; SESSION_ENDED: string; SESSION_START_FAILED: string }
-  const RemotePlayerEventType: { IS_PAUSED_CHANGED: string }
 }
 
 declare namespace chrome.cast {
