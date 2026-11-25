@@ -1,6 +1,6 @@
 # Usage tracking with Matomo (design)
 
-Status: DRAFT 2026-11-24, waiting for the owner's approval. Builds on NooRotic/prism#134 (the address fragment is never sent),
+Status: APPROVED by the owner 2026-11-24. Builds on NooRotic/prism#134 (the address fragment is never sent),
 which must merge first. One front-end PR; nothing on the history server changes.
 
 ## Why
