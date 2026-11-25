@@ -47,6 +47,9 @@ export function useHeaderRow(
   // it hit, and that must not stop the next click outside from folding the row.
   const focusInside = useRef(false)
   const usingKeyboard = useRef(false)
+  // A mouse is over a tab or the row. Tells a hold that ends (a panel closes, an import finishes) whether the pointer
+  // is still there to keep the previewed row open or has long gone.
+  const pointerOver = useRef(false)
 
   // The listeners below read the latest values without re-subscribing.
   const holdsRef = useRef(holds)
@@ -59,7 +62,9 @@ export function useHeaderRow(
   // Worked out when an event arrives, never cached: whether anything is holding the row open right now.
   const send = useCallback((event: RowEvent) => {
     const h = holdsRef.current
-    const held = h.navPanelOpen || h.browseOpen || h.importing || (focusInside.current && usingKeyboard.current)
+    // An import holds only the Accounts row, where its progress and result show. Any other row has no reason to stay.
+    const importHold = h.importing && stateRef.current.open === 'accounts'
+    const held = h.navPanelOpen || h.browseOpen || importHold || (focusInside.current && usingKeyboard.current)
     setState((s) => nextRow(s, event, held))
   }, [])
 
@@ -73,15 +78,25 @@ export function useHeaderRow(
     timer.current = setTimeout(() => send({ type: 'hoverClose' }), HOVER_CLOSE_DELAY_MS)
   }, [clearTimer, send])
 
+  // A previewed row that something was holding open folds once the hold is gone, unless the pointer is still over it.
+  // Pinned rows stay, and `hoverClose` looks at the holds again when the timer fires, so a hold that is still there wins.
+  const foldIfIdle = useCallback(() => {
+    const s = stateRef.current
+    if (s.open === null || s.pinned || pointerOver.current) return
+    scheduleClose()
+  }, [scheduleClose])
+
   const tabHoverProps = useCallback(
     (row: ToolsRowId): HoverProps => ({
       onPointerEnter: (e) => {
         if (e.pointerType !== 'mouse') return
+        pointerOver.current = true
         clearTimer()
         timer.current = setTimeout(() => send({ type: 'hoverOpen', row }), HOVER_OPEN_DELAY_MS)
       },
       onPointerLeave: (e) => {
         if (e.pointerType !== 'mouse') return
+        pointerOver.current = false
         scheduleClose()
       },
     }),
@@ -91,10 +106,12 @@ export function useHeaderRow(
   const rowHoverProps: HoverProps = {
     onPointerEnter: (e) => {
       if (e.pointerType !== 'mouse') return
+      pointerOver.current = true
       clearTimer()
     },
     onPointerLeave: (e) => {
       if (e.pointerType !== 'mouse') return
+      pointerOver.current = false
       scheduleClose()
     },
   }
@@ -117,7 +134,9 @@ export function useHeaderRow(
       focusInside.current = true
     }
     const onOut = (e: FocusEvent) => {
-      if (!el.contains(e.relatedTarget as Node | null)) focusInside.current = false
+      if (el.contains(e.relatedTarget as Node | null)) return
+      focusInside.current = false
+      foldIfIdle()
     }
     el.addEventListener('focusin', onIn)
     el.addEventListener('focusout', onOut)
@@ -125,7 +144,7 @@ export function useHeaderRow(
       el.removeEventListener('focusin', onIn)
       el.removeEventListener('focusout', onOut)
     }
-  }, [rowRef])
+  }, [rowRef, foldIfIdle])
 
   useEffect(() => {
     const onKeyInput = () => {
@@ -152,8 +171,11 @@ export function useHeaderRow(
       if (holdsRef.current.navPanelOpen || holdsRef.current.browseOpen) return
       if (e.target instanceof Element && e.target.closest('[data-paste-box]')) return
       if (stateRef.current.open === null) return
+      // Focus goes back to the button that pinned the row. A row the pointer merely previewed was opened by no button,
+      // and the one `trigger` remembers belongs to an earlier press.
+      const wasPinned = stateRef.current.pinned
       send({ type: 'dismiss' })
-      trigger.current?.focus()
+      if (wasPinned) trigger.current?.focus()
     }
     document.addEventListener('keydown', onKey, true)
     return () => document.removeEventListener('keydown', onKey, true)
@@ -182,6 +204,12 @@ export function useHeaderRow(
     }
   }, [headerRef, send])
 
+  // Whatever was holding a previewed row open has let go: fold it now, not at the next click outside.
+  const { navPanelOpen, browseOpen, importing } = holds
+  useEffect(() => {
+    foldIfIdle()
+  }, [navPanelOpen, browseOpen, importing, foldIfIdle])
+
   // A page change folds the row.
   const { pathname } = useLocation()
   const lastPath = useRef(pathname)
@@ -192,7 +220,7 @@ export function useHeaderRow(
     send({ type: 'dismiss' })
   }, [pathname, clearTimer, send])
 
-  // Fill mode hides the header; an open row would leave --header-height at the tall value, so fold it.
+  // Fill mode hides the header: fold the row, so it is closed (not still open) when the header comes back.
   useEffect(() => {
     const el = headerRef.current
     if (!el || typeof ResizeObserver === 'undefined') return

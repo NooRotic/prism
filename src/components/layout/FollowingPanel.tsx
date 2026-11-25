@@ -7,7 +7,7 @@ import {
 } from '../../hooks/useFollowedChannels'
 import type { FollowingSortMode } from '../../contexts/AppContext'
 import FollowedChannelCard from './FollowedChannelCard'
-import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import { useSessionExpiry } from '../../hooks/useSessionExpiry'
 import SlidedownPanel from './SlidedownPanel'
 
 const SORT_OPTIONS: { id: FollowingSortMode; label: string }[] = [
@@ -18,19 +18,16 @@ const SORT_OPTIONS: { id: FollowingSortMode; label: string }[] = [
 
 export default function FollowingPanel() {
   const { state, dispatch } = useApp()
-  const { handleAuthError } = useTwitchAuth()
+  // A 401 signs the viewer out (and says why), so the panel shows Connect instead of a Retry that can never work.
+  const onSessionExpired = useSessionExpiry()
 
   const isOpen = state.navPanel.open === 'following'
   const sort = state.navPanel.followingSort
   const authUserId = state.auth.user?.id ?? null
 
-  const handleAuthErrorCallback = useCallback(
-    () => handleAuthError(null),
-    [handleAuthError],
-  )
   const fetchOptions = useMemo(
-    () => ({ handleAuthError: handleAuthErrorCallback }),
-    [handleAuthErrorCallback],
+    () => ({ handleAuthError: onSessionExpired }),
+    [onSessionExpired],
   )
 
   // Read the shared follows whether or not the panel is open. They are the

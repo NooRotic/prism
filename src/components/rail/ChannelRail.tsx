@@ -4,6 +4,7 @@ import { Heart, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { useFollowedChannels } from '../../hooks/useFollowedChannels'
+import { useSessionExpiry } from '../../hooks/useSessionExpiry'
 import { useRailAvatars } from '../../hooks/useRailAvatars'
 import ConnectTwitchPrompt from '../ui/ConnectTwitchPrompt'
 import RailSection from './RailSection'
@@ -38,7 +39,8 @@ const LOADING_PLACEHOLDER_SIZE = 40
 
 export default function ChannelRail() {
   const { state, dispatch } = useApp()
-  const { login, handleAuthError } = useTwitchAuth()
+  const { login } = useTwitchAuth()
+  const onSessionExpired = useSessionExpiry()
   // Signed-in state lives in AppContext, which useTwitchAuth also reads, so a
   // login or logout anywhere (Header, an expired session) reaches the rail.
   // AppProvider seeds it from the stored token, so a returning signed-in user
@@ -113,8 +115,8 @@ export default function ChannelRail() {
   // no API calls at all in that state.
   const userId = isAuthenticated ? (state.auth.user?.id ?? null) : null
   const authOptions = useMemo(
-    () => ({ handleAuthError: () => handleAuthError(undefined) }),
-    [handleAuthError],
+    () => ({ handleAuthError: onSessionExpired }),
+    [onSessionExpired],
   )
   const follows = useFollowedChannels(userId, authOptions)
 

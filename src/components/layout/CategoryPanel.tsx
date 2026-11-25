@@ -4,7 +4,7 @@ import { X, Loader2, ExternalLink, Eye, Heart, RefreshCw } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useCategoryStreams } from '../../hooks/useCategoryStreams'
 import type { EnrichedCategoryStream } from '../../hooks/useCategoryStreams'
-import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import { useSessionExpiry } from '../../hooks/useSessionExpiry'
 import SlidedownPanel from './SlidedownPanel'
 
 function StreamCard({ stream }: { stream: EnrichedCategoryStream }) {
@@ -118,19 +118,16 @@ function StreamCard({ stream }: { stream: EnrichedCategoryStream }) {
 
 export default function CategoryPanel() {
   const { state, dispatch } = useApp()
-  const { handleAuthError } = useTwitchAuth()
+  // A 401 signs the viewer out (and says why), so the panel shows Connect instead of a Retry that can never work.
+  const onSessionExpired = useSessionExpiry()
 
   const categoryName =
     state.navPanel.open === 'category' ? state.navPanel.category : null
   const viewerUserId = state.auth.user?.id ?? null
 
-  const handleAuthErrorCallback = useCallback(
-    () => handleAuthError(null),
-    [handleAuthError],
-  )
   const fetchOptions = useMemo(
-    () => ({ handleAuthError: handleAuthErrorCallback }),
-    [handleAuthErrorCallback],
+    () => ({ handleAuthError: onSessionExpired }),
+    [onSessionExpired],
   )
 
   const { game, streams, loading, error, refetch } = useCategoryStreams(
