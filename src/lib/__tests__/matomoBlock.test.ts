@@ -64,6 +64,12 @@ describe('visit counting block in index.html', () => {
     expect(r.counted).toBe(false)
   })
 
+  it('leaves the address fragment out, before anything is counted (it can hold a sign-in token or an /import list)', () => {
+    const names = run({ hostname: 'prism.nooroticx.tv' }).paq!.map(([name, value]) => (name === 'discardHashTag' ? `${name}:${value}` : name))
+    expect(names).toContain('discardHashTag:true')
+    expect(names.indexOf('discardHashTag:true')).toBeLessThan(names.indexOf('trackPageView'))
+  })
+
   it('hides the "what is counted" note unless the page is counting', () => {
     expect(indexCss).toMatch(/\.counted-note\s*\{[^}]*display:\s*none/)
     expect(indexCss).toMatch(/html\.counted\s+\.counted-note\s*\{[^}]*display:\s*block/)
