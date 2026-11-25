@@ -17,6 +17,7 @@ import FloatingPanel from '../components/chat/FloatingPanel'
 import ChatDock from '../components/chat/ChatDock'
 import { encodeTarget } from '../lib/youtubeChatTarget'
 import { useFloatingPageSource, useFloatingVideo } from '../components/chat/floatingVideoContext'
+import CastComingSoon from '../components/cast/CastComingSoon'
 import VideoPopoutBar from '../components/chat/VideoPopoutBar'
 import PlayerHost from '../components/player/PlayerHost'
 import DebugPanel from '../components/layout/DebugPanel'
@@ -156,6 +157,7 @@ export default function YoutubePlayerPage() {
     return (
       <div className="flex flex-col gap-5 w-full pt-4 pb-8">
         <div className="w-full px-4 md:px-6 lg:px-8 flex flex-col gap-3">
+          <CastComingSoon platform="YouTube" />
           <div className="fill-hide w-full max-w-[1600px] mx-auto">{title}</div>
           {/* The dock draws the floating-window panel itself, as on the Twitch page. */}
           <ChatDock
@@ -172,6 +174,7 @@ export default function YoutubePlayerPage() {
 
   return (
     <div className="flex flex-col gap-5 w-full max-w-5xl mx-auto px-4 md:px-6 pt-4 pb-8">
+      <CastComingSoon platform="YouTube" />
       {/* One row above the player: the title, and the pop-out button at its right. */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">{title}</div>
