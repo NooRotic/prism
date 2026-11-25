@@ -1,7 +1,8 @@
 import type { StreamEntry, StreamSnapshot } from '../streamsApi'
 
 export interface GuideGroup {
-  key: 'favorites' | 'all' | `group:${number}`
+  /** What the group is, not where it is: the list can change while the guide is open. */
+  key: string
   label: string
   streams: StreamEntry[]
 }
@@ -38,7 +39,7 @@ export function guideGroups(list: StreamSnapshot | null, favorites: readonly str
   const groups: GuideGroup[] = [
     { key: 'favorites', label: 'Favorites', streams: inFavorites(list, favorites) },
     { key: 'all', label: 'All', streams: list.streams },
-    ...list.groups.map((label, index): GuideGroup => ({ key: `group:${index}`, label, streams: list.streams.filter((stream) => stream.groups.includes(index)) })),
+    ...list.groups.map((label, index): GuideGroup => ({ key: `group:${label}`, label, streams: list.streams.filter((stream) => stream.groups.includes(index)) })),
   ]
   return groups.filter((group) => group.streams.length > 0)
 }

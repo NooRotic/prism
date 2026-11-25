@@ -54,8 +54,8 @@ describe('guideGroups', () => {
     expect(groups.map((g) => [g.key, g.label, ids(g.streams)])).toEqual([
       ['favorites', 'Favorites', ['b']],
       ['all', 'All', ['a', 'b', 'c']],
-      ['group:0', 'News', ['a', 'c']],
-      ['group:1', 'Sports', ['b', 'c']],
+      ['group:News', 'News', ['a', 'c']],
+      ['group:Sports', 'Sports', ['b', 'c']],
     ])
     expect(guideGroups(LIST, []).map((g) => g.key)[0]).toBe('all')
   })
