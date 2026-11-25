@@ -75,6 +75,27 @@ describe('useHeaderHeight', () => {
     expect(read()).toBe('')
   })
 
+  // Fill mode hides the header with display: none; the rail and full-height pages should then use the room it left.
+  it('publishes 0px while the header is hidden, and its height again when it comes back', () => {
+    const el = header(56)
+    document.body.appendChild(el)
+    const { unmount } = renderHook(() => useHeaderHeight({ current: el }))
+    expect(read()).toBe('56px')
+
+    el.style.display = 'none'
+    Object.defineProperty(el, 'offsetHeight', { configurable: true, get: () => 0 })
+    FakeObserver.last?.callback()
+    expect(read()).toBe('0px')
+
+    el.style.display = ''
+    Object.defineProperty(el, 'offsetHeight', { configurable: true, get: () => 96 })
+    FakeObserver.last?.callback()
+    expect(read()).toBe('96px')
+
+    unmount()
+    el.remove()
+  })
+
   it('leaves --header-height alone for a header with no height (not displayed), and for no header at all', () => {
     renderHook(() => useHeaderHeight({ current: header(0) }))
     expect(read()).toBe('')

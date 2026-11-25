@@ -23,7 +23,7 @@ interface SlidedownPanelProps {
  * - Fixed positioning below the header with `translateY` animation
  * - `brushed-metal` surface class (SVG turbulence background)
  * - Close behaviors: ESC key, click-outside (with `[data-nav-trigger]`
- *   carve-out so the header nav button's own toggle handler wins)
+ *   carve-out so a trigger's own toggle handler wins)
  * - ARIA attributes: `role="region"`, `aria-hidden` when closed,
  *   `aria-label` from props
  * - `pointerEvents: none` when closed so the hidden panel can't
@@ -68,9 +68,9 @@ export default function SlidedownPanel({
     return () => document.removeEventListener('keydown', handleKey)
   }, [isOpen, close])
 
-  // Click-outside closes — but carve out the header nav button so
-  // its own toggle handler runs instead. The nav button container
-  // marks itself with `data-nav-trigger` for exactly this purpose.
+  // Click-outside closes — but carve out the buttons that toggle the
+  // panel so their own handler runs instead. Each marks itself (or its
+  // container) with `data-nav-trigger` for exactly this purpose.
   //
   // The listener is registered on the NEXT animation frame to avoid
   // a race: the mousedown that opened the panel (e.g. clicking a
@@ -82,8 +82,8 @@ export default function SlidedownPanel({
     const handleMouseDown = (e: MouseEvent) => {
       const target = e.target as Node
       if (panelRef.current && !panelRef.current.contains(target)) {
-        const headerNav = document.querySelector('[data-nav-trigger]')
-        if (headerNav && headerNav.contains(target)) return
+        // Any trigger (the header's row, the Twitch page's sidebar) toggles the panel itself.
+        if (e.target instanceof Element && e.target.closest('[data-nav-trigger]')) return
         close()
       }
     }
@@ -99,6 +99,7 @@ export default function SlidedownPanel({
   return (
     <div
       ref={panelRef}
+      id={`nav-panel-${panelId}`}
       aria-hidden={!isOpen}
       aria-label={ariaLabel}
       role="region"

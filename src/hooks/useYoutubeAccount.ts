@@ -5,6 +5,8 @@ import { getYoutubeImportSnapshot, subscribeYoutubeImport } from '../lib/youtube
 
 export interface YoutubeAccountView {
   importing: boolean
+  /** Why the last import did not happen (until the next one starts or succeeds), or null. */
+  failure: string | null
   revision: number
   /** Which account the subscriptions came from, or null (never imported, imported before records existed, or damaged). */
   account: StoredAccount | null
@@ -17,13 +19,14 @@ export interface YoutubeAccountView {
 
 /** What PRISM holds from the viewer's YouTube import: cheap localStorage reads, re-read after every import. Loads nothing. */
 export function useYoutubeAccount(): YoutubeAccountView {
-  const { importing, revision } = useSyncExternalStore(subscribeYoutubeImport, getYoutubeImportSnapshot, getYoutubeImportSnapshot)
+  const { importing, failure, revision } = useSyncExternalStore(subscribeYoutubeImport, getYoutubeImportSnapshot, getYoutubeImportSnapshot)
   const stored = useMemo(() => {
     void revision
     return { account: getAccount(), subscriptionCount: getSubscriptions().length }
   }, [revision])
   return {
     importing,
+    failure,
     revision,
     account: stored.account,
     subscriptionCount: stored.subscriptionCount,

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useApp } from '../../contexts/AppContext'
@@ -41,6 +41,19 @@ export function Header() {
 
   const { importing } = useYoutubeAccount()
   const row = useHeaderRow(headerRef, rowRef, { navPanelOpen: state.navPanel.open !== null, browseOpen, importing })
+
+  // Following or Your Stats opened from somewhere else (the Twitch page's sidebar) brings the Twitch row up with it,
+  // pinned, so its button shows as the open one. Only at the moment it opens: a row folded later (fill mode, a page
+  // change) stays folded. Category has no button in the row, so it leaves the row alone.
+  const panel = state.navPanel.open
+  const lastPanel = useRef(panel)
+  const openRow = row.state.open
+  const pressInHook = row.press
+  useEffect(() => {
+    const opened = panel !== lastPanel.current
+    lastPanel.current = panel
+    if (opened && (panel === 'following' || panel === 'your-stats') && openRow !== 'twitch') pressInHook('twitch')
+  }, [panel, openRow, pressInHook])
 
   // When a press takes the Twitch row away, its panels go with it: their buttons are about to leave the page.
   const pressRow = (id: RowId, trigger: HTMLElement) => {
@@ -104,7 +117,9 @@ export function Header() {
         <SectionTabs current={current} row={row} onPress={pressRow} />
         <div className="min-w-0 flex-1" />
 
-      <div data-header-actions className="flex shrink-0 items-center gap-1 sm:gap-3">
+      {/* While the paste box is open from 640 px, this group may shrink, so the box gives up room (down to its own minimum)
+          instead of leaving the whole squeeze to the tab strip. */}
+      <div data-header-actions className={`flex shrink-0 items-center gap-1 sm:gap-3 ${pasteOpen ? 'sm:min-w-0 sm:shrink' : ''}`}>
         {showHeaderInput && (
           <PasteToggle
             open={pasteOpen}
