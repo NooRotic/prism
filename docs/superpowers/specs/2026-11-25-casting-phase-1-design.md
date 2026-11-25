@@ -1,6 +1,6 @@
 # Casting PRISM, phase 1: HLS / DASH as a set-top box
 
-Status: draft, waiting for the owner's approval. Nothing is built.
+Status: approved by the owner 2026-11-25. Nothing is built.
 
 **Whose words are whose:** lines marked **Owner** are the owner's decisions. Everything else is a proposal by the writer, shown to the owner as such ("my calls" are listed at the end).
 
