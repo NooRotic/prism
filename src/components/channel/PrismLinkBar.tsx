@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useChannelUploads } from '../../hooks/useChannelUploads'
 import { useLinkedAccount } from '../../hooks/useLinkedAccount'
+import { linkName, trackEvent } from '../../lib/analytics'
 import { filterBySource, flagLikelyDuplicates, twitchToItem, youtubeToItem, type Source } from '../../lib/combinedVods'
 import { SORT_LABELS, sortVideos, type SortOrder } from '../../lib/sortVideos'
 import { PrismMark } from '../brand/PrismMark'
@@ -67,7 +68,10 @@ export default function PrismLinkBar({ login }: { login: string }) {
         <button
           type="button"
           aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            if (!open) trackEvent('Linking', 'videos together', linkName(link))
+            setOpen((o) => !o)
+          }}
           className={`flex w-full items-center justify-between gap-3 rounded-[9px] px-5 py-4 cursor-pointer text-left ${confirmed ? 'prism-tint' : ''}`}
           style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: 'none' }}
         >

@@ -1,10 +1,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLinkSuggestion } from '../useLinkSuggestion'
+import { trackEvent } from '../../lib/analytics'
 import { fetchYoutubeChannel } from '../../lib/youtubeChannelApi'
 import { dismissSuggestion, findByTwitch, isDismissed, saveLink } from '../../lib/linkedAccounts'
 
 vi.mock('../../lib/youtubeChannelApi', () => ({ fetchYoutubeChannel: vi.fn() }))
+vi.mock('../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../lib/analytics')>()), trackEvent: vi.fn() }))
 vi.mock('../../lib/youtubeApi', () => ({ isYouTubeApiAvailable: () => true }))
 
 const channel = { channelId: 'UCX6OQ3DkcsbYNE6H8uQQuVA', title: 'Justin Wong', handle: '@jwonggg', description: 'I love fighting games!', thumbnail: '' }
@@ -12,6 +14,7 @@ const channel = { channelId: 'UCX6OQ3DkcsbYNE6H8uQQuVA', title: 'Justin Wong', h
 beforeEach(() => {
   localStorage.clear()
   vi.mocked(fetchYoutubeChannel).mockReset()
+  vi.mocked(trackEvent).mockClear()
 })
 
 describe('dismissed suggestions', () => {
@@ -79,5 +82,30 @@ describe('useLinkSuggestion', () => {
     rerender({ login: 'another' })
     await waitFor(() => expect(result.current.status).toBe('none'))
     expect(fetchYoutubeChannel).toHaveBeenLastCalledWith({ handle: 'another' })
+  })
+})
+
+describe('useLinkSuggestion: what is counted', () => {
+  const PAIR = 'twitch/jwonggg <-> youtube/Justin Wong'
+
+  it('a link it makes by itself is kept apart, and is not counted again on the next visit', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel: { ...channel, description: 'streams at twitch.tv/jwonggg' } })
+    const first = renderHook(() => useLinkSuggestion('jwonggg', 'videos: youtube.com/@jwonggg'))
+    await waitFor(() => expect(findByTwitch('jwonggg')?.confirmed).toBe(true))
+    first.unmount()
+    renderHook(() => useLinkSuggestion('jwonggg', 'videos: youtube.com/@jwonggg'))
+    await act(async () => {})
+
+    expect(vi.mocked(trackEvent).mock.calls).toEqual([['Linking', 'auto-linked', PAIR]])
+  })
+
+  it('offering a channel is not counted; accepting it is', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel })
+    const { result } = renderHook(() => useLinkSuggestion('jwonggg', ''))
+    await waitFor(() => expect(result.current.status).toBe('suggest'))
+    expect(trackEvent).not.toHaveBeenCalled()
+
+    act(() => result.current.accept())
+    expect(vi.mocked(trackEvent).mock.calls).toEqual([['Linking', 'linked', PAIR]])
   })
 })

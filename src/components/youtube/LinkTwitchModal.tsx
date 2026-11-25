@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { useDialogFocus } from '../../hooks/useDialogFocus'
 import { isMutual } from '../../lib/accountBios'
+import { linkName, trackEvent } from '../../lib/analytics'
 import { findByTwitch, findByYoutube, linkYoutubeToTwitch, unlinkYoutube } from '../../lib/linkedAccounts'
 import { parseTwitchLogin } from '../../lib/parseTwitchLink'
 import { getUserInfo, SessionExpiredError } from '../../lib/twitchApi'
@@ -94,7 +95,11 @@ export default function LinkTwitchModal({ channelId, channelTitle, suggested, on
     const confirmed =
       yt.status === 'ok' &&
       isMutual({ twitchLogin: loginName, twitchDescription: twitch.user.description, youtube: { channelId, handle: yt.channel.handle, description: yt.channel.description } })
+    const before = findByTwitch(loginName)
     linkYoutubeToTwitch(loginName, youtube, confirmed)
+    // A Kick link already on that Twitch channel stays with it, as linkYoutubeToTwitch keeps it.
+    const name = linkName({ twitch: loginName, youtube, ...(before?.kick ? { kick: before.kick } : {}) })
+    if (!before || linkName(before) !== name) trackEvent('Linking', 'linked', name)
     onClose()
   }
 
@@ -121,8 +126,10 @@ export default function LinkTwitchModal({ channelId, channelTitle, suggested, on
             Link Twitch for {channelTitle}
           </h2>
           <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Say where this creator streams on Twitch. The link is checked against both bios; it is marked confirmed only when each names the other.
-            Links stay in this browser.
+            Say where this creator streams on Twitch. The link is checked against both bios; it is marked confirmed only when each names the other.{' '}
+            {/* CSS shows one of the two: the second only where Matomo is counting (html.counted, see CountedNote). */}
+            <span className="uncounted-note">Links stay in this browser.</span>
+            <span className="counted-note">Links are kept in this browser. Which accounts are linked is counted, without your name.</span>
           </p>
         </div>
         {signedOut ? (
@@ -176,6 +183,8 @@ export default function LinkTwitchModal({ channelId, channelTitle, suggested, on
                 <button
                   type="button"
                   onClick={() => {
+                    // Only the YouTube part goes; a Kick link stays.
+                    trackEvent('Linking', 'unlinked', linkName({ twitch: existing.twitch, youtube: existing.youtube }))
                     unlinkYoutube(channelId)
                     onClose()
                   }}

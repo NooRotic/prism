@@ -77,4 +77,9 @@ describe('visit counting block in index.html', () => {
     expect(indexCss).toMatch(/\.counted-note\s*\{[^}]*display:\s*none/)
     expect(indexCss).toMatch(/html\.counted\s+\.counted-note\s*\{[^}]*display:\s*block/)
   })
+
+  it('shows what is said to a visitor who is not counted only while the page is not counting', () => {
+    expect(indexCss).toMatch(/html\.counted\s+\.uncounted-note\s*\{[^}]*display:\s*none/)
+    expect(indexCss).not.toMatch(/(^|\})\s*\.uncounted-note\s*\{[^}]*display:\s*none/)
+  })
 })

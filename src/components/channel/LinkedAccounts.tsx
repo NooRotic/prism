@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { linkName, trackEvent } from '../../lib/analytics'
 import { PrismMark } from '../brand/PrismMark'
 import { useLinkedAccount } from '../../hooks/useLinkedAccount'
 import { useLinkSuggestion } from '../../hooks/useLinkSuggestion'
@@ -16,6 +17,7 @@ export default function LinkedAccounts({ login, description }: { login: string; 
   const mainRef = useRef<HTMLButtonElement>(null)
   const link = useLinkedAccount(login)
   const suggestion = useLinkSuggestion(login, description)
+  const followed = () => link && trackEvent('Linking', 'followed', linkName(link))
 
   return (
     <div className="flex flex-col gap-2">
@@ -26,7 +28,7 @@ export default function LinkedAccounts({ login, description }: { login: string; 
           </span>
           {link.youtube && (
             <>
-              <Link to={youtubeHref(link.youtube)} title={`${link.youtube.title} on YouTube`} className="rounded-full px-2.5 py-0.5 text-xs" style={{ ...chipStyle, color: 'var(--accent-youtube-text)', borderColor: 'var(--accent-youtube)' }}>
+              <Link to={youtubeHref(link.youtube)} onClick={followed} title={`${link.youtube.title} on YouTube`} className="rounded-full px-2.5 py-0.5 text-xs" style={{ ...chipStyle, color: 'var(--accent-youtube-text)', borderColor: 'var(--accent-youtube)' }}>
                 YouTube
               </Link>
               <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -35,7 +37,7 @@ export default function LinkedAccounts({ login, description }: { login: string; 
             </>
           )}
           {link.kick && (
-            <a href={`https://kick.com/${link.kick.slug}`} target="_blank" rel="noopener noreferrer" title={`${link.kick.slug} on Kick`} className="rounded-full px-2.5 py-0.5 text-xs" style={chipStyle}>
+            <a href={`https://kick.com/${link.kick.slug}`} onClick={followed} target="_blank" rel="noopener noreferrer" title={`${link.kick.slug} on Kick`} className="rounded-full px-2.5 py-0.5 text-xs" style={chipStyle}>
               Kick
             </a>
           )}

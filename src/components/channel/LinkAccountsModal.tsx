@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useDialogFocus } from '../../hooks/useDialogFocus'
 import { isMutual } from '../../lib/accountBios'
+import { linkName, trackEvent } from '../../lib/analytics'
 import { findByTwitch, removeLink, saveLink } from '../../lib/linkedAccounts'
 import { parseAccountLink } from '../../lib/parseAccountLink'
 import { isYouTubeApiAvailable } from '../../lib/youtubeApi'
@@ -23,7 +24,8 @@ const inputStyle = { backgroundColor: 'var(--bg)', border: '1px solid var(--bord
 /**
  * "Link accounts": say where else this creator is. The YouTube link is checked (one 1-unit call): when each bio names the
  * other channel it is saved as confirmed, otherwise as the viewer's own claim. A Kick link cannot be checked (Kick's API
- * needs a server-held token), so it is always the viewer's own. Nothing leaves this browser.
+ * needs a server-held token), so it is always the viewer's own. The links are kept in this browser; the owner's
+ * Matomo is told which accounts were linked, never by whom (and nothing at all where it does not count).
  */
 export default function LinkAccountsModal({ login, description, onClose, suggested, returnFocusRef }: LinkAccountsModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -66,13 +68,16 @@ export default function LinkAccountsModal({ login, description, onClose, suggest
       youtube = { channelId: c.channelId, title: c.title, ...(c.handle ? { handle: c.handle } : {}) }
       confirmed = isMutual({ twitchLogin: login, twitchDescription: description, youtube: { channelId: c.channelId, handle: c.handle, description: c.description } })
     }
-    saveLink({
-      twitch: login,
+    const before = findByTwitch(login)
+    const record = {
+      twitch: login.toLowerCase(),
       ...(youtube ? { youtube } : {}),
       ...(kick?.platform === 'kick' ? { kick: { slug: kick.slug } } : {}),
       confirmed,
       linkedAt: Date.now(),
-    })
+    }
+    saveLink(record)
+    if (!before || linkName(before) !== linkName(record)) trackEvent('Linking', 'linked', linkName(record))
     onClose()
   }
 
@@ -97,8 +102,10 @@ export default function LinkAccountsModal({ login, description, onClose, suggest
             Link accounts for {login}
           </h2>
           <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Say where else this creator is. A YouTube link is checked against both bios; it is marked confirmed only when each names the other.
-            Links stay in this browser.
+            Say where else this creator is. A YouTube link is checked against both bios; it is marked confirmed only when each names the other.{' '}
+            {/* CSS shows one of the two: the second only where Matomo is counting (html.counted, see CountedNote). */}
+            <span className="uncounted-note">Links stay in this browser.</span>
+            <span className="counted-note">Links are kept in this browser. Which accounts are linked is counted, without your name.</span>
           </p>
         </div>
         <form onSubmit={submit} className="flex flex-col gap-3">
@@ -127,6 +134,7 @@ export default function LinkAccountsModal({ login, description, onClose, suggest
               <button
                 type="button"
                 onClick={() => {
+                  trackEvent('Linking', 'unlinked', linkName(existing))
                   removeLink(login)
                   onClose()
                 }}
