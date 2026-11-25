@@ -165,7 +165,8 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
         // a dot in it, another scheme) keeps the old behaviour and plays nothing; a bare
         // host/path is only completed when its ending already says it is a stream.
         const address = toStreamAddress(url, det.type !== 'unknown')
-        if (address) navigate(buildStreamPath(address))
+        // `castPick`: an address someone chose. While casting, the HLS / DASH page sends it to the TV.
+        if (address) navigate(buildStreamPath(address), { state: { castPick: true } })
         else dispatch({ type: 'PLAY_URL', url, detection: det })
       } else {
         // Fallback: dispatch PLAY_URL for unknown types (keeps existing behavior)

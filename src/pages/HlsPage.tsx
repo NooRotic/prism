@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Navigate, useLocation, useNavigate, useNavigationType, useParams, useSearchParams } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
 import { demoToEntry, getHlsDashDemo } from '../config/demoContent'
 import { STORAGE_KEYS } from '../config/storageKeys'
 import { useFavoriteCounts, useFavoriteIds, useToggleFavorite } from '../hooks/useFavorites'
 import { useStreamSnapshot } from '../hooks/useStreamSnapshot'
+import { castReason, toCastStream } from '../lib/cast/castable'
 import { buildStreamPath, CUSTOM_STREAM_ID } from '../lib/routes'
 import { filterStreams, groupCounts } from '../lib/streamFilter'
 import { resolveSnapshotStream, resolveStreamSource, type StreamSource } from '../lib/streamSource'
 import type { StreamEntry } from '../lib/streamsApi'
 import type { FramedSource } from '../lib/floatingVideo'
+import CastButton from '../components/cast/CastButton'
+import CastPanel, { CastEndedPanel } from '../components/cast/CastPanel'
+import { useCast } from '../components/cast/castContext'
 import FloatingPanel from '../components/chat/FloatingPanel'
 import { useFloatingPageSource, useFloatingVideo } from '../components/chat/floatingVideoContext'
 import VideoPopoutBar from '../components/chat/VideoPopoutBar'
@@ -96,6 +100,8 @@ export default function HlsPage() {
   const { streamId } = useParams<{ streamId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const navigationType = useNavigationType()
   const { state, dispatch } = useApp()
   const { status, snapshot } = useStreamSnapshot()
   const [text, setText] = useState('')
@@ -145,11 +151,16 @@ export default function HlsPage() {
     return { source: listedDefault ?? resolveStreamSource(DEFAULT_DEMO_ID, NO_PARAMS), waiting: false }
   }, [streamId, searchParams, real, status])
 
-  // The pop-out follows this page: it opens on the stream shown and switches when the page moves to another one.
+  const cast = useCast()
+  const { connected, stoppedOn, load: loadCast, start: startCast, tune: tuneCast, clearEnded } = cast
+  useEffect(() => loadCast(), [loadCast])
+
+  // The pop-out follows this page: it opens on the stream shown and switches when the page moves to another one. While the
+  // stream is on a TV there is nothing here to float.
   const video = useFloatingVideo()
   const floatSource = useMemo<FramedSource | null>(
-    () => (source ? { kind: 'stream', url: source.url, streamKind: source.kind } : null),
-    [source],
+    () => (source && !connected ? { kind: 'stream', url: source.url, streamKind: source.kind } : null),
+    [source, connected],
   )
   useFloatingPageSource(floatSource)
 
@@ -175,12 +186,55 @@ export default function HlsPage() {
   const counts = useMemo(() => groupCounts(afterSearch, groupNames.length), [afterSearch, groupNames.length])
   const shown = useMemo(() => filterStreams(afterSearch, { text: '', group }), [afterSearch, group])
 
+  // ── Casting ──
+  // Only a choice someone makes tunes the TV: a card, or a pasted address. Coming Back, opening the page, a reload and the
+  // list arriving all leave it where the remote put it.
+  const castGroup = real !== null && group !== null ? (groupNames[group] ?? null) : null
+  const listedEntry = useCallback((url: string) => real?.streams.find((entry) => entry.url === url) ?? null, [real])
+  const tuneTv = useCallback(
+    (chosen: StreamSource | null) => {
+      if (chosen && castReason(chosen) === null) tuneCast(toCastStream(chosen, listedEntry(chosen.url), false), castGroup)
+    },
+    [tuneCast, listedEntry, castGroup],
+  )
+
+  const startCasting = () => {
+    if (!source) return
+    const local = playerAnchor.current?.querySelector('video')
+    if (video.isFloating) video.close()
+    startCast(toCastStream(source, listedEntry(source.url), local !== null && local !== undefined && local.duration > 0 && Number.isFinite(local.duration)), castGroup)
+  }
+
+  const pickHandled = useRef<string | null>(null)
+  useEffect(() => {
+    if (navigationType !== 'PUSH' || (location.state as { castPick?: boolean } | null)?.castPick !== true) return
+    if (pickHandled.current === location.key) return
+    pickHandled.current = location.key
+    if (connected) tuneTv(source)
+    else clearEnded()
+  }, [navigationType, location, connected, source, tuneTv, clearEnded])
+
+  // A cast that ended by itself while this page was not open has nothing to say to a later visit.
+  useLayoutEffect(() => {
+    if (cast.endedBySelf && !connected) clearEnded()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stop was pressed here: the channel the TV was on comes back to the computer, if it is in the list.
+  const returnTo = !connected && stoppedOn !== null && stoppedOn !== streamId && resolveSnapshotStream(stoppedOn, real) ? stoppedOn : null
+  useLayoutEffect(() => {
+    if (connected || stoppedOn === null) return
+    if (returnTo !== null) navigate(`/hls-dash/${returnTo}`, { replace: true })
+    clearEnded()
+  }, [connected, stoppedOn, returnTo, navigate, clearEnded])
+
   const choose = useCallback(
     (id: string) => {
+      if (connected) tuneTv(resolveStreamSource(id, NO_PARAMS) ?? resolveSnapshotStream(id, real))
+      else clearEnded()
       if (id !== streamId) navigate(`/hls-dash/${id}`)
       playerAnchor.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
     },
-    [navigate, streamId],
+    [navigate, streamId, connected, tuneTv, real, clearEnded],
   )
   const renderCard = useCallback(
     (stream: StreamEntry, selected: boolean) => (
@@ -206,8 +260,20 @@ export default function HlsPage() {
         <div className="min-w-0 flex-1">
           {source ? (
             <div className="flex flex-col gap-2">
-              <VideoPopoutBar />
-              {video.isFloating ? (
+              {!connected && (
+                <VideoPopoutBar
+                  extra={cast.available ? <CastButton reason={castReason(source)} onStart={startCasting} /> : undefined}
+                />
+              )}
+              {connected ? (
+                <CastPanel />
+              ) : cast.endedBySelf ? (
+                <CastEndedPanel onPlayHere={clearEnded} />
+              ) : returnTo !== null ? (
+                <PlayerPlaceholder>
+                  <p>Loading stream…</p>
+                </PlayerPlaceholder>
+              ) : video.isFloating ? (
                 <div
                   className="aspect-video w-full overflow-hidden rounded-lg"
                   style={{ backgroundColor: '#000', border: '2px solid var(--accent-hls)' }}
