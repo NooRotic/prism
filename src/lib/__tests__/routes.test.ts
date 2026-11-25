@@ -1,4 +1,4 @@
-import { isPlayerPagePath, buildStreamPath, CUSTOM_STREAM_ID } from '../routes'
+import { hasDebugPanel, isPlayerPagePath, buildStreamPath, CUSTOM_STREAM_ID } from '../routes'
 
 describe('isPlayerPagePath', () => {
   it.each(['/twitch/streamer', '/youtube/abc', '/hls-dash/some-stream', '/hls-dash'])('is true for %s, which plays a video', (path) => {
@@ -11,6 +11,16 @@ describe('isPlayerPagePath', () => {
       expect(isPlayerPagePath(path)).toBe(false)
     },
   )
+})
+
+describe('hasDebugPanel', () => {
+  it.each(['/twitch/streamer', '/youtube/dQw4w9WgXcQ', '/hls-dash/some-stream', '/hls-dash'])('is true for %s', (path) => {
+    expect(hasDebugPanel(path)).toBe(true)
+  })
+
+  it.each(['/', '/twitch', '/youtube', '/youtube/catchup', '/youtube/catchup/', '/import', '/nope'])('is false for %s, which has no player to debug', (path) => {
+    expect(hasDebugPanel(path)).toBe(false)
+  })
 })
 
 describe('buildStreamPath', () => {

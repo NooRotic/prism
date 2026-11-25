@@ -263,6 +263,16 @@ describe('Accounts: the pill', () => {
 })
 
 describe('Accounts: the debug toggle', () => {
+  it.each(['/', '/twitch', '/youtube', '/youtube/catchup'])('is nowhere on %s, which has no player, at either width', async (path) => {
+    for (const wide of [true, false]) {
+      setWide(wide)
+      const { unmount } = renderHeader({}, path)
+      await userEvent.click(pill())
+      expect(screen.queryByLabelText('Toggle debug overlay')).toBeNull()
+      unmount()
+    }
+  })
+
   it('sits in the bar when wide, never twice', async () => {
     setWide(true)
     renderHeader()

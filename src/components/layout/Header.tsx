@@ -7,6 +7,7 @@ import { useHeaderRow } from '../../hooks/useHeaderRow'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { useYoutubeAccount } from '../../hooks/useYoutubeAccount'
 import { nextRow, type RowId } from '../../lib/headerRow'
+import { hasDebugPanel } from '../../lib/routes'
 import { SECTIONS, sectionForPath, showsHeaderPaste } from '../../lib/headerSections'
 import { PrismMark } from '../brand/PrismMark'
 import { PasteToggle } from './PasteToggle'
@@ -23,6 +24,7 @@ export function Header() {
   const debugMode = state.player.debugMode
   const wide = useMediaQuery('(min-width: 640px)')
   const { pathname } = useLocation()
+  const debuggable = hasDebugPanel(pathname)
   const current = sectionForPath(pathname)
   const currentColor = SECTIONS.find((s) => s.id === current)?.color ?? 'transparent'
 
@@ -131,8 +133,9 @@ export function Header() {
         {/* Debug toggle lives here, not over the player: anything drawn on top
             of the Twitch embed makes its visibility check fail and disables
             autoplay. Below 640 px there is no room in the bar: it moves into the
-            Accounts row (only ever one of the two exists). */}
-        {wide && (
+            Accounts row (only ever one of the two exists). On a page with no
+            player it has nothing to show, so it is not there. */}
+        {wide && debuggable && (
           <button
             type="button"
             onClick={() => dispatch({ type: 'TOGGLE_DEBUG' })}
@@ -153,7 +156,7 @@ export function Header() {
       <div id="header-paste-list" ref={setPasteList} className="max-h-64 overflow-y-auto px-3 sm:px-6" />
 
       <FoldingRow open={row.state.open !== null} row={row} rowRef={rowRef}>
-        {shownRow === 'accounts' && <AccountsRow showDebugToggle={!wide} />}
+        {shownRow === 'accounts' && <AccountsRow showDebugToggle={!wide && debuggable} />}
         {shownRow === 'twitch' && <TwitchTools browseOpen={browseOpen} onBrowseOpenChange={setBrowseOpen} />}
         {shownRow === 'youtube' && (
           <Link

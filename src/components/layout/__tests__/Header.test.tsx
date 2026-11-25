@@ -26,9 +26,9 @@ function DebugState() {
   return <div data-testid="debug-state">{state.player.debugMode ? 'on' : 'off'}</div>
 }
 
-function renderHeader() {
+function renderHeader(path = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <AppProvider>
         <Header />
         <DebugState />
@@ -109,7 +109,7 @@ describe('Header', () => {
   // autoplay (verified 2026-11-04: hiding the in-player gear flipped it).
   it('has a debug toggle that switches debug mode', async () => {
     wideScreen()
-    renderHeader()
+    renderHeader('/twitch/streamer')
     expect(screen.getByTestId('debug-state')).toHaveTextContent('off')
     const user = userEvent.setup()
     await user.click(screen.getByLabelText('Toggle debug overlay'))
