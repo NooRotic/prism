@@ -37,6 +37,8 @@ export interface Tuner {
 const FAIL_AFTER_MS = 20_000
 const BUFFERING_AFTER_MS = 1_000
 const MOVED_S = 0.05
+/** A step forward this much longer than the time that passed is a jump (to the live edge, or after a sliding window), not play. */
+const JUMP_S = 1
 
 /** Watches whether what was tuned really plays. What counts is the picture's clock moving, not what the player reports. */
 export function createTuner(engine: CastEngine, now: () => number): Tuner {
@@ -44,6 +46,7 @@ export function createTuner(engine: CastEngine, now: () => number): Tuner {
   // Each tune has a number; an answer from an older one is ignored.
   let tune = 0
   let lastTime: number | null = null
+  let lastSampleAt = 0
   let lastMoveAt = 0
   let started = false
   const listeners = new Set<() => void>()
@@ -62,6 +65,19 @@ export function createTuner(engine: CastEngine, now: () => number): Tuner {
     started = false
     set({ stream, state: 'tuning' })
     return tune
+  }
+
+  /** Whether the picture's clock went on as it does when playing. Keeps what it saw for the next look. */
+  function playedOn(sample: EngineSample | null, at: number): boolean {
+    if (sample === null) {
+      lastTime = null
+      return false
+    }
+    const forward = lastTime === null ? 0 : sample.time - lastTime
+    const most = ((at - lastSampleAt) / 1000) * 2 + JUMP_S
+    if (lastTime === null || Math.abs(forward) > MOVED_S) lastTime = sample.time
+    lastSampleAt = at
+    return forward > MOVED_S && forward <= most
   }
 
   engine.onError(() => {
@@ -85,12 +101,12 @@ export function createTuner(engine: CastEngine, now: () => number): Tuner {
       if (sample?.ended) return setState('ended')
       if (sample?.paused) {
         lastTime = sample.time
+        lastSampleAt = at
         lastMoveAt = at
         started = true
         return setState('paused')
       }
-      const moved = sample !== null && lastTime !== null && Math.abs(sample.time - lastTime) > MOVED_S
-      if (sample && (lastTime === null || moved)) lastTime = sample.time
+      const moved = playedOn(sample, at)
       if (moved) {
         lastMoveAt = at
         started = true

@@ -77,15 +77,18 @@ The sender sends with every load (in the media's `customData`): the stream id (o
 | Button | Guide closed | Guide open |
 |---|---|---|
 | Up / Down | previous / next in the surf list, wrapping | move in the guide, wrapping |
-| Left / Right | nothing | previous / next group (Favorites, All, then the list's groups; empty ones skipped) |
-| OK | open the guide on the playing channel | watch the highlighted channel and close the guide (the playing one just closes it) |
+| Left / Right | nothing (and kept from Cast, which could seek with nothing on screen) | previous / next group (Favorites, All, then the list's groups; empty ones skipped) |
+| OK | open the guide on the playing channel | watch the highlighted channel and close the guide (the playing one just closes it, or is tried again if it failed or ended) |
 | Back | first press: "Press Back again to leave" for 3 s; second press within it leaves | close the guide |
 | Play / pause and other media keys | left to Cast | left to Cast |
 
 - Keys are taken on `window` in the capture phase. Keys PRISM does not use are never blocked.
-- OK and Back act once per press: another `keydown` of the same key within 600 ms of the previous one is the same press held down (measured: 400 ms to the first repeat, then about 50 ms; `repeat` is not set). The window runs from the last `keydown`, so a hold of any length is one press. If `keyup` turns out to arrive on the Gen 5 (checked first, on the device), it ends the press early and a quick second press counts sooner; without it, the second Back must come at least 600 ms after the first, inside the 3 s. A hold can therefore never leave PRISM or open and shut the guide.
+- OK and Back act once per press: another `keydown` of the same key is the same press held down when it comes within 600 ms of the first, or within 300 ms once it is repeating (measured: 400 ms to the first repeat, then about 50, the slowest 180; `repeat` is not set). Times are the events' own (`event.timeStamp`), so a busy moment of the device does not look like a new press. So a hold can never leave PRISM or open and shut the guide, and someone who keeps tapping Back at a normal pace still leaves.
+- `keyup` ends nothing (a device may send one with every repeat). It is claimed for a key whose press was claimed, because a device may act on the release.
 - Holding Up / Down repeats: in the guide, one step per 100 ms. With the guide closed the banner steps through names and only the one it stops on is tuned, 600 ms after the last step. Starts take about 3 s, so tuning each one passed would feel broken.
 - The key handling is a pure reducer (state, key, time) -> (state, effects), tested without Cast.
+- The guide stands on a channel, not on a row number: a list that changes under it (a refresh, a star on the computer) keeps the highlight.
+- A flip that is waiting to be tuned is dropped when the guide opens or the computer picks a channel.
 - The guide closes by itself after 15 s with no key. The stream keeps playing under it, visible beside it.
 
 ```
@@ -115,6 +118,8 @@ The guide is windowed (a group can hold 2,000 streams), laid out for 1280x720, i
 ### The engine boundary
 
 One module owns playing: `tune(stream)`, `stop()`, and events `playing`, `stalled`, `failed`. Nothing else touches Cast's player. **Live or recording:** streams from the list are LIVE; the built-in demos are BUFFERED; a pasted address is BUFFERED when the local player already knows a finite length, otherwise LIVE. The sender sends its choice with the load; the receiver applies the same rule to its own tunes. A tune is a normal Cast load made by the receiver itself with the stream's name and logo as metadata, so phones, Google Home and the sender see the right title after a flip with the remote.
+
+What Cast really does was measured on the receiver framework in desktop Chrome (2026-11-25): its own loads pass through the load interceptor too; the order is interceptor, MEDIA_FINISHED INTERRUPTED (the old stream), PLAYER_LOADING, LOADED_METADATA, `load()` resolves; a second load waits until the first has given up (3.7 s for a dead address) and no ERROR is sent for the first; a dead stream gives ERROR with a code, then ERROR 905, and a rejected `load()`; a load the interceptor refuses also ends the stream that was playing; `getLiveSeekableRange()` is null for some live streams. Movement means the picture's clock going on at about real speed: a jump (to the live edge, or a window sliding under a stalled stream) is not play.
 
 Tuning is part of phase 1: after it works, the same 60 streams are run with a few settings (starting bandwidth, buffer before play, Shaka's streaming goals). Aim: median start within 0.5 s of PRISM's 2.2 s and no more than 10 of 58 over 5 s, with nothing lost in started streams. It is an aim, not a gate: the best setting found ships, with the numbers written into this document. The engine is revisited only if the owner finds flips too slow.
 

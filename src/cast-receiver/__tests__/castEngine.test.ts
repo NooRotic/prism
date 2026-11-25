@@ -39,7 +39,7 @@ beforeEach(() => {
   document.body.append(media.element)
   vi.stubGlobal('cast', {
     framework: {
-      events: { EventType: { ERROR: 'ERROR', PLAYER_LOADING: 'PLAYER_LOADING', LOADED_METADATA: 'LOADED_METADATA', MEDIA_FINISHED: 'MEDIA_FINISHED' }, EndedReason: { END_OF_STREAM: 'END_OF_STREAM', STOPPED: 'STOPPED', INTERRUPTED: 'INTERRUPTED' } },
+      events: { EventType: { ERROR: 'ERROR', PLAYER_LOADING: 'PLAYER_LOADING', LOADED_METADATA: 'LOADED_METADATA', MEDIA_FINISHED: 'MEDIA_FINISHED' }, EndedReason: { END_OF_STREAM: 'END_OF_STREAM', STOPPED: 'STOPPED', SENDER_STOPPED: 'SENDER_STOPPED', INTERRUPTED: 'INTERRUPTED' }, DetailedErrorCode: { IMAGE_ERROR: 903, LOAD_INTERRUPTED: 904, MEDIA_ERROR_MESSAGE: 906 } },
       messages: {
         MessageType: { LOAD: 'LOAD', PLAY: 'PLAY' },
         PlayerState: { IDLE: 'IDLE', PAUSED: 'PAUSED', PLAYING: 'PLAYING' },
@@ -135,8 +135,46 @@ describe('a load made by the sender', () => {
     const heard = vi.fn()
     engine.onSenderLoad(heard)
     await engine.load(STREAM)
-    senderLoad(manager.load.mock.calls[0][0])
+    senderLoad(manager.load.mock.calls[0][0]) // measured: Cast passes its own loads through the interceptor
     expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('cannot pass itself off as the engine’s own', async () => {
+    const { manager, engine, senderLoad } = setup()
+    const heard = vi.fn()
+    engine.onSenderLoad(heard)
+    expect(senderLoad({ media: { ...SENDER_MEDIA, contentUrl: 'javascript:alert(1)', customData: { origin: 'tv' } } })).toMatchObject({ type: 'LOAD_FAILED' })
+    // What the engine put on a load is visible to everyone who reads the status; sent back, it is a sender's load.
+    await engine.load(STREAM)
+    const own = manager.load.mock.calls[0][0] as { media: Record<string, unknown> }
+    senderLoad(own)
+    senderLoad({ media: { ...own.media, contentUrl: 'https://h.test/other.m3u8' } })
+    expect(heard).toHaveBeenCalledTimes(1)
+    await engine.load(STREAM)
+    const again = manager.load.mock.calls[1][0] as { media: Record<string, unknown> }
+    expect(senderLoad({ media: { ...again.media, contentUrl: 'file:///x' } })).toMatchObject({ type: 'LOAD_FAILED' })
+  })
+
+  it('keeps two quick loads of its own apart from a sender’s', async () => {
+    const { manager, engine, senderLoad } = setup()
+    const heard = vi.fn()
+    engine.onSenderLoad(heard)
+    await engine.load(STREAM)
+    await engine.load({ ...STREAM, id: 'def' })
+    senderLoad(manager.load.mock.calls[0][0])
+    senderLoad(manager.load.mock.calls[1][0])
+    expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('plays a plain http address it is sent, and keeps an odd title and picture out', () => {
+    const { engine, senderLoad } = setup()
+    const heard = vi.fn()
+    engine.onSenderLoad(heard)
+    senderLoad({ media: { ...SENDER_MEDIA, contentUrl: 'http://h.test/a.m3u8', metadata: { title: 'x'.repeat(5000), images: [{ url: 'javascript:alert(1)' }] } } })
+    const [stream] = heard.mock.calls[0] as [CastStream]
+    expect(stream.url).toBe('http://h.test/a.m3u8')
+    expect(stream.name).toHaveLength(200)
+    expect(stream.logo).toBeNull()
   })
 })
 
@@ -157,16 +195,60 @@ describe('sample', () => {
     expect(engine.sample()).toBeNull()
   })
 
-  it('says ended and stopped, and not for a replaced one', async () => {
+  it('does not take the last stream’s late data for the new one’s', async () => {
     const { manager, engine } = setup()
     await engine.load(STREAM)
+    manager.emit('PLAYER_LOADING')
+    await engine.load({ ...STREAM, id: 'def' }) // Cast starts it only when the first has given up
     manager.emit('LOADED_METADATA')
+    manager.state = 'PLAYING'
+    expect(engine.sample()).toBeNull()
+    manager.emit('PLAYER_LOADING')
+    manager.emit('LOADED_METADATA')
+    expect(engine.sample()).not.toBeNull()
+  })
+
+  it('finds the picture inside Cast’s own element, where it lives', async () => {
+    document.body.innerHTML = ''
+    const host = document.createElement('cast-media-player')
+    const inner = document.createElement('div')
+    host.attachShadow({ mode: 'open' }).append(inner)
+    inner.attachShadow({ mode: 'open' }).append(media.element as HTMLVideoElement)
+    document.body.append(host)
+    media.time = 7
+    const { manager, engine } = setup()
+    await engine.load(STREAM)
+    manager.emit('PLAYER_LOADING')
+    manager.emit('LOADED_METADATA')
+    manager.state = 'PLAYING'
+    expect(engine.sample()?.time).toBe(7)
+  })
+
+  it('says ended and stopped, and not for a replaced one', async () => {
+    const { manager, engine } = setup()
+    const tuned = async () => {
+      await engine.load(STREAM)
+      manager.emit('PLAYER_LOADING')
+      manager.emit('LOADED_METADATA')
+    }
+    await tuned()
     manager.emit('MEDIA_FINISHED', { endedReason: 'INTERRUPTED' })
     expect(engine.sample()).toBeNull() // IDLE, nothing to say
     manager.emit('MEDIA_FINISHED', { endedReason: 'END_OF_STREAM' })
     expect(engine.sample()?.ended).toBe(true)
+    for (const endedReason of ['STOPPED', 'SENDER_STOPPED']) {
+      await tuned()
+      manager.emit('MEDIA_FINISHED', { endedReason })
+      expect(engine.sample()?.stopped).toBe(true)
+    }
+  })
+
+  it('says stopped while still loading, and not for the stream before', async () => {
+    const { manager, engine } = setup()
     await engine.load(STREAM)
-    manager.emit('LOADED_METADATA')
+    manager.emit('MEDIA_FINISHED', { endedReason: 'STOPPED' }) // the last one's
+    expect(engine.sample()).toBeNull()
+    manager.emit('PLAYER_LOADING')
     manager.emit('MEDIA_FINISHED', { endedReason: 'STOPPED' })
     expect(engine.sample()?.stopped).toBe(true)
   })
@@ -181,8 +263,36 @@ describe('errors', () => {
     manager.emit('ERROR') // the old stream's
     expect(heard).not.toHaveBeenCalled()
     manager.emit('PLAYER_LOADING')
+    manager.emit('ERROR', { detailedErrorCode: 310 })
+    expect(heard).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([903, 904, 906])('%s is not the stream’s: a picture, a replaced load, a message', async (detailedErrorCode) => {
+    const { manager, engine } = setup()
+    const heard = vi.fn()
+    engine.onError(heard)
+    await engine.load(STREAM)
+    manager.emit('PLAYER_LOADING')
+    manager.emit('ERROR', { detailedErrorCode })
+    expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('with no code count', async () => {
+    const { manager, engine } = setup()
+    const heard = vi.fn()
+    engine.onError(heard)
+    await engine.load(STREAM)
+    manager.emit('PLAYER_LOADING')
     manager.emit('ERROR')
     expect(heard).toHaveBeenCalledTimes(1)
+  })
+
+  it('thrown by Cast at once are a refused load', async () => {
+    const { manager, engine } = setup()
+    manager.load.mockImplementationOnce(() => {
+      throw new TypeError('no')
+    })
+    await expect(engine.load(STREAM)).rejects.toThrow('no')
   })
 })
 
@@ -195,7 +305,10 @@ describe('resuming', () => {
     manager.live = { end: 120 }
     expect(play()).toEqual({ type: 'PLAY' })
     expect(manager.seek).toHaveBeenCalledWith(120)
-    manager.live = null
+    manager.state = 'PLAYING'
+    play() // not a resume
+    manager.state = 'PAUSED'
+    manager.live = null // some live streams have no range to offer
     play()
     await engine.load({ ...STREAM, live: false })
     manager.live = { end: 120 }

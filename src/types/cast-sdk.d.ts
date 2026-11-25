@@ -5,7 +5,7 @@ declare namespace cast.framework {
   // ── The receiver (the TV page) ─────────────────────────────────────────────
 
   class PlayerManager {
-    addEventListener(type: string, listener: (event: { endedReason?: string }) => void): void
+    addEventListener(type: string, listener: (event: { endedReason?: string; detailedErrorCode?: number }) => void): void
     setMessageInterceptor<T>(type: string, interceptor: (data: T) => unknown): void
     load(request: messages.LoadRequestData): Promise<void>
     stop(): void
@@ -38,7 +38,8 @@ declare namespace cast.framework {
 
   namespace events {
     const EventType: { ERROR: string; PLAYER_LOADING: string; LOADED_METADATA: string; MEDIA_FINISHED: string }
-    const EndedReason: { END_OF_STREAM: string; STOPPED: string; INTERRUPTED: string }
+    const EndedReason: { END_OF_STREAM: string; STOPPED: string; SENDER_STOPPED: string }
+    const DetailedErrorCode: { IMAGE_ERROR: number; LOAD_INTERRUPTED: number; MEDIA_ERROR_MESSAGE: number }
   }
 
   namespace system {

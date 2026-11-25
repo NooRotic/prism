@@ -75,6 +75,54 @@ it('does not count a pause against the stream', () => {
   expect(at(80_000, 2)).toBe('failed')
 })
 
+it('does not take a jump for playing: a window that slides under a stalled stream, or the move to the live edge', () => {
+  const { tuner, at } = setup()
+  tuner.tune(stream('a'))
+  at(0, 0)
+  expect(at(250, 40)).toBe('tuning') // to the live edge, with no picture yet
+  expect(at(500, 40.25)).toBe('playing')
+  let time = 40.25
+  let state = ''
+  for (let t = 750; t <= 25_000; t += 250) {
+    if (t % 10_000 === 0) time += 10 // the window slides and the player follows it
+    state = at(t, time)
+  }
+  expect(state).toBe('failed')
+})
+
+it('does not take going backwards for playing', () => {
+  const { tuner, at } = setup()
+  tuner.tune(stream('a'))
+  at(0, 30)
+  expect(at(250, 10)).toBe('tuning')
+  expect(at(500, 10.25)).toBe('playing')
+})
+
+it('starts counting afresh after a moment with nothing to see', () => {
+  const { tuner, at } = setup()
+  tuner.tune(stream('a'))
+  at(0, 1)
+  at(250, 1.25)
+  at(500, null)
+  expect(at(10_000, 9)).not.toBe('playing')
+})
+
+it('keeps up when the device is busy and looks less often', () => {
+  const { tuner, at } = setup()
+  tuner.tune(stream('a'))
+  at(0, 1)
+  at(250, 1.25)
+  expect(at(4250, 5.25)).toBe('playing')
+})
+
+it('a pause before the first picture moved counts as started, not as tuning', () => {
+  const { tuner, at } = setup()
+  tuner.tune(stream('a'))
+  at(0, 1, { paused: true })
+  expect(at(500, 1)).toBe('playing')
+  expect(at(1500, 1)).toBe('buffering')
+})
+
 it('says when a recording has ended, and when playing was stopped', () => {
   const { tuner, at } = setup()
   tuner.tune(stream('a'))
