@@ -28,3 +28,4 @@ jobs:
           VITE_TWITCH_CLIENT_ID: ${{ secrets.VITE_TWITCH_CLIENT_ID }}
           VITE_YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY }}
           VITE_YOUTUBE_CLIENT_ID: ${{ secrets.VITE_YOUTUBE_CLIENT_ID }}
+      - run: pnpm run build:cast
