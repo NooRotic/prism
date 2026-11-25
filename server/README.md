@@ -10,6 +10,9 @@ Plan: [docs/superpowers/plans/2026-11-12-history-server.md](../docs/superpowers/
 
 ## Deploy
 
+The TV page for casting (`prism-cast.nooroticx.tv`, folder `PRISM/casting`) is not part of this server: `node tools/deploy-cast.mjs`
+builds it and lists its upload the same way, `--go` uploads.
+
 `node server/tools/deploy.mjs` lists what would go to the host; add `--go` to upload over password SFTP (pinned host
 key, `IONOS_SSH_PASSWORD` from the environment or a gitignored `.env`; options `--config` and `--env-file`). It never
 uploads `config.php`. Classes go up first and `public/` last, so a request during an upgrade never meets a new front
