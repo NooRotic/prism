@@ -1,16 +1,22 @@
-import { COUNTED_NOTE } from '../../config/analytics'
+import { COUNTED_NOTE, UNCOUNTED_NOTE } from '../../config/analytics'
+import { SEND_VISITS } from '../../config/historyServer'
 
 /**
- * The one plain line about what is counted. It is in the page for everyone but hidden by CSS (`.counted-note` in index.css)
- * unless the counting block in index.html ran, which adds the class "counted" to <html>: it shows only where a visit is counted.
+ * The one plain line about what is counted. Both versions are in the page for everyone and CSS shows one of them
+ * (`.counted-note`, `.uncounted-note` in index.css): the first only where the counting block in index.html ran, which adds the class
+ * "counted" to <html>; the second where it did not. A development build counts nothing, so it does not say it does.
  */
-export function CountedNote() {
+export function CountedNote({ className = 'text-sm max-w-md text-center text-[var(--text-muted)]' }: { className?: string }) {
   return (
-    <p
-      className="counted-note text-sm max-w-md text-center"
-      style={{ color: 'var(--text-muted)', fontWeight: 300 }}
-    >
-      {COUNTED_NOTE}
-    </p>
+    <>
+      <p className={`counted-note ${className}`} style={{ fontWeight: 300 }}>
+        {COUNTED_NOTE}
+      </p>
+      {SEND_VISITS && (
+        <p className={`uncounted-note ${className}`} style={{ fontWeight: 300 }}>
+          {UNCOUNTED_NOTE}
+        </p>
+      )}
+    </>
   )
 }

@@ -295,3 +295,15 @@ describe('Accounts: the debug toggle', () => {
     expect(screen.getByTestId('debug-state')).toHaveTextContent('on')
   })
 })
+
+describe('Accounts: what is counted', () => {
+  it('says what is counted, so it can be found on every page', async () => {
+    twitch(false)
+    renderHeader()
+    expect(screen.queryByText(/are counted by Matomo/)).not.toBeInTheDocument()
+
+    await userEvent.click(pill())
+
+    expect(screen.getByText(/^Visits, and what is played or linked, are counted by Matomo/)).toHaveClass('counted-note')
+  })
+})
