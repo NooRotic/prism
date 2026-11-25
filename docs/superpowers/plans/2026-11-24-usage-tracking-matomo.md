@@ -42,7 +42,7 @@ components send events with one line each. No server change.
 | `src/hooks/usePageView.ts` (new) | One page view per path change; first-view referrer and `utm_` |
 | `src/hooks/useStayed.ts` (new) | "Stayed" events at 1 and 10 minutes |
 | `index.html`, `public/404.html` | Settings only; keep the real referrer across the redirect |
-| Call sites | `HlsPage`, `StreamPlayerPanel`, `DashJSPlayer`, `StreamStatus`, `TwitchPlayerPage`, `YoutubePlayerPage`, `useLinkSuggestion`, `LinkAccountsModal`, `LinkTwitchModal`, `LinkedAccounts`, `useYoutubeChatPopout`, `useChatPopout`, `FloatingVideoProvider`, `SmartUrlInput` |
+| Call sites | `HlsPage`, `StreamPlayerPanel`, `DashJSPlayer`, `StreamStatus`, `TwitchPlayerPage`, `YoutubePlayerPage`, `useLinkSuggestion`, `LinkAccountsModal`, `LinkTwitchModal`, `LinkedAccounts`, `PrismLinkBar`, `AlsoOnTwitch`, `useYoutubeChatPopout`, `useChatPopout`, `FloatingVideoProvider`, `SmartUrlInput` |
 | `CountedNote.tsx`, `config/analytics.ts`, `index.css`, `AccountsRow.tsx` | The notice, two versions, two places |
 
 ---
@@ -277,8 +277,10 @@ it('counts nothing without a name')
 
 **Files:**
 - Modify: `src/hooks/useLinkSuggestion.ts`, `src/components/channel/LinkAccountsModal.tsx`, `src/components/youtube/LinkTwitchModal.tsx`,
-  `src/components/channel/LinkedAccounts.tsx`, `src/components/chat/useYoutubeChatPopout.ts`
-- Test: `useLinkSuggestion.test.tsx`, `LinkedAccounts.test.tsx`, `LinkTwitchModal.test.tsx`, `useYoutubeChatPopout.test.tsx`
+  `src/components/channel/LinkedAccounts.tsx`, `src/components/channel/PrismLinkBar.tsx`, `src/components/youtube/AlsoOnTwitch.tsx`,
+  `src/components/chat/useYoutubeChatPopout.ts`
+- Test: `useLinkSuggestion.test.tsx`, `LinkedAccounts.test.tsx`, `PrismLinkBar.test.tsx`, `AlsoOnTwitch.test.tsx`, `LinkTwitchModal.test.tsx`,
+  `useYoutubeChatPopout.test.tsx`
 
 **Interfaces:**
 - Consumes: `trackEvent`, `linkName`, `LinkRecord`.
@@ -291,6 +293,8 @@ it('counts nothing without a name')
 //   'twitch/x <-> youtube/Y + kick/k'; "Remove links" -> 'unlinked' with the removed pair's name; a failed check -> nothing
 // LinkTwitchModal: saving -> 'linked' 'twitch/x <-> youtube/Title'; unchanged -> nothing; "Remove link" -> 'unlinked'
 // LinkedAccounts: clicking the YouTube chip, then the Kick chip -> two 'followed'
+// PrismLinkBar: opening the bar -> one 'videos together'; closing it -> nothing more; opening again -> one more
+// AlsoOnTwitch: clicking the link to the Twitch channel -> one 'followed'
 // useYoutubeChatPopout: open() that opens a window -> one 'followed'; a blocked pop-up -> nothing
 ```
 

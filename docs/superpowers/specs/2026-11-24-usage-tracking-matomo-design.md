@@ -100,7 +100,8 @@ clicking it would otherwise send the pasted address as an outgoing link. This ge
 | Linking | linked | `twitch/x <-> youtube/Title` (or `kick/y`) | the viewer saves a link (either modal, or accepts a suggestion) and it differs from the one before |
 | Linking | auto-linked | the same | `useLinkSuggestion` saves one by itself because both bios agree |
 | Linking | unlinked | the same | the viewer removes a link |
-| Linking | followed | the same | the viewer opens a linked account's chip (Twitch page), or the linked YouTube chat pop-out |
+| Linking | followed | the same | the viewer opens a linked account's chip (Twitch page), the "Also on Twitch" link (YouTube page), or the linked YouTube chat pop-out |
+| Linking | videos together | the same | the viewer opens the "Twitch + YouTube videos, together" bar (`PrismLinkBar`); closing it sends nothing. Found while planning: it is the link feature's main use |
 | Feature | video pop-out, chat pop-out, YouTube chat pop-out | (none) | the window opened |
 | Feature | paste | the detected type (twitch, youtube, hls, dash, mp4, unknown), or `text` for words that are no address; never the text itself | a paste or search is submitted |
 | Feature | favorite | stream name | a stream is starred (not un-starred) |
