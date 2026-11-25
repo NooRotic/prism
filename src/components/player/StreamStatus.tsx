@@ -99,7 +99,7 @@ function Actions({ url, kind, guessedKind, onRetry, onTryAs }: StatusProps) {
       >
         Retry
       </button>
-      {/* matomo_ignore: a click here must not be counted as a link, because the address can be a pasted one with a key in it. */}
+      {/* matomo_ignore: a click here is not counted (startLinkTracking), because even the site of a pasted address is the visitor's own. */}
       <a
         href={url}
         target="_blank"

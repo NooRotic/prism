@@ -6,6 +6,8 @@
  * Never hand these a pasted address, typed words or an account name: what is passed is sent as it is.
  */
 
+import { analyticsPage } from './analyticsPage'
+
 declare global {
   interface Window {
     /** An array until matomo.js loads and puts its own object there, so only `push` can be relied on. */
@@ -43,9 +45,38 @@ export function trackPage({ path, title, query = '', referrer }: PageView): void
   push('trackPageView')
 }
 
-/** Counts clicks on links to other sites. Started with the first page view, so a page that sends no view sends no click either. */
-export function startLinkTracking(): void {
-  push('enableLinkTracking')
+/** Where a click on a link leads, when that is another site: the site alone (`https://www.twitch.tv/`). Null for anything else. */
+function otherSite(target: EventTarget | null): string | null {
+  const link = target instanceof Element ? target.closest('a[href]') : null
+  if (!(link instanceof HTMLAnchorElement) || link.closest('.matomo_ignore')) return null
+  try {
+    const { protocol, origin } = new URL(link.href)
+    if ((protocol !== 'http:' && protocol !== 'https:') || origin === window.location.origin) return null
+    return `${origin}/`
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Counts clicks on links to other sites, by site and never by address. Matomo's own link tracking is left off on purpose: it
+ * sends every address whole unless the link is marked, and PRISM builds links from what people type and paste (a category
+ * search, a video address with no id). A link whose site alone is somebody's own, like a pasted stream's, carries
+ * `matomo_ignore`. Nothing is counted on a page that is not (admin, pop-outs). Returns the way to stop.
+ */
+export function startLinkTracking(): () => void {
+  const onClick = (event: MouseEvent) => {
+    if (event.type === 'auxclick' && event.button !== 1) return // a right click opens nothing
+    const site = otherSite(event.target)
+    if (site === null || analyticsPage(window.location.pathname) === null) return
+    push('trackLink', site, 'link')
+  }
+  document.addEventListener('click', onClick, true)
+  document.addEventListener('auxclick', onClick, true)
+  return () => {
+    document.removeEventListener('click', onClick, true)
+    document.removeEventListener('auxclick', onClick, true)
+  }
 }
 
 export function trackEvent(category: EventCategory, action: string, name?: string): void {

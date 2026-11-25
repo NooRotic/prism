@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import HlsPage from '../HlsPage'
+import { FloatingVideoContext, type FloatingVideoControls } from '../../components/chat/floatingVideoContext'
 import { useApp } from '../../contexts/AppContext'
 import { useStayed } from '../../hooks/useStayed'
 import { useStreamSnapshot, type StreamSnapshotState } from '../../hooks/useStreamSnapshot'
@@ -66,13 +67,18 @@ function Nav() {
   return null
 }
 
-const tree = (path: string) => (
-  <MemoryRouter initialEntries={[path]}>
-    <Routes>
-      <Route path="hls-dash/:streamId?" element={<HlsPage />} />
-    </Routes>
-    <Nav />
-  </MemoryRouter>
+const controls = (isFloating: boolean): FloatingVideoControls => ({
+  supported: true, canOpen: true, isFloating, blocked: false, failed: false, open: vi.fn(), close: vi.fn(), registerSource: vi.fn(),
+})
+const tree = (path: string, floating = false) => (
+  <FloatingVideoContext.Provider value={controls(floating)}>
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="hls-dash/:streamId?" element={<HlsPage />} />
+      </Routes>
+      <Nav />
+    </MemoryRouter>
+  </FloatingVideoContext.Provider>
 )
 
 function renderAt(path: string, snapshot: StreamSnapshotState = READY) {
@@ -156,6 +162,93 @@ describe('HlsPage: streams played and failed', () => {
     renderAt(`/hls-dash/${BETA.id}`)
     await click('fail')
     await click('retry')
+    await click('fail')
+
+    expect(events('HLS / DASH')).toEqual([['chosen', 'Beta Two'], ['failed', 'Beta Two']])
+  })
+
+  it('reports nothing again when a popped-out video is brought back and starts over', async () => {
+    const path = `/hls-dash/${BETA.id}`
+    const { rerender } = renderAt(path)
+    await click('play')
+    rerender(tree(path, true))
+    expect(screen.queryByTestId('player-host')).not.toBeInTheDocument()
+    rerender(tree(path, false))
+    await click('play')
+    await click('fail')
+    rerender(tree(path, true))
+    rerender(tree(path, false))
+    await click('fail')
+
+    expect(events('HLS / DASH')).toEqual([['chosen', 'Beta Two'], ['played', 'Beta Two'], ['failed', 'Beta Two']])
+  })
+
+  it('nor for the default stream', async () => {
+    const { rerender } = renderAt('/hls-dash')
+    await click('play')
+    rerender(tree('/hls-dash', true))
+    rerender(tree('/hls-dash', false))
+    await click('play')
+
+    expect(events('HLS / DASH')).toEqual([['default played', 'Alpha One']])
+  })
+
+  it('reports each stream that plays, under its own name', async () => {
+    renderAt(`/hls-dash/${BETA.id}`)
+    await click('play')
+    act(() => router.go(`/hls-dash/${ALPHA.id}`))
+    await click('play')
+
+    expect(events('HLS / DASH')).toEqual([['chosen', 'Beta Two'], ['played', 'Beta Two'], ['chosen', 'Alpha One'], ['played', 'Alpha One']])
+  })
+
+  it('reports a stream again when the visitor comes back to it', async () => {
+    renderAt(`/hls-dash/${BETA.id}`)
+    await click('play')
+    act(() => router.go('/hls-dash'))
+    act(() => router.go(`/hls-dash/${BETA.id}`))
+    await click('play')
+
+    expect(events('HLS / DASH')).toEqual([['chosen', 'Beta Two'], ['played', 'Beta Two'], ['chosen', 'Beta Two'], ['played', 'Beta Two']])
+  })
+
+  it('counts the default stream as played once the visitor chooses it while it is playing', async () => {
+    renderAt('/hls-dash')
+    await click('play')
+    act(() => router.go(`/hls-dash/${ALPHA.id}`))
+
+    expect(events('HLS / DASH')).toEqual([['default played', 'Alpha One'], ['chosen', 'Alpha One'], ['played', 'Alpha One']])
+  })
+
+  it('does not count it as played when it had failed by then', async () => {
+    renderAt('/hls-dash')
+    await click('play')
+    await click('fail')
+    act(() => router.go(`/hls-dash/${ALPHA.id}`))
+
+    expect(events('HLS / DASH')).toEqual([['default played', 'Alpha One'], ['failed', 'Alpha One'], ['chosen', 'Alpha One']])
+  })
+
+  it('does not count it as played when it was not playing yet', () => {
+    renderAt('/hls-dash')
+    act(() => router.go(`/hls-dash/${ALPHA.id}`))
+
+    expect(events('HLS / DASH')).toEqual([['chosen', 'Alpha One']])
+  })
+
+  it('reports one failure for one pasted address, however many types are tried', async () => {
+    renderAt(buildStreamPath(SECRET))
+    await click('fail')
+    await click('try dash')
+    await click('fail')
+
+    expect(events('HLS / DASH')).toEqual([['failed', 'Pasted address']])
+  })
+
+  it('reports one failure for one listed stream, however many types are tried', async () => {
+    renderAt(`/hls-dash/${BETA.id}`)
+    await click('fail')
+    await click('try dash')
     await click('fail')
 
     expect(events('HLS / DASH')).toEqual([['chosen', 'Beta Two'], ['failed', 'Beta Two']])

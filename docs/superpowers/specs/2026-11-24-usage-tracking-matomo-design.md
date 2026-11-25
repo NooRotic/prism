@@ -52,8 +52,8 @@ The owner dropped the "counts, not people" rule for usage tracking, which remove
 2. **`src/lib/analyticsPage.ts`** (new, pure): turns a path into `{ path, title }` or null (table below).
 3. **`src/hooks/usePageView.ts`** (new), called beside `usePageHit` in `HitReporter`, with the same rule for what a page change is
    (a different path, trailing slash ignored). `usePageHit` is untouched.
-4. **`index.html`**: the block keeps its settings (including `discardHashTag`) but no longer sends the page view or starts link
-   tracking; the hook does both with the first page view, so there is one place that decides what address is sent, and pages that
+4. **`index.html`**: the block keeps its settings (including `discardHashTag`) but no longer sends the page view or turns on link
+   tracking; the hook sends the view and starts PRISM's own link counting with the first one, so there is one place that decides what address is sent, and pages that
    send no view (admin, pop-outs) send nothing at all. (Link tracking moved here while planning: a click in the pop-out player
    would have sent its raw address, which holds a pasted stream.)
 5. **`public/404.html`**: before redirecting, keeps `document.referrer` in `sessionStorage` (`prism_entry_referrer`) when it is
@@ -84,8 +84,11 @@ Query strings and fragments are never sent, with one exception: `utm_source`, `u
 | anything else (no such page) | `/not-found` | Not found |
 | `/admin/*`, `/chat/*`, `/chat-youtube/*`, `/popout/player` | nothing | (the owner's tool; parts of a page already counted) |
 
-Link tracking stays on, but the "Open address" link on a failed stream (`StreamStatus.tsx`) gets Matomo's ignore class, because
-clicking it would otherwise send the pasted address as an outgoing link. This gets a test.
+Clicks on links to other sites are counted by site only (`https://www.twitch.tv/`), by `startLinkTracking` in `analytics.ts`.
+Matomo's own link tracking is off: it sends every address whole unless a link is marked, and the final review found PRISM links built
+from typed words and pasted addresses (the category panel's "twitch", a video page opened without an id), and a "download" rule that
+sends PRISM's own addresses with their query. The "Open address" link on a failed stream (`StreamStatus.tsx`) carries `matomo_ignore`,
+because even the site of a pasted address is the visitor's own.
 
 ### Events
 
@@ -95,6 +98,13 @@ clicking it would otherwise send the pasted address as an outgoing link. This ge
 | HLS / DASH | played | stream name, or `Pasted address` | first `onPlaying` for that stream. Only `VideoJSPlayer` calls it today; `DashJSPlayer` handles the video's `playing` event but never tells the page, so it gets the same call (it also clears the stall notice, as it already does for HLS) |
 | HLS / DASH | default played | stream name | the same, when the page opened on its default stream |
 | HLS / DASH | failed | stream name, or `Pasted address` | no engine could play it (`markFailed`) |
+
+Each of "played" and "failed" is reported once for what is shown, also when a popped-out video is brought back and starts over, and
+however many types are tried. Choosing the default stream while it plays reports "chosen" and "played". A stream picked while the video
+is popped out plays in the window's frame, which reports nothing: it shows as "chosen" without "played".
+
+| Category | Action | Name | When |
+|---|---|---|---|
 | Twitch | opened | login | a channel page opens |
 | YouTube | opened | `Channel title (UC...)` | the video's details arrive; once per video |
 | Linking | linked | `twitch/x <-> youtube/Title` (or `kick/y`) | the viewer saves a link (either modal, or accepts a suggestion) and it differs from the one before |

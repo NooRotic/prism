@@ -29,9 +29,12 @@ interface StreamPlayerPanelProps {
    * owner's Playlist preview) passes its own handler, which is called instead and nothing is navigated.
    */
   onTryAs?: (kind: StreamKind) => void
-  /** The stream is playing. Called once, however often it rebuffers or is retried. */
+  /**
+   * The stream is playing. Called once per mount, however often it rebuffers or is retried; the page that mounts the panel
+   * again (a popped-out video brought back) knows whether it is the same stream.
+   */
   onStarted?: () => void
-  /** No engine could play the stream. Called once, also when a retry fails again. */
+  /** No engine could play the stream. Called once per mount, also when a retry fails again. */
   onFailed?: () => void
 }
 

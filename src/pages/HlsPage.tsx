@@ -183,11 +183,37 @@ export default function HlsPage() {
     trackEvent('HLS / DASH', 'chosen', knownName)
   }, [chosenId, knownName])
   const reportedName = knownName ?? PASTED_STREAM
-  const onStarted = useCallback(
-    () => trackEvent('HLS / DASH', streamId === undefined ? 'default played' : 'played', reportedName),
-    [streamId, reportedName],
+  // Playing and failing are each reported once for what is shown, here and not in the player panel: the panel goes away while
+  // the video is popped out, and starts over when it is brought back. Trying the same address as another type is still the
+  // same stream; the default stream and the same one chosen are not.
+  const sourceUrl = source?.url ?? null
+  const isDefault = streamId === undefined
+  const shownStream = sourceUrl === null ? null : `${isDefault ? 'default' : 'chosen'}|${sourceUrl}`
+  const reported = useRef<{ key: string | null; actions: Set<string> }>({ key: null, actions: new Set() })
+  const playingUrl = useRef<string | null>(null)
+  const report = useCallback(
+    (action: 'played' | 'failed') => {
+      if (reported.current.key !== shownStream) reported.current = { key: shownStream, actions: new Set() }
+      if (reported.current.actions.has(action)) return
+      reported.current.actions.add(action)
+      trackEvent('HLS / DASH', action === 'played' && isDefault ? 'default played' : action, reportedName)
+    },
+    [shownStream, isDefault, reportedName],
   )
-  const onFailed = useCallback(() => trackEvent('HLS / DASH', 'failed', reportedName), [reportedName])
+  useEffect(() => {
+    if (reported.current.key !== shownStream) reported.current = { key: shownStream, actions: new Set() }
+    if (playingUrl.current !== sourceUrl) playingUrl.current = null
+    // The visitor chose the stream that was already playing by default: nothing restarts, so the player will not say so.
+    else if (playingUrl.current !== null && !isDefault) report('played')
+  }, [shownStream, sourceUrl, isDefault, report])
+  const onStarted = useCallback(() => {
+    playingUrl.current = sourceUrl
+    report('played')
+  }, [sourceUrl, report])
+  const onFailed = useCallback(() => {
+    playingUrl.current = null
+    report('failed')
+  }, [report])
   useStayed(source === null ? null : streamId === undefined ? `${reportedName} (default)` : reportedName, video.isFloating)
   const star = useCallback(
     (id: string) => {
