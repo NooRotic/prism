@@ -184,6 +184,7 @@ export function remote(previous: RemoteState, event: RemoteEvent, now: number, c
 
   const next = step(ctx.surf, state.pending?.entry.id ?? ctx.playingId, vertical)
   if (next === null) {
+    if (!held) effects.push({ type: 'refreshList' })
     effects.push({ type: 'noList' })
   } else {
     state.pending = { entry: next, at: now }

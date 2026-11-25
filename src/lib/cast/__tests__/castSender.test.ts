@@ -142,6 +142,13 @@ describe('starting', () => {
     expect(fake.loadMedia).not.toHaveBeenCalled()
   })
 
+  it('plays what was asked for once: a later cast started another way does not repeat it', async () => {
+    await connected()
+    fake.sessionEnded()
+    fake.sessionStarted('TV')
+    expect(fake.loadMedia).toHaveBeenCalledTimes(1)
+  })
+
   it('says it is connecting, from the press to the session or the closed picker', async () => {
     const sender = ready()
     sender.start(STREAM, null)
@@ -168,6 +175,40 @@ describe('a session taken up again after a reload', () => {
     expect(sender.view()).toMatchObject({ connected: true, device: 'Living room' })
     expect(fake.loadMedia).not.toHaveBeenCalled()
     expect(fake.sendMessage).not.toHaveBeenCalled()
+  })
+})
+
+describe('while it looks for the TV after a reload', () => {
+  const reloaded = () => {
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
+    return ready()
+  }
+
+  it('keeps what is picked for the TV, the last pick only', () => {
+    const sender = reloaded()
+    sender.tune(STREAM, null)
+    sender.tune({ ...STREAM, id: 'b' }, 'News')
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+    fake.sessionResumed('Living room')
+    expect(fake.loadMedia).toHaveBeenCalledTimes(1)
+    expect(fake.loadMedia.mock.calls[0][0].media).toMatchObject({ contentId: 'b', customData: { group: 'News' } })
+  })
+
+  it('forgets the pick when the TV is not there any more', () => {
+    vi.useFakeTimers()
+    const sender = reloaded()
+    sender.tune(STREAM, null)
+    vi.advanceTimersByTime(5_000)
+    fake.sessionStarted('TV')
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+  })
+
+  it('never tunes it to the page’s stream by itself, whatever Google calls the rejoin', () => {
+    const sender = reloaded()
+    sender.offer(() => ({ stream: STREAM, group: null }))
+    fake.sessionStarted('Living room')
+    expect(sender.view()).toMatchObject({ connected: true, rejoining: false })
+    expect(fake.loadMedia).not.toHaveBeenCalled()
   })
 })
 
@@ -233,6 +274,17 @@ describe('ending', () => {
     expect(sessionStorage.getItem(STORAGE_KEYS.SESSION_CASTING)).toBeNull()
     sender.clearEnded()
     expect(sender.view().stoppedOn).toBeNull()
+  })
+
+  it('by Stop, with something picked before it has ended: nothing goes to the TV, and the pick stands', async () => {
+    const sender = await connected()
+    fake.message({ v: 1, type: 'now', id: 'b', name: 'Sports', state: 'playing' })
+    fake.loadMedia.mockClear()
+    sender.stop()
+    sender.tune({ ...STREAM, id: 'c' }, null)
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+    fake.sessionEnded()
+    expect(sender.view()).toMatchObject({ connected: false, endedBySelf: false, stoppedOn: null })
   })
 
   it('any other way is told apart, and a new cast clears it', async () => {

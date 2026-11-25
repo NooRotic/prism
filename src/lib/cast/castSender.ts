@@ -73,7 +73,7 @@ export function createCastSender(): CastSender {
   let context: cast.framework.CastContext | null = null
   let session: cast.framework.CastSession | null = null
   let controller: cast.framework.RemotePlayerController | null = null
-  /** What the cast that is being asked for will play. */
+  /** What the TV will play once it is there: the cast that is being asked for, or a pick made while it is looked for. */
   let waiting: CastChoice | null = null
   let offered: (() => CastChoice | null) | null = null
   let stopping: ReturnType<typeof setTimeout> | null = null
@@ -121,6 +121,12 @@ export function createCastSender(): CastSender {
     set({ connected: true, connecting: false, rejoining: false, device: active.getCastDevice().friendlyName, endedBySelf: false, stoppedOn: null })
   }
 
+  function loadWaiting(otherwise: CastChoice | null): void {
+    const choice = waiting ?? otherwise
+    waiting = null
+    if (choice) loadOnTv(choice)
+  }
+
   function detach(): void {
     const had = session !== null
     const byStop = stopping !== null
@@ -146,13 +152,14 @@ export function createCastSender(): CastSender {
     context.addEventListener(framework.CastContextEventType.SESSION_STATE_CHANGED, (event) => {
       const S = framework.SessionState
       if (event.sessionState === S.SESSION_STARTED) {
+        // Started from Chrome's own menu, nothing waits: the page that is open is what was meant. A TV that was only found
+        // again keeps what it plays.
+        const found = view.rejoining
         attach()
-        // Started from Chrome's own menu, nothing waits: the page that is open is what was meant.
-        const choice = waiting ?? offered?.() ?? null
-        waiting = null
-        if (choice) loadOnTv(choice)
+        loadWaiting(found ? null : (offered?.() ?? null))
       } else if (event.sessionState === S.SESSION_RESUMED) {
         attach()
+        loadWaiting(null)
       } else if (event.sessionState === S.SESSION_ENDED) {
         detach()
       }
@@ -170,6 +177,7 @@ export function createCastSender(): CastSender {
   /** The TV was not found again. */
   function giveUpRejoining(): void {
     if (!view.rejoining) return
+    waiting = null
     markCasting(false)
     set({ rejoining: false })
   }
@@ -208,8 +216,9 @@ export function createCastSender(): CastSender {
       })
     },
     tune(stream, group) {
-      if (session) loadOnTv({ stream, group })
-      else if (waiting) waiting = { stream, group }
+      if (stopping) set({ stoppedOn: null }) // the TV is on its way out: what was picked plays here instead
+      else if (session) loadOnTv({ stream, group })
+      else if (waiting || view.rejoining) waiting = { stream, group }
     },
     togglePause() {
       controller?.playOrPause()

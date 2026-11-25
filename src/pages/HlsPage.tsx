@@ -158,6 +158,8 @@ export default function HlsPage() {
   const [sawCast, setSawCast] = useState(connected)
   if (connected && !sawCast) setSawCast(true)
   const ended = sawCast && !connected && cast.endedBySelf
+  // There is a TV, or there is about to be one: what is picked now is for it.
+  const forTv = connected || cast.connecting || cast.rejoining
 
   // The pop-out follows this page: it opens on the stream shown and switches when the page moves to another one. While the
   // stream is on a TV, or the page stays silent after that, there is nothing here to float.
@@ -229,27 +231,34 @@ export default function HlsPage() {
     if (navigationType !== 'PUSH' || (location.state as { castPick?: boolean } | null)?.castPick !== true) return
     if (pickHandled.current === location.key) return
     pickHandled.current = location.key
-    if (connected || cast.connecting) tuneTv(source)
+    if (forTv) tuneTv(source)
     if (!connected) clearEnded()
-  }, [navigationType, location, connected, cast.connecting, source, tuneTv, clearEnded])
+  }, [navigationType, location, connected, forTv, source, tuneTv, clearEnded])
 
-  // Stop was pressed here: the channel the TV was on comes back to the computer, if it is in the list.
-  // It is forgotten only once the page is there: the navigation lands after a store update, and the old channel must not start.
-  const returnTo = sawCast && !connected && stoppedOn !== null && stoppedOn !== streamId && resolveSnapshotStream(stoppedOn, real) ? stoppedOn : null
+  // Stop was pressed here: the channel the TV was on comes back to the computer, if it is in the list. Not over a stream that
+  // could not go to the TV: that one can only have been stopped for. It is forgotten only once the page is there: the
+  // navigation lands after a store update, and the old channel must not start.
+  const returning = sawCast && !connected && stoppedOn !== null && stoppedOn !== streamId && (source === null || castReason(source) === null)
+  const returnTo = returning && resolveSnapshotStream(stoppedOn, real) ? stoppedOn : null
+  const returnUnknown = returning && status === 'loading'
   useLayoutEffect(() => {
-    if (connected || stoppedOn === null) return
+    if (connected || stoppedOn === null || returnUnknown) return
     if (returnTo !== null) navigate(`/hls-dash/${returnTo}`, { replace: true })
     else clearEnded()
-  }, [connected, stoppedOn, returnTo, navigate, clearEnded])
+  }, [connected, stoppedOn, returnTo, returnUnknown, navigate, clearEnded])
 
+  // Picking another card is a pick like a pasted address: it is acted on once the page is there, for the same reason.
   const choose = useCallback(
     (id: string) => {
-      if (connected || cast.connecting) tuneTv(resolveStreamSource(id, NO_PARAMS) ?? resolveSnapshotStream(id, real))
-      if (!connected) clearEnded()
-      if (id !== streamId) navigate(`/hls-dash/${id}`)
+      if (id !== streamId) {
+        navigate(`/hls-dash/${id}`, { state: { castPick: true } })
+      } else {
+        if (forTv) tuneTv(source)
+        if (!connected) clearEnded()
+      }
       playerAnchor.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
     },
-    [navigate, streamId, connected, cast.connecting, tuneTv, real, clearEnded],
+    [navigate, streamId, connected, forTv, tuneTv, source, clearEnded],
   )
   const renderCard = useCallback(
     (stream: StreamEntry, selected: boolean) => (
@@ -287,7 +296,7 @@ export default function HlsPage() {
             <PlayerPlaceholder>
               <p>Reconnecting to the TV…</p>
             </PlayerPlaceholder>
-          ) : returnTo !== null ? (
+          ) : returnTo !== null || returnUnknown ? (
             <PlayerPlaceholder>
               <p>Loading stream…</p>
             </PlayerPlaceholder>

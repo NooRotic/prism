@@ -97,7 +97,10 @@ export function createTuner(engine: CastEngine, now: () => number): Tuner {
     tick(at) {
       if (!current.stream) return
       const sample = engine.sample()
-      if (sample?.stopped) return set({ stream: null, state: 'idle' })
+      if (sample?.stopped) {
+        tune += 1 // a load that was still on its way has nothing more to say
+        return set({ stream: null, state: 'idle' })
+      }
       if (sample?.ended) return setState('ended')
       if (sample?.paused) {
         lastTime = sample.time

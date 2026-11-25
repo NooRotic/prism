@@ -1,6 +1,6 @@
 # Casting PRISM, phase 1: HLS / DASH as a set-top box
 
-Status: approved by the owner 2026-11-25. Nothing is built.
+Status: approved by the owner 2026-11-25. Built on branch `feat/casting-phase-1`; the device checklist and the tuning are still to do.
 
 **Whose words are whose:** lines marked **Owner** are the owner's decisions. Everything else is a proposal by the writer, shown to the owner as such ("my calls" are listed at the end).
 
@@ -70,7 +70,7 @@ The receiver loads `GET /api/streams` itself at launch and again when the guide 
 
 The sender sends with every load (in the media's `customData`): the stream id (or null), the kind, the viewer's favorite ids, and the group the page was showing (by name, or null). Favorites are sent again when they change while connected (see Messages). The receiver keeps the last set in memory only.
 
-**Surf list**, what Up and Down move through: the favorites that are in the list, in list order; with none, the streams of the page's group; with no group, the whole list. A playing stream that is not in the surf list (a pasted address, a demo): the first Down goes to the first entry, the first Up to the last. The ends wrap.
+**Surf list**, what Up and Down move through: the favorites that are in the list, in list order; with fewer than two, the streams of the page's group; with no group or fewer than two in it, the whole list (one channel is nothing to move through). A playing stream that is not in the surf list (a pasted address, a demo): the first Down goes to the first entry, the first Up to the last. The ends wrap.
 
 ### The remote
 
@@ -130,11 +130,11 @@ Tuning is part of phase 1: after it works, the same 60 streams are run with a fe
 - **Button:** beside the pop-out button above the player, in the same style, shown only when Cast reports a device. It opens Chrome's own device picker.
 - **Starting:** the page's stream goes to the TV, the local player goes away (one stream, not two), and a floating video closes first. MP4 and other non-HLS/DASH addresses, and any `http://` address, are not castable: the button is disabled with the reason as its title.
 - **While casting on the HLS page** a panel takes the player's place: "Playing on <device>", the channel the TV is on now (it follows the remote), its state (tuning, playing, not available), Play / Pause, Stop casting. The TV is tuned from the page only by an explicit choice: a card in the list (also the one already in the address) or a pasted address. Those change the address as today. Back / Forward, opening the page from the header, a reload and the list arriving never tune the TV. A flip by remote changes the panel, not the page's address. Play / Pause drives Cast's own remote player and is labelled by what the TV says.
-- **Stop casting** clicked on the page: the local player returns and plays, on the channel the TV was last on if it is in the list (the address is replaced, not pushed), otherwise on the page's stream. **The session ending any other way** (Back on the TV, another app, the network): nothing starts by itself. The HLS page shows "Casting ended" with a Play here button, so an unattended computer never starts making sound. On any other page nothing happens except the coming-soon line going away.
+- **Stop casting** clicked on the page: the local player returns and plays, on the channel the TV was last on if it is in the list (the address is replaced, not pushed), otherwise on the page's stream. A page whose own stream cannot be cast keeps it: that is what Stop was pressed for. Something picked between Stop and the end of the session plays here and is not sent to the TV. **The session ending any other way** (Back on the TV, another app, the network): nothing starts by itself. The HLS page shows "Casting ended" with a Play here button, so an unattended computer never starts making sound. On any other page nothing happens except the coming-soon line going away.
 - **Coming soon:** on `/twitch/:channel` and `/youtube/:videoId` while connected, one line above the player: "Casting Twitch (YouTube) is coming soon. Your TV keeps playing <name>." The page otherwise works as today and nothing is sent to the TV. Never over the player.
 - The app's other notices and the "PLAYBACK" log are unchanged; casting writes nothing to the log (it is cleared whenever the player mounts, so a line there is never seen).
 - **A reload while casting** shows "Reconnecting to the TV…" and makes no sound until the session is back, for at most 5 s; then (or at once when Google's script is blocked or says there is no Cast) the page plays by itself.
-- **A cast started from Chrome's own menu** takes the stream of the HLS page that is open; on any other page the TV waits for a choice. **A pick made while the picker is open** is the one that is cast. A pick that cannot be cast leaves the TV as it is and the panel says why.
+- **A cast started from Chrome's own menu** takes the stream of the HLS page that is open; on any other page the TV waits for a choice. **A pick made while the picker is open** is the one that is cast. So is one made during "Reconnecting to the TV…". A pick that cannot be cast leaves the TV as it is and the panel says why.
 - How a cast ended matters only to an HLS page that was open during it: one opened later starts as it always did. A Stop that has not ended the session within 10 s did not work and is forgotten.
 
 ## Messages
@@ -164,7 +164,7 @@ File names and component split, guide visuals within the limits above, exact wor
 ## Calls made by the writer, for the owner to check
 
 1. Up goes to the previous channel and Down to the next (the guide's own direction).
-2. Favorites are the surf list; with none, the page's group; with none, everything.
+2. Favorites are the surf list; with fewer than two, the page's group; with fewer than two, everything.
 3. OK opens the guide; Left / Right do nothing while it is closed.
 4. Back asks twice before leaving.
 5. A dead stream stays on a message instead of skipping by itself.

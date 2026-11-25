@@ -12,17 +12,20 @@ const inFavorites = (list: StreamSnapshot, favorites: readonly string[]): Stream
   return list.streams.filter((stream) => wanted.has(stream.id))
 }
 
+/** One channel is nothing to move through. */
+const isChoice = (streams: StreamEntry[]): boolean => streams.length > 1
+
 /**
- * What Up and Down move through: the viewer's favorites that are still in the list; with none, the group they cast from;
- * with none of those either, everything. Always in the list's own order.
+ * What Up and Down move through: the viewer's favorites that are still in the list; with fewer than two, the group they cast
+ * from; with fewer than two of those either, everything. Always in the list's own order.
  */
 export function surfList(list: StreamSnapshot | null, favorites: readonly string[], group: string | null): StreamEntry[] {
   if (list === null) return []
   const starred = inFavorites(list, favorites)
-  if (starred.length > 0) return starred
+  if (isChoice(starred)) return starred
   const index = group === null ? -1 : list.groups.indexOf(group)
   const grouped = index === -1 ? [] : list.streams.filter((stream) => stream.groups.includes(index))
-  return grouped.length > 0 ? grouped : list.streams
+  return isChoice(grouped) ? grouped : list.streams
 }
 
 /** The channel `by` places on from the current one, round both ends. A current one that is not in the list starts at an end. */

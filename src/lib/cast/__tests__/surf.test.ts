@@ -14,7 +14,15 @@ describe('surfList', () => {
   })
 
   it('skips a favorite that has left the list', () => {
-    expect(ids(surfList(LIST, ['gone', 'b'], null))).toEqual(['b'])
+    expect(ids(surfList(LIST, ['gone', 'b', 'c'], null))).toEqual(['b', 'c'])
+  })
+
+  it('is never a single channel while there are others: Up and Down would go nowhere', () => {
+    expect(ids(surfList(LIST, ['b'], null))).toEqual(['a', 'b', 'c'])
+    expect(ids(surfList(LIST, ['gone', 'b'], 'News'))).toEqual(['a', 'c'])
+    const one: StreamSnapshot = { ...LIST, groups: [...LIST.groups, 'Just one'], streams: [A, B, entry('d', [3])] }
+    expect(ids(surfList(one, [], 'Just one'))).toEqual(['a', 'b', 'd'])
+    expect(ids(surfList({ ...LIST, streams: [A] }, ['a'], 'News'))).toEqual(['a'])
   })
 
   it('is the group when no favorite is left, and everything when there is no such group', () => {

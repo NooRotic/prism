@@ -32,7 +32,7 @@ vi.mock('../../components/streams/StreamGrid', () => ({
 }))
 
 const entry = (id: string, name: string): StreamEntry => ({ id, name, groups: [0], country: null, logo: null, kind: 'hls', pinned: false, state: 'working', url: `https://h.test/${id}.m3u8` })
-const LIST: StreamSnapshot = { generated: '', defaultId: 'aaa', groups: ['News'], streams: [entry('aaa', 'Alpha'), entry('bbb', 'Beta')] }
+const LIST: StreamSnapshot = { generated: '', defaultId: 'aaa', groups: ['News'], streams: [entry('aaa', 'Alpha'), entry('bbb', 'Beta'), entry('ccc', 'Gamma')] }
 const URL_A = 'https://h.test/aaa.m3u8'
 const URL_B = 'https://h.test/bbb.m3u8'
 
@@ -205,6 +205,34 @@ describe('a reload while casting', () => {
     expect(sessionStorage.getItem(STORAGE_KEYS.SESSION_CASTING)).toBeNull()
   })
 
+  it('a card picked before the TV is back is what it plays', async () => {
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
+    mount('/hls-dash/aaa')
+    ready()
+    await click(card('Beta'))
+    expect(player()).toBeNull()
+    act(() => fake.sessionResumed('Living room'))
+    expect(loaded()).toEqual(['bbb'])
+  })
+
+  it('so is an address pasted before the TV is back', async () => {
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
+    mount('/hls-dash/aaa')
+    ready()
+    await click(screen.getByText('paste hls'))
+    act(() => fake.sessionResumed('Living room'))
+    expect(loaded()).toEqual(['pasted'])
+  })
+
+  it('never tunes the TV by itself, whatever Google calls the rejoin', () => {
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
+    mount('/hls-dash/aaa')
+    ready()
+    act(() => fake.sessionStarted('Living room'))
+    expect(screen.getByText('Playing on Living room')).toBeInTheDocument()
+    expect(loaded()).toEqual([])
+  })
+
   it('is remembered for the next reload too, and over once the cast ends', async () => {
     vi.useFakeTimers()
     sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
@@ -254,6 +282,73 @@ describe('Stop casting', () => {
     expect(played).toEqual([URL_A])
   })
 
+  it.each([
+    ['the page’s own card', 'Alpha', '/hls-dash/aaa', URL_A],
+    ['another card', 'Gamma', '/hls-dash/ccc', 'https://h.test/ccc.m3u8'],
+  ])('%s picked before the TV has let go is what plays here', async (_what, name, path, url) => {
+    await casting()
+    tell('bbb', 'Beta')
+    played.length = 0
+    await click(screen.getByRole('button', { name: 'Stop casting' }))
+    await click(card(name))
+    await act(async () => fake.sessionEnded())
+    expect(loaded()).toEqual(['aaa'])
+    expect(window.location.pathname).toBe(path)
+    expect(played).toEqual([url])
+  })
+
+  it('an address pasted before the TV has let go is what plays here', async () => {
+    await casting()
+    tell('bbb', 'Beta')
+    played.length = 0
+    await click(screen.getByRole('button', { name: 'Stop casting' }))
+    await click(screen.getByText('paste hls'))
+    await act(async () => fake.sessionEnded())
+    expect(played).toEqual(['https://p.test/x.m3u8'])
+  })
+
+  it('plays the page’s own stream when that is what could not be cast, and keeps its address', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    await click(screen.getByText('paste mp4'))
+    played.length = 0
+    await click(screen.getByRole('button', { name: 'Stop casting' }))
+    await act(async () => fake.sessionEnded())
+    expect(played).toEqual(['https://p.test/x.mp4'])
+    expect(window.location.pathname + window.location.search).toBe(buildStreamPath('https://p.test/x.mp4'))
+  })
+
+  it('before the list has come waits for it, then plays the channel the TV was on', async () => {
+    vi.mocked(useStreamSnapshot).mockReturnValue({ status: 'loading', snapshot: null } as unknown as ReturnType<typeof useStreamSnapshot>)
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
+    mount('/hls-dash/aaa')
+    ready()
+    act(() => fake.sessionResumed('Living room'))
+    tell('bbb', 'Beta')
+    await click(screen.getByRole('button', { name: 'Stop casting' }))
+    await act(async () => fake.sessionEnded())
+    expect(played).toEqual([])
+    vi.mocked(useStreamSnapshot).mockReturnValue({ status: 'ready', snapshot: LIST })
+    await act(async () => fake.castState('NO_DEVICES_AVAILABLE')) // the page looks again
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+    expect(played).toEqual([URL_B])
+  })
+
+  it('does not wait for a list that never comes', async () => {
+    vi.mocked(useStreamSnapshot).mockReturnValue({ status: 'loading', snapshot: null } as unknown as ReturnType<typeof useStreamSnapshot>)
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
+    mount(buildStreamPath('https://p.test/x.m3u8'))
+    ready()
+    act(() => fake.sessionResumed('Living room'))
+    tell('bbb', 'Beta')
+    await click(screen.getByRole('button', { name: 'Stop casting' }))
+    await act(async () => fake.sessionEnded())
+    expect(played).toEqual([])
+    vi.mocked(useStreamSnapshot).mockReturnValue({ status: 'unavailable', snapshot: null } as unknown as ReturnType<typeof useStreamSnapshot>)
+    await act(async () => fake.castState('NO_DEVICES_AVAILABLE'))
+    expect(played).toEqual(['https://p.test/x.m3u8'])
+  })
+
   it('does not take over a later visit', async () => {
     await casting()
     tell('bbb', 'Beta')
@@ -280,6 +375,22 @@ describe('a cast that ends by itself', () => {
     await click(screen.getByRole('button', { name: 'Play here' }))
     expect(player()).toHaveAttribute('data-url', URL_A)
     expect(registerSource).toHaveBeenLastCalledWith(expect.objectContaining({ url: URL_A }))
+  })
+
+  it('a card picked then is all that plays, never the old channel on the way', async () => {
+    await casting()
+    played.length = 0
+    await act(async () => fake.sessionEnded())
+    await click(card('Beta'))
+    expect(played).toEqual([URL_B])
+  })
+
+  it('the card of the channel that was on plays it', async () => {
+    await casting()
+    played.length = 0
+    await act(async () => fake.sessionEnded())
+    await click(card('Alpha'))
+    expect(played).toEqual([URL_A])
   })
 
   it('while on another page, a later visit plays as usual', async () => {

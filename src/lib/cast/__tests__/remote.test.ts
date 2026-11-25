@@ -153,6 +153,16 @@ describe('Up and Down with the guide closed', () => {
     expect(r.of('noList')).toHaveLength(1)
   })
 
+  it('asks for the list again when there is none, once per press however long it is held', () => {
+    const r = hand({ surf: [], groups: [], playingId: 'b', retry: true })
+    r.press('ArrowDown', 0)
+    r.press('ArrowDown', 400)
+    r.press('ArrowDown', 600)
+    expect(r.of('refreshList')).toHaveLength(1)
+    r.press('ArrowDown', 5_000)
+    expect(r.of('refreshList')).toHaveLength(2)
+  })
+
   it('keeps working when the clock goes backwards', () => {
     const r = hand()
     r.press('ArrowDown', 10_000)

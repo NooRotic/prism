@@ -135,6 +135,16 @@ it('says when a recording has ended, and when playing was stopped', () => {
   expect(tuner.view().stream).toBeNull()
 })
 
+it('a stop while it is loading is a stop, whatever becomes of the load', async () => {
+  const { tuner, loads, at } = setup()
+  tuner.tune(stream('a'))
+  expect(at(500, 0, { stopped: true })).toBe('idle')
+  loads[0].reject('load_cancelled')
+  await Promise.resolve()
+  await Promise.resolve()
+  expect(tuner.view()).toEqual({ stream: null, state: 'idle' })
+})
+
 it('fails at once on an error or a refused load', async () => {
   const one = setup()
   one.tuner.tune(stream('a'))
