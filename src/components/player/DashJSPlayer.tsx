@@ -26,6 +26,7 @@ export default function DashJSPlayer({
   onPause,
   onEnded,
   onPlaybackBlocked,
+  onPlaying,
 }: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<MediaPlayerClass | null>(null)
@@ -40,6 +41,7 @@ export default function DashJSPlayer({
     onPause,
     onEnded,
     onPlaybackBlocked,
+    onPlaying,
   })
 
   useEffect(() => {
@@ -69,6 +71,7 @@ export default function DashJSPlayer({
       if (!mountedRef.current) return
       out.log('ok', 'dashjs', 'playing')
       out.setStatus('playing')
+      cb.current.onPlaying?.()
     }
 
     videoEl.addEventListener('play', handlePlay)

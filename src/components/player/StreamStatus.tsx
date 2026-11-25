@@ -99,11 +99,12 @@ function Actions({ url, kind, guessedKind, onRetry, onTryAs }: StatusProps) {
       >
         Retry
       </button>
+      {/* matomo_ignore: a click here must not be counted as a link, because the address can be a pasted one with a key in it. */}
       <a
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-sm hover:bg-white/10"
+        className="matomo_ignore inline-flex items-center gap-1 px-3 py-1.5 rounded text-sm hover:bg-white/10"
         style={BUTTON_STYLE}
       >
         <ExternalLink size={14} />

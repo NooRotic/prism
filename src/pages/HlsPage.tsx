@@ -5,6 +5,8 @@ import { demoToEntry, getHlsDashDemo } from '../config/demoContent'
 import { STORAGE_KEYS } from '../config/storageKeys'
 import { useFavoriteCounts, useFavoriteIds, useToggleFavorite } from '../hooks/useFavorites'
 import { useStreamSnapshot } from '../hooks/useStreamSnapshot'
+import { PASTED_STREAM, trackEvent } from '../lib/analytics'
+import { getFavorites } from '../lib/favorites'
 import { buildStreamPath, CUSTOM_STREAM_ID } from '../lib/routes'
 import { filterStreams, groupCounts } from '../lib/streamFilter'
 import { resolveSnapshotStream, resolveStreamSource, type StreamSource } from '../lib/streamSource'
@@ -167,6 +169,33 @@ export default function HlsPage() {
   )
   const aboutEntry = useMemo(() => playingEntry ?? (source ? pastedEntry(source) : null), [playingEntry, source])
 
+  // What the owner's Matomo is told. The name is a listed stream's or a demo's (a demo plays by its id whatever list is
+  // showing); a pasted address is never given. A choice is a stream named in the address, by a click or a shared link: the
+  // stream the page opens on by itself is nobody's choice, so its playing is kept apart.
+  const knownName = playingEntry?.name ?? (source ? demoEntries.find((entry) => entry.url === source.url)?.name : undefined)
+  const chosenId = streamId !== undefined && streamId !== CUSTOM_STREAM_ID ? streamId : null
+  const reportedChoice = useRef<string | null>(null)
+  useEffect(() => {
+    if (chosenId === null) reportedChoice.current = null
+    if (chosenId === null || knownName === undefined || reportedChoice.current === chosenId) return
+    reportedChoice.current = chosenId
+    trackEvent('HLS / DASH', 'chosen', knownName)
+  }, [chosenId, knownName])
+  const reportedName = knownName ?? PASTED_STREAM
+  const onStarted = useCallback(
+    () => trackEvent('HLS / DASH', streamId === undefined ? 'default played' : 'played', reportedName),
+    [streamId, reportedName],
+  )
+  const onFailed = useCallback(() => trackEvent('HLS / DASH', 'failed', reportedName), [reportedName])
+  const star = useCallback(
+    (id: string) => {
+      const was = getFavorites().has(id)
+      toggleFavorite(id)
+      if (!was && getFavorites().has(id)) trackEvent('Feature', 'favorite', entries.find((entry) => entry.id === id)?.name)
+    },
+    [toggleFavorite, entries],
+  )
+
   const starred = useMemo(() => entries.filter((entry) => favoriteIds.has(entry.id)), [entries, favoriteIds])
   const afterSearch = useMemo(
     () => filterStreams(favoritesOnly ? starred : entries, { text, group: null }),
@@ -190,10 +219,10 @@ export default function HlsPage() {
         onSelect={choose}
         favorite={favoriteIds.has(stream.id)}
         favoriteCount={favoriteCounts[stream.id] ?? 0}
-        onToggleFavorite={toggleFavorite}
+        onToggleFavorite={star}
       />
     ),
-    [choose, favoriteIds, favoriteCounts, toggleFavorite],
+    [choose, favoriteIds, favoriteCounts, star],
   )
 
   // Links made while the paste box sent streams to this page (`/hls-dash?url=...`) still work: the custom path plays them.
@@ -220,6 +249,8 @@ export default function HlsPage() {
                   source={source}
                   heading={false}
                   className="flex w-full flex-col gap-4"
+                  onStarted={onStarted}
+                  onFailed={onFailed}
                 />
               )}
             </div>
@@ -236,7 +267,7 @@ export default function HlsPage() {
           groups={groupNames}
           favorite={aboutEntry !== null && favoriteIds.has(aboutEntry.id)}
           favoriteCount={aboutEntry ? (favoriteCounts[aboutEntry.id] ?? 0) : 0}
-          onToggleFavorite={playingEntry ? toggleFavorite : undefined}
+          onToggleFavorite={playingEntry ? star : undefined}
         />
       </div>
 
