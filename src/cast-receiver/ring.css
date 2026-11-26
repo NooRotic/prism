@@ -1,0 +1,38 @@
+/* PRISM's faint rainbow round a panel, on the TV page and the help page: a wheel of colour that only turns (a transform: the
+   GPU moves it, nothing is drawn again), cut to a 2px edge. The panel needs a position; TvRing sizes the wheel. Chrome 87. */
+:root {
+  --rainbow: #9146ff, #3b82f6, #22d3ee, #39ff14, #ffc832, #ff6b35, #ff0000, #9146ff;
+}
+
+.tv-ring {
+  isolation: isolate;
+}
+
+.tv-ring-edge {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  padding: 2px;
+  border-radius: inherit;
+  overflow: hidden;
+  opacity: 0.55;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.tv-ring-wheel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: conic-gradient(var(--rainbow));
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: tv-turn 90s linear infinite;
+}
+
+@keyframes tv-turn {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}

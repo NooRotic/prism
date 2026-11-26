@@ -9,6 +9,28 @@ export interface EngineSample {
   stopped: boolean
 }
 
+/**
+ * What the player is doing, for the TV's debug line. Numbers are there only when the player gives a real one; never anything
+ * from the stream's address.
+ */
+export interface EngineReport {
+  /** Which player: 'shaka' on the TV. */
+  engine: string
+  /** The latest thing the player said about the stream that is on: 'PLAYER_LOADING', 'BUFFERING', 'ERROR 905' and so on. */
+  step: string | null
+  width?: number
+  height?: number
+  /** Bits a second of what is playing. */
+  bitrate?: number
+  /** Bits a second the connection was measured at. */
+  bandwidth?: number
+  /** Seconds buffered ahead of the picture. */
+  buffered?: number
+  /** Seconds behind the live edge (live streams only). */
+  behindLive?: number
+  dropped?: number
+}
+
 /** The one thing that plays. It can be replaced without the rest of the TV page noticing. */
 export interface CastEngine {
   /** Rejects when the load is refused. */
@@ -18,6 +40,7 @@ export interface CastEngine {
   sample(): EngineSample | null
   onError(listener: () => void): () => void
   onSenderLoad(listener: (stream: CastStream, data: CastLoadData | null) => void): () => void
+  report(): EngineReport
 }
 
 export interface TunerView {

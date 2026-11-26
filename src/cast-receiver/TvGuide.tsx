@@ -2,6 +2,7 @@ import ChannelPicture from '../components/streams/ChannelPicture'
 import CountryFlag from '../components/streams/CountryFlag'
 import type { GuidePosition } from '../lib/cast/remote'
 import type { GuideGroup } from '../lib/cast/surf'
+import TvRing from './TvRing'
 import { tvPixels } from './tvPixels'
 
 /** Rows on screen. A group can hold thousands, so only these are drawn. */
@@ -20,7 +21,8 @@ export default function TvGuide({ groups, at, playingId }: TvGuideProps) {
   const first = Math.max(0, Math.min(at.row - Math.floor(ROWS / 2), count - ROWS))
 
   return (
-    <aside className="tv-guide">
+    <TvRing as="aside" className="tv-guide">
+      <p className="tv-guide-platform">HLS / DASH</p>
       <p className="tv-guide-group">
         <span aria-hidden="true">◂</span>
         {group.key === 'favorites' && (
@@ -52,6 +54,6 @@ export default function TvGuide({ groups, at, playingId }: TvGuideProps) {
       <p className="tv-small tv-guide-foot">
         {at.row + 1} of {count} · OK watch · Back close
       </p>
-    </aside>
+    </TvRing>
   )
 }

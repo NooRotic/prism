@@ -12,6 +12,7 @@ function setup() {
     load: (s) => new Promise((_, reject) => loads.push({ stream: s, reject })),
     stop: vi.fn(),
     sample: () => sample,
+    report: () => ({ engine: 'test', step: null }),
     onError: (l) => {
       errors.add(l)
       return () => errors.delete(l)

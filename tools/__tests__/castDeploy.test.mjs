@@ -1,25 +1,30 @@
 import { deployCast, planCastUpload } from '../lib/castDeploy.mjs'
 
 const SSH = { host: 'h.example', user: 'u1', port: 22, remoteDir: 'prism-data', hostKeySha256: ['SHA256:abc'] }
-const FILES = ['index.html', '.htaccess', 'assets/b.css', 'assets/deep/a.js', 'icon.svg']
+const FILES = ['index.html', '.htaccess', 'assets/b.css', 'tv/index.html', 'assets/deep/a.js', 'icon.svg', 'cast-device.js']
 
 describe('planCastUpload', () => {
-  it('puts index.html last, so the page never names a file that is not there yet', () => {
+  it('puts the pages last, the TV page and then the help page, so a page never names a file that is not there yet', () => {
     const { files } = planCastUpload(FILES)
-    expect(files.at(-1)).toEqual({ local: 'index.html', remote: 'PRISM/casting/index.html' })
+    expect(files.slice(-2)).toEqual([
+      { local: 'tv/index.html', remote: 'PRISM/casting/tv/index.html' },
+      { local: 'index.html', remote: 'PRISM/casting/index.html' },
+    ])
     expect(files.map((f) => f.local)).toContain('.htaccess')
+    expect(files.map((f) => f.local)).toContain('cast-device.js')
   })
 
   it('makes parent folders before their children, and never the folders above its own', () => {
-    expect(planCastUpload(FILES).dirs).toEqual(['PRISM/casting/assets', 'PRISM/casting/assets/deep'])
+    expect(planCastUpload(FILES).dirs).toEqual(['PRISM/casting/assets', 'PRISM/casting/tv', 'PRISM/casting/assets/deep'])
   })
 
   it.each(['.env', 'assets/.env.local', 'assets/a.js.map', '../x.js', 'assets/../../x.js', '/etc/x', 'C:/x.js'])('refuses %s', (bad) => {
     expect(() => planCastUpload([...FILES, bad])).toThrow(/will not upload/)
   })
 
-  it('refuses a build with no index.html', () => {
-    expect(() => planCastUpload(['assets/a.js'])).toThrow(/index\.html/)
+  it('refuses a build with no help page or no TV page', () => {
+    expect(() => planCastUpload(['assets/a.js', 'tv/index.html'])).toThrow(/index\.html/)
+    expect(() => planCastUpload(['assets/a.js', 'index.html'])).toThrow(/tv\/index\.html/)
   })
 })
 

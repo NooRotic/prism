@@ -1,10 +1,15 @@
+import { Resvg } from '@resvg/resvg-js'
 import { act, render, screen, within } from '@testing-library/react'
+import jsQR from 'jsqr'
+import { shareUrl } from '../../lib/cast/qrCode'
 import type { CastLoadData, CastStream, ContextMessage, NowMessage } from '../../lib/cast/messages'
-import type { CastEngine, EngineSample } from '../../lib/cast/tuner'
+import type { CastEngine, EngineReport, EngineSample } from '../../lib/cast/tuner'
 import { loadStreamSnapshot, refreshStreamSnapshot, type StreamEntry, type StreamSnapshot } from '../../lib/streamsApi'
+import { fetchTvSettings } from '../../lib/tvSettingsApi'
 import TvApp from '../TvApp'
 
 vi.mock('../../lib/streamsApi', async (original) => ({ ...(await original<object>()), loadStreamSnapshot: vi.fn(), refreshStreamSnapshot: vi.fn() }))
+vi.mock('../../lib/tvSettingsApi', () => ({ fetchTvSettings: vi.fn() }))
 
 const entry = (id: string, name: string, groups: number[] = [0]): StreamEntry => ({ id, name, groups, country: 'us', logo: null, kind: 'hls', pinned: false, state: 'working', url: `https://secret-host.test/${id}.m3u8?token=hunter2` })
 const NEWS = entry('news', 'News One')
@@ -15,6 +20,8 @@ const SENT: CastStream = { id: 'news', name: 'News One', url: NEWS.url, kind: 'h
 const DATA: CastLoadData = { v: 1, id: 'news', kind: 'hls', live: true, favorites: ['news', 'films'], group: null }
 
 let sample: EngineSample | null
+let report: EngineReport
+let reportCalls: number
 let loads: CastStream[]
 let senderLoad: (stream: CastStream, data: CastLoadData | null) => void
 let sendContext: (message: ContextMessage) => void
@@ -29,6 +36,10 @@ const engine: CastEngine = {
   },
   stop: () => {},
   sample: () => sample,
+  report: () => {
+    reportCalls += 1
+    return report
+  },
   onError: (l) => {
     engineError = l
     return () => {}
@@ -90,12 +101,19 @@ async function playing() {
 }
 
 const banner = () => screen.queryByTestId('tv-banner')
+const card = () => screen.queryByTestId('tv-card')
+const clock = () => screen.queryByTestId('tv-clock')
+const now = () => screen.queryByTestId('tv-now')
+const SHARE = 'Scan to watch it on your phone, star it or share it'
 const guide = () => screen.queryByRole('listbox')
 const highlighted = () => within(screen.getByRole('listbox')).getByRole('option', { selected: true })
 
 beforeEach(() => {
   vi.useFakeTimers()
   sample = null
+  report = { engine: 'shaka', step: null }
+  reportCalls = 0
+  vi.mocked(fetchTvSettings).mockReset().mockResolvedValue(null)
   loads = []
   sent = []
   leave.mockReset()
@@ -209,11 +227,19 @@ describe('the guide', () => {
     expect(leave).not.toHaveBeenCalled()
   })
 
-  it('has the bottom of the screen to itself: no banner under or over it', async () => {
+  it('shows what is on beside it, in place of the big banner', async () => {
     await playing()
     expect(banner()).not.toBeNull()
     press('Enter')
     expect(banner()).toBeNull()
+    expect(now()).toHaveTextContent('News One')
+    expect(guide()).not.toBeNull()
+  })
+
+  it('names the platform above the group', async () => {
+    await playing()
+    press('Enter')
+    expect(screen.getByText('HLS / DASH')).toBeInTheDocument()
   })
 
   it('closes after 15 s', async () => {
@@ -326,6 +352,170 @@ describe('when it does not play', () => {
     sample = { time: 60, paused: false, ended: false, stopped: true }
     wait(250)
     expect(screen.getByText('Pick a stream in PRISM')).toBeInTheDocument()
+  })
+})
+
+describe('the share card', () => {
+  it('its code opens the channel’s page in PRISM', async () => {
+    await playing()
+    press('ArrowRight')
+    const svg = card()?.querySelector('svg')?.outerHTML ?? ''
+    const image = new Resvg(svg, { fitTo: { mode: 'width', value: 400 }, background: '#6a7a8a' }).render()
+    expect(jsQR(new Uint8ClampedArray(image.pixels), image.width, image.height, { inversionAttempts: 'attemptBoth' })?.data).toBe(shareUrl('news'))
+  })
+
+  it('names the country, and shows the picture the computer sent when there is no list', async () => {
+    await playing()
+    press('ArrowRight')
+    expect(card()?.querySelector('img[src*="us"]')).not.toBeNull()
+    press('ArrowLeft')
+    await open(null)
+    act(() => senderLoad({ ...SENT, id: 'abc123def456', logo: 'https://d.test/pic.png' }, { ...DATA, id: 'abc123def456' }))
+    plays(1000)
+    press('ArrowRight')
+    expect(screen.getAllByTestId('tv-card').at(-1)?.querySelector('img[src="https://d.test/pic.png"]')).not.toBeNull()
+  })
+
+  it('says a channel that is not working is not working', async () => {
+    await playing()
+    sample = null
+    act(() => engineError())
+    press('ArrowRight')
+    expect(card()).toHaveTextContent('Not available right now')
+  })
+
+  it('Right shows it with the channel’s code, Left takes it away', async () => {
+    await playing()
+    press('ArrowRight')
+    expect(card()).toHaveTextContent('News One')
+    expect(card()).toHaveTextContent(SHARE)
+    expect(card()?.querySelector('svg')).not.toBeNull()
+    expect(banner()).toBeNull()
+    press('ArrowLeft')
+    expect(card()).toBeNull()
+  })
+
+  it('a stream without an id has no code', async () => {
+    await open()
+    act(() => senderLoad({ ...SENT, id: null, name: 'p.test' }, { ...DATA, id: null }))
+    plays(1000)
+    press('ArrowRight')
+    expect(card()).toHaveTextContent("Only channels from PRISM's list can be shared from the TV")
+    expect(card()?.querySelector('svg')).toBeNull()
+  })
+
+  it('a channel the TV has no list for still gets its code', async () => {
+    await open(null)
+    act(() => senderLoad({ ...SENT, id: 'abc123def456', name: 'Mystery Channel' }, { ...DATA, id: 'abc123def456' }))
+    plays(1000)
+    press('ArrowRight')
+    expect(card()).toHaveTextContent('Mystery Channel')
+    expect(card()?.querySelector('svg')).not.toBeNull()
+  })
+
+  it('asks which style to draw at the start and each time it opens', async () => {
+    await playing()
+    expect(fetchTvSettings).toHaveBeenCalledTimes(1)
+    press('ArrowRight')
+    expect(fetchTvSettings).toHaveBeenCalledTimes(2)
+  })
+
+  it('goes away after 30 s', async () => {
+    await playing()
+    press('ArrowRight')
+    plays(29_000)
+    expect(card()).not.toBeNull()
+    plays(1500)
+    expect(card()).toBeNull()
+  })
+})
+
+describe('the clock', () => {
+  it('shows only with the guide, the banner or the card', async () => {
+    await open()
+    expect(clock()).toBeNull()
+    act(() => senderLoad(SENT, DATA))
+    expect(clock()).not.toBeNull()
+    plays(6000)
+    expect(banner()).toBeNull()
+    expect(clock()).toBeNull()
+    press('Enter')
+    expect(clock()).not.toBeNull()
+    press('BrowserBack')
+    press('ArrowRight')
+    expect(clock()).not.toBeNull()
+  })
+
+  it('is not over a channel that does not play', async () => {
+    await playing()
+    plays(6000)
+    sample = null
+    act(() => engineError())
+    expect(clock()).toBeNull()
+  })
+})
+
+describe('the debug line', () => {
+  it('follows the player while a channel tunes', async () => {
+    report = { engine: 'shaka', step: 'PLAYER_LOADING' }
+    await open()
+    act(() => senderLoad(SENT, DATA))
+    wait(250)
+    expect(banner()).toHaveTextContent('PLAYER_LOADING')
+    expect(banner()).toHaveTextContent('ch 1/2')
+  })
+
+  it('puts the player’s error under a channel that does not play', async () => {
+    await playing()
+    report = { engine: 'shaka', step: 'ERROR 905' }
+    sample = null
+    act(() => engineError())
+    wait(1000)
+    expect(document.querySelector('.tv-message')).toHaveTextContent(/ERROR 905/)
+  })
+
+  it('a new channel’s banner never shows the last one’s step', async () => {
+    report = { engine: 'shaka', step: 'PLAYING' }
+    await playing()
+    report = { engine: 'shaka', step: null }
+    act(() => senderLoad({ ...SENT, id: 'sports', name: 'Sports Live' }, { ...DATA, id: 'sports' }))
+    expect(banner()).not.toHaveTextContent('PLAYING')
+  })
+
+  it('a channel tuned on the TV itself never shows the last one’s step either', async () => {
+    report = { engine: 'shaka', step: 'PLAYING' }
+    await playing()
+    press('Enter')
+    press('ArrowDown')
+    key('Enter') // OK in the guide: tuned here, not by the computer
+    expect(banner()).not.toHaveTextContent('PLAYING')
+  })
+
+  it('asks the player nothing while none of its words are on screen', async () => {
+    await playing()
+    plays(6000)
+    expect(banner()).toBeNull()
+    reportCalls = 0
+    plays(5000)
+    expect(reportCalls).toBe(0)
+    press('ArrowRight') // the share card shows no debug line
+    reportCalls = 0
+    plays(5000)
+    expect(reportCalls).toBe(0)
+    press('Enter') // the guide's now card does
+    plays(2000)
+    expect(reportCalls).toBeGreaterThan(0)
+  })
+})
+
+describe('the screen', () => {
+  it('never shows a stream’s address, in its text or its markup', async () => {
+    await playing()
+    expect(document.body.innerHTML).not.toMatch(/secret-host|hunter2/)
+    press('ArrowRight')
+    expect(document.body.innerHTML).not.toMatch(/secret-host|hunter2/)
+    press('Enter')
+    expect(document.body.innerHTML).not.toMatch(/secret-host|hunter2/)
   })
 })
 

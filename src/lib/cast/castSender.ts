@@ -46,6 +46,13 @@ const FRAMEWORK_WAIT_MS = 100
 const REJOIN_MS = 5_000
 /** A Stop that has not ended the session by now did not work (Google's SDK says nothing about it). */
 const STOP_MS = 10_000
+/**
+ * How long a page that joins a TV waits for it to say what it is doing; a TV that says nothing is taken as having nothing on.
+ * The TV says it as a sender connects and again 1.5 s later (the first can be missed); this leaves room for a slow second.
+ */
+export const JOIN_WAIT_MS = 4_000
+/** What the TV says while a channel is on: a page that joins then leaves it alone. */
+const ON_THE_TV: ReadonlySet<TvState> = new Set<TvState>(['tuning', 'playing', 'buffering', 'paused'])
 
 function markCasting(on: boolean): void {
   try {
@@ -73,8 +80,12 @@ export function createCastSender(): CastSender {
   let context: cast.framework.CastContext | null = null
   let session: cast.framework.CastSession | null = null
   let controller: cast.framework.RemotePlayerController | null = null
-  /** What the TV will play once it is there: the cast that is being asked for, or a pick made while it is looked for. */
-  let waiting: CastChoice | null = null
+  /** The page's stream, from its Cast button: it goes to the TV only if the TV has nothing on. */
+  let startedWith: CastChoice | null = null
+  /** A card or an address picked while the TV is asked for or looked for again: that one goes to the TV whatever it is doing. */
+  let picked: CastChoice | null = null
+  /** The page's stream, waiting to hear whether the TV has something on. */
+  let joining: { choice: CastChoice; timer: ReturnType<typeof setTimeout> } | null = null
   let offered: (() => CastChoice | null) | null = null
   let stopping: ReturnType<typeof setTimeout> | null = null
   let unstar: (() => void) | null = null
@@ -110,7 +121,9 @@ export function createCastSender(): CastSender {
     session = active
     active.addMessageListener(CAST_NAMESPACE, (_namespace, text) => {
       const message = parseNow(text)
-      if (message && session === active) set({ now: { id: message.id, name: message.name, state: message.state } })
+      if (!message || session !== active) return
+      set({ now: { id: message.id, name: message.name, state: message.state } })
+      if (joining) endJoin(!ON_THE_TV.has(message.state))
     })
     unstar?.()
     unstar = subscribeFavorites(() => {
@@ -121,10 +134,22 @@ export function createCastSender(): CastSender {
     set({ connected: true, connecting: false, rejoining: false, device: active.getCastDevice().friendlyName, endedBySelf: false, stoppedOn: null })
   }
 
-  function loadWaiting(otherwise: CastChoice | null): void {
-    const choice = waiting ?? otherwise
-    waiting = null
-    if (choice) loadOnTv(choice)
+  /**
+   * The page's own stream, for a TV just joined: sent only if the TV has nothing on. Cast's own media session can say so at
+   * once; while its player is idle the TV may still be between two channels, so the TV's own word decides.
+   */
+  function joinWith(choice: CastChoice): void {
+    const media = session?.getMediaSession?.() ?? null
+    if (media && media.playerState !== 'IDLE') return
+    joining = { choice, timer: setTimeout(() => endJoin(true), JOIN_WAIT_MS) }
+  }
+
+  function endJoin(send: boolean): void {
+    if (!joining) return
+    clearTimeout(joining.timer)
+    const { choice } = joining
+    joining = null
+    if (send) loadOnTv(choice)
   }
 
   function detach(): void {
@@ -132,6 +157,8 @@ export function createCastSender(): CastSender {
     const byStop = stopping !== null
     if (stopping) clearTimeout(stopping)
     stopping = null
+    if (joining) clearTimeout(joining.timer)
+    joining = null
     session = null
     unstar?.()
     unstar = null
@@ -152,14 +179,25 @@ export function createCastSender(): CastSender {
     context.addEventListener(framework.CastContextEventType.SESSION_STATE_CHANGED, (event) => {
       const S = framework.SessionState
       if (event.sessionState === S.SESSION_STARTED) {
-        // Started from Chrome's own menu, nothing waits: the page that is open is what was meant. A TV that was only found
-        // again keeps what it plays.
+        // A pick always goes. Otherwise the page's stream (from its Cast button, or the open page when Chrome's own menu
+        // started the cast) goes only to a TV with nothing on: a phone that joins must not retune a TV someone is watching. A
+        // TV that was only found again keeps what it plays.
         const found = view.rejoining
+        const pick = picked
+        const first = startedWith
+        picked = null
+        startedWith = null
         attach()
-        loadWaiting(found ? null : (offered?.() ?? null))
+        if (pick) loadOnTv(pick)
+        else if (!found) {
+          const choice = first ?? offered?.() ?? null
+          if (choice) joinWith(choice)
+        }
       } else if (event.sessionState === S.SESSION_RESUMED) {
+        const pick = picked
+        picked = null
         attach()
-        loadWaiting(null)
+        if (pick) loadOnTv(pick)
       } else if (event.sessionState === S.SESSION_ENDED) {
         detach()
       }
@@ -177,7 +215,7 @@ export function createCastSender(): CastSender {
   /** The TV was not found again. */
   function giveUpRejoining(): void {
     if (!view.rejoining) return
-    waiting = null
+    picked = null
     markCasting(false)
     set({ rejoining: false })
   }
@@ -206,19 +244,29 @@ export function createCastSender(): CastSender {
     load,
     start(stream, group) {
       if (!context) return
-      waiting = { stream, group }
+      startedWith = { stream, group }
       if (view.connecting) return // the picker is open already: it will cast this one
       set({ connecting: true })
       const done = () => set({ connecting: false })
       context.requestSession().then(done, () => {
-        waiting = null // the picker was closed, or the TV did not answer
+        // The picker was closed, or the TV did not answer.
+        startedWith = null
+        picked = null
         done()
       })
     },
     tune(stream, group) {
-      if (stopping) set({ stoppedOn: null }) // the TV is on its way out: what was picked plays here instead
-      else if (session) loadOnTv({ stream, group })
-      else if (waiting || view.rejoining) waiting = { stream, group }
+      if (stopping) {
+        set({ stoppedOn: null }) // the TV is on its way out: what was picked plays here instead
+      } else if (session) {
+        if (joining) {
+          clearTimeout(joining.timer)
+          joining = null
+        }
+        loadOnTv({ stream, group })
+      } else if (view.connecting || view.rejoining) {
+        picked = { stream, group }
+      }
     },
     togglePause() {
       controller?.playOrPause()

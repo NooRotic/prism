@@ -1,5 +1,7 @@
-/* The TV page. Drawn for 1280x720 and scaled with the screen: 1rem is 16px there, so 1.5rem is the smallest text, 24px.
-   Nothing stands closer to an edge than 5% (a TV may cut that off). PRISM's colours; no Tailwind, so it stays small. */
+/* The TV page. Drawn for 1280x720 and scaled with the screen: 1rem is 16px there, so 1.5rem is the smallest text, 24px (the
+   debug line alone is smaller, for whoever leans in). Nothing stands closer to an edge than 5% (a TV may cut that off).
+   PRISM's colours, the HLS / DASH blue for this platform; no green (it will be Kick's). No Tailwind, so it stays small.
+   Built for Chrome 87: transforms only, no aspect-ratio, -webkit- masks. */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=JetBrains+Mono:wght@400;700&display=swap');
 
 :root {
@@ -8,7 +10,7 @@
   --border-accent: #2a2a3a;
   --text-primary: #eeeef0;
   --text-secondary: #c4c4d4;
-  --accent-green: #39ff14;
+  --text-dim: #8a8aa0;
   --accent-hls: #3b82f6;
   --font-heading: 'Orbitron', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -75,11 +77,56 @@ ul {
   height: 12rem;
 }
 
+.tv-start-mark-icon {
+  width: 9rem;
+  height: 9rem;
+}
+
+.tv-start-link {
+  font-size: 1.5rem;
+  color: var(--accent-hls);
+}
+
 .tv-start-name {
   font-family: var(--font-heading);
   font-size: 4rem;
   letter-spacing: 0.2em;
-  color: var(--accent-green);
+  background: linear-gradient(90deg, var(--rainbow));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* The rainbow ring is in ring.css (shared with the help page). */
+
+/* ── The clock, top right, only while PRISM has something on screen ── */
+.tv-clock {
+  position: absolute;
+  top: 5%;
+  right: 5%;
+  padding: 0.3rem 0.8rem;
+  border-radius: 0.5rem;
+  background: rgba(5, 5, 7, 0.55);
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tv-clock-colon {
+  animation: tv-fade 2s ease-in-out infinite alternate;
+}
+
+.tv-clock-period {
+  margin-left: 0.4rem;
+  font-size: 1.5rem;
+  color: var(--text-dim);
+}
+
+@keyframes tv-fade {
+  to {
+    opacity: 0.25;
+  }
 }
 
 .tv-message,
@@ -102,9 +149,13 @@ ul {
   transform: translate(-50%, -50%);
 }
 
+.tv-message .tv-debug {
+  margin-top: 0.75rem;
+}
+
 .tv-notice {
   top: 8%;
-  border-color: var(--accent-green);
+  border-color: var(--accent-hls);
 }
 
 .tv-banner {
@@ -115,15 +166,69 @@ ul {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 1rem 1.5rem;
-  border-left: 0.4rem solid var(--accent-hls);
-  border-radius: 0.5rem;
+  padding: 1rem 1.5rem 0.8rem;
+  border-radius: 0.6rem;
   background: var(--panel);
 }
 
+.tv-banner-compact {
+  left: 50%;
+  gap: 1.25rem;
+  padding: 1rem 1.25rem;
+}
+
 .tv-banner-text {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
   min-width: 0;
+}
+
+.tv-banner-mark {
+  flex-shrink: 0;
+  width: 5.5rem;
+  height: 5.5rem;
+}
+
+.tv-banner-compact .tv-banner-mark {
+  width: 4rem;
+  height: 4rem;
+}
+
+/* The state, above the name: rainbow letters while a channel tunes (the page's one painted animation), quiet after. */
+.tv-state {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.tv-state-rainbow {
+  background: linear-gradient(90deg, var(--rainbow));
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: tv-drift 40s linear infinite;
+}
+
+@keyframes tv-drift {
+  to {
+    background-position: 300% 0;
+  }
+}
+
+/* One line of what the player is doing: smaller than the page's floor on purpose. */
+.tv-debug {
+  margin-top: 0.35rem;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tv-banner-name,
@@ -139,10 +244,77 @@ ul {
   font-weight: 700;
 }
 
-.tv-banner-note {
+.tv-banner-compact .tv-banner-name {
+  font-size: 1.9rem;
+}
+
+/* ── The share card: Left or Right with the guide closed ── */
+.tv-card {
+  position: absolute;
+  right: 5%;
+  top: 14%;
+  bottom: 6%;
+  width: 34%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  background: var(--panel);
+  text-align: center;
+}
+
+.tv-card-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  text-align: left;
+}
+
+.tv-card-title {
+  min-width: 0;
+}
+
+.tv-card-name {
+  overflow: hidden;
+  font-size: 1.9rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-card-qr {
+  width: 17rem;
+  height: 17rem;
+}
+
+.tv-card-hint {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.tv-card-keys {
+  color: var(--text-dim);
+}
+
+.tv-card-logo {
   flex-shrink: 0;
-  font-size: 1.75rem;
-  color: var(--accent-green);
+  border-radius: 0.375rem;
+  object-fit: contain;
+}
+
+.tv-card-where {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.tv-card-down {
+  color: #ffc832;
 }
 
 .tv-guide {
@@ -156,9 +328,16 @@ ul {
   gap: 0.75rem;
   padding: 1.25rem;
   box-sizing: border-box;
-  border: 2px solid var(--border-accent);
   border-radius: 0.75rem;
   background: var(--panel);
+}
+
+.tv-guide-platform {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: var(--accent-hls);
 }
 
 .tv-guide-group {
@@ -168,7 +347,7 @@ ul {
   gap: 0.75rem;
   font-family: var(--font-heading);
   font-size: 1.75rem;
-  color: var(--accent-green);
+  color: var(--accent-hls);
 }
 
 .tv-guide-label {
@@ -199,8 +378,8 @@ ul {
 }
 
 .tv-row[aria-selected='true'] {
-  border-color: var(--accent-green);
-  background: #16301a;
+  border-color: var(--accent-hls);
+  background: #0f1d36;
 }
 
 .tv-row-name {
@@ -209,7 +388,7 @@ ul {
 }
 
 .tv-row-playing {
-  color: var(--accent-green);
+  color: var(--accent-hls);
 }
 
 .tv-guide-foot {

@@ -32,6 +32,10 @@ import StreamSearch from '../components/streams/StreamSearch'
 const DEFAULT_DEMO_ID = 'bbb-hls'
 const DEMO_GROUPS = ['Demo']
 const NO_PARAMS = new URLSearchParams()
+/** How long a pick made here waits for the TV to name it before the page follows the TV again. */
+const PICK_HOLD_MS = 10_000
+/** What the TV says while a channel is on. */
+const ON_THE_TV: ReadonlySet<string> = new Set(['tuning', 'playing', 'buffering', 'paused'])
 
 /** The group the visitor chose last time, by name, or null. Never throws: a blocked or full storage just forgets. */
 function readSavedGroup(): string | null {
@@ -193,12 +197,14 @@ export default function HlsPage() {
   const knownName = playingEntry?.name ?? (source ? demoEntries.find((entry) => entry.url === source.url)?.name : undefined)
   const chosenId = streamId !== undefined && streamId !== CUSTOM_STREAM_ID ? streamId : null
   const reportedChoice = useRef<string | null>(null)
+  // A channel the page moved to because the TV did (see "The page follows the TV") was nobody's choice either.
+  const followedTv = (location.state as { followsTv?: boolean } | null)?.followsTv === true
   useEffect(() => {
     if (chosenId === null) reportedChoice.current = null
     if (chosenId === null || knownName === undefined || reportedChoice.current === chosenId) return
     reportedChoice.current = chosenId
-    trackEvent('HLS / DASH', 'chosen', knownName)
-  }, [chosenId, knownName])
+    if (!followedTv) trackEvent('HLS / DASH', 'chosen', knownName)
+  }, [chosenId, knownName, followedTv])
   const reportedName = knownName ?? PASTED_STREAM
   // Playing and failing are each reported once for what is shown, here and not in the player panel: the panel goes away while
   // the video is popped out, and starts over when it is brought back. Trying the same address as another type is still the
@@ -254,9 +260,14 @@ export default function HlsPage() {
   // list arriving all leave it where the remote put it.
   const castGroup = real !== null && group !== null ? (groupNames[group] ?? null) : null
   const listedEntry = useCallback((url: string) => real?.streams.find((entry) => entry.url === url) ?? null, [real])
+  /** A pick sent to the TV from here, until the TV names it: the page does not follow the TV meanwhile (see below). */
+  const pickHold = useRef<{ id: string | null; at: number } | null>(null)
   const tuneTv = useCallback(
     (chosen: StreamSource | null) => {
-      if (chosen && castReason(chosen) === null) tuneCast(toCastStream(chosen, listedEntry(chosen.url), false), castGroup)
+      if (!chosen || castReason(chosen) !== null) return
+      const stream = toCastStream(chosen, listedEntry(chosen.url), false)
+      pickHold.current = { id: stream.id, at: performance.now() }
+      tuneCast(stream, castGroup)
     },
     [tuneCast, listedEntry, castGroup],
   )
@@ -303,6 +314,48 @@ export default function HlsPage() {
     if (returnTo !== null) navigate(`/hls-dash/${returnTo}`, { replace: true })
     else clearEnded()
   }, [connected, stoppedOn, returnTo, returnUnknown, navigate, clearEnded])
+
+  // The page follows the TV: when the remote flips it (the TV starts tuning another channel the list has), and on the first word
+  // from the TV after this page opens or connects, the page moves to that channel in place. Nothing is sent to the TV.
+  // - Each word from the TV is acted on once: the page changing for its own reasons never reads an old word again.
+  // - A pick made here (a card, an address) holds the following until the TV names it, so a word about what the TV played
+  //   before can never undo it (a pasted address is named with no id). A hold the TV never answers ends after PICK_HOLD_MS.
+  // - The first word after a join follows only a channel that is on: a TV that failed or finished is about to get this page's
+  //   stream. After a reload the page follows whatever the TV says.
+  const tvNow = cast.now
+  const firstWord = useRef(true)
+  const actedOn = useRef<typeof tvNow>(null)
+  const wasConnected = useRef(connected)
+  const [rejoined, setRejoined] = useState(cast.rejoining)
+  if (cast.rejoining && !rejoined) setRejoined(true)
+  if (!cast.rejoining && !connected && rejoined) setRejoined(false)
+  useEffect(() => {
+    if (!connected) {
+      firstWord.current = true
+      actedOn.current = null
+      // A cast that ended takes its pick with it; a pick made while a cast is being asked for stays for that cast.
+      if (wasConnected.current) pickHold.current = null
+      wasConnected.current = false
+      return
+    }
+    wasConnected.current = true
+    if (tvNow === null || status === 'loading' || tvNow === actedOn.current) return
+    actedOn.current = tvNow
+    const first = firstWord.current
+    firstWord.current = false
+    const hold = pickHold.current
+    if (hold && performance.now() - hold.at < PICK_HOLD_MS) {
+      if (tvNow.id === hold.id) pickHold.current = null
+      return
+    }
+    pickHold.current = null
+    if (tvNow.id === null || tvNow.id === streamId) return
+    const flip = tvNow.state === 'tuning'
+    if (!flip && !(first && (rejoined || ON_THE_TV.has(tvNow.state)))) return
+    if (resolveStreamSource(tvNow.id, NO_PARAMS) ?? resolveSnapshotStream(tvNow.id, real)) {
+      navigate(`/hls-dash/${tvNow.id}`, { replace: true, state: { followsTv: true } })
+    }
+  }, [connected, tvNow, status, streamId, real, navigate, rejoined])
 
   // Picking another card is a pick like a pasted address: it is acted on once the page is there, for the same reason.
   const choose = useCallback(

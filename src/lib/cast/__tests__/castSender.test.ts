@@ -178,6 +178,121 @@ describe('a session taken up again after a reload', () => {
   })
 })
 
+describe('joining a TV that is already on', () => {
+  const PICK: CastStream = { ...STREAM, id: 'pick', name: 'Picked' }
+
+  it('keeps the TV’s channel when it is playing, and shows it', () => {
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', { state: 'playing', id: 'b', name: 'Beta' })
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+    expect(sender.view().now).toEqual({ id: 'b', name: 'Beta', state: 'playing' })
+  })
+
+  it.each(['tuning', 'buffering', 'paused'])('also while it is %s', (state) => {
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', { state, id: 'b', name: 'Beta' })
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+  })
+
+  it.each(['idle', 'failed', 'ended'])('sends the page’s stream to a TV that is %s, as soon as it says so', (state) => {
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', { state })
+    expect(fake.loadMedia).toHaveBeenCalledTimes(1)
+    expect(fake.loadMedia.mock.calls[0][0].media).toMatchObject({ contentId: 'abc' })
+  })
+
+  it('sends it after 4 s to a TV that says nothing', () => {
+    vi.useFakeTimers()
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', 'silent')
+    vi.advanceTimersByTime(3_999)
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(fake.loadMedia).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits for the TV’s second telling, which comes 1.5 s after it is joined, with room to spare', () => {
+    vi.useFakeTimers()
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', 'silent') // the first word was lost
+    vi.advanceTimersByTime(3_000) // a slow second telling
+    fake.message({ v: 1, type: 'now', id: 'b', name: 'Beta', state: 'playing' })
+    vi.advanceTimersByTime(5_000)
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+  })
+
+  it('believes Cast’s own media session at once', () => {
+    vi.useFakeTimers()
+    fake.mediaSession('PLAYING')
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', 'silent')
+    vi.advanceTimersByTime(5_000)
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+  })
+
+  it('asks the TV when Cast’s player is idle: it may be between channels', () => {
+    fake.mediaSession('IDLE')
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', { state: 'tuning', id: 'b', name: 'Beta' })
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+  })
+
+  it('sends the page’s stream when Cast’s player is idle and the TV says nothing is on', () => {
+    fake.mediaSession('IDLE')
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', { state: 'failed', id: 'b', name: 'Beta' })
+    expect(fake.loadMedia).toHaveBeenCalledTimes(1)
+  })
+
+  it('forgets the page’s stream when the session ends while it waits', () => {
+    vi.useFakeTimers()
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', 'silent')
+    vi.advanceTimersByTime(500)
+    fake.sessionEnded()
+    fake.sessionStarted('TV', 'silent') // started again from Chrome's menu, on a page that offers nothing
+    vi.advanceTimersByTime(10_000)
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+  })
+
+  it('sends a pick made while it waits, at once, and only that', () => {
+    vi.useFakeTimers()
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', 'silent')
+    sender.tune(PICK, 'News')
+    expect(fake.loadMedia).toHaveBeenCalledTimes(1)
+    expect(fake.loadMedia.mock.calls[0][0].media).toMatchObject({ contentId: 'pick' })
+    vi.advanceTimersByTime(10_000)
+    expect(fake.loadMedia).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends a pick made while connecting even to a playing TV', () => {
+    const sender = ready()
+    sender.start(STREAM, null)
+    sender.tune(PICK, null)
+    fake.sessionStarted('TV', { state: 'playing', id: 'b', name: 'Beta' })
+    expect(fake.loadMedia).toHaveBeenCalledTimes(1)
+    expect(fake.loadMedia.mock.calls[0][0].media).toMatchObject({ contentId: 'pick' })
+  })
+
+  it('from Chrome’s own menu follows the same rule', () => {
+    const sender = ready()
+    sender.offer(() => ({ stream: STREAM, group: null }))
+    fake.sessionStarted('TV', { state: 'playing', id: 'b', name: 'Beta' })
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+  })
+})
+
 describe('while it looks for the TV after a reload', () => {
   const reloaded = () => {
     sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')

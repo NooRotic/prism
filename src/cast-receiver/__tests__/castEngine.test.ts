@@ -8,6 +8,10 @@ class FakeManager {
   interceptors = new Map<string, (data: never) => unknown>()
   state = 'IDLE'
   live: { end?: number } | null = null
+  stats: () => unknown = () => ({})
+  getStats() {
+    return this.stats()
+  }
   load = vi.fn<(request: unknown) => Promise<void>>(() => Promise.resolve())
   stop = vi.fn()
   seek = vi.fn()
@@ -39,7 +43,7 @@ beforeEach(() => {
   document.body.append(media.element)
   vi.stubGlobal('cast', {
     framework: {
-      events: { EventType: { ERROR: 'ERROR', PLAYER_LOADING: 'PLAYER_LOADING', LOADED_METADATA: 'LOADED_METADATA', MEDIA_FINISHED: 'MEDIA_FINISHED' }, EndedReason: { END_OF_STREAM: 'END_OF_STREAM', STOPPED: 'STOPPED', SENDER_STOPPED: 'SENDER_STOPPED', INTERRUPTED: 'INTERRUPTED' }, DetailedErrorCode: { IMAGE_ERROR: 903, LOAD_INTERRUPTED: 904, MEDIA_ERROR_MESSAGE: 906 } },
+      events: { EventType: { ERROR: 'ERROR', PLAYER_LOADING: 'PLAYER_LOADING', LOADED_METADATA: 'LOADED_METADATA', MEDIA_FINISHED: 'MEDIA_FINISHED', BUFFERING: 'BUFFERING', PLAYING: 'PLAYING', PAUSE: 'PAUSE' }, EndedReason: { END_OF_STREAM: 'END_OF_STREAM', STOPPED: 'STOPPED', SENDER_STOPPED: 'SENDER_STOPPED', INTERRUPTED: 'INTERRUPTED' }, DetailedErrorCode: { IMAGE_ERROR: 903, LOAD_INTERRUPTED: 904, MEDIA_ERROR_MESSAGE: 906 } },
       messages: {
         MessageType: { LOAD: 'LOAD', PLAY: 'PLAY' },
         PlayerState: { IDLE: 'IDLE', PAUSED: 'PAUSED', PLAYING: 'PLAYING' },
@@ -293,6 +297,88 @@ describe('errors', () => {
       throw new TypeError('no')
     })
     await expect(engine.load(STREAM)).rejects.toThrow('no')
+  })
+})
+
+describe('report', () => {
+  it('gives the latest step of the stream that is loading, and starts again with each load', async () => {
+    const { manager, engine } = setup()
+    await engine.load(STREAM)
+    expect(engine.report()).toEqual({ engine: 'shaka', step: null })
+    manager.emit('PLAYER_LOADING')
+    expect(engine.report().step).toBe('PLAYER_LOADING')
+    manager.emit('LOADED_METADATA')
+    manager.emit('BUFFERING', { isBuffering: true })
+    expect(engine.report().step).toBe('BUFFERING')
+    manager.emit('PLAYING')
+    expect(engine.report().step).toBe('PLAYING')
+    manager.emit('ERROR', { detailedErrorCode: 905 })
+    expect(engine.report().step).toBe('ERROR 905')
+    await engine.load(STREAM)
+    expect(engine.report().step).toBeNull()
+  })
+
+  it('ignores the stream before: nothing counts until Cast has begun the new load', async () => {
+    const { manager, engine } = setup()
+    await engine.load(STREAM)
+    manager.emit('ERROR', { detailedErrorCode: 905 })
+    manager.emit('PLAYING')
+    expect(engine.report().step).toBeNull()
+  })
+
+  it('reads Cast’s statistics and the picture', async () => {
+    const { manager, engine } = setup()
+    await engine.load(STREAM)
+    manager.emit('PLAYER_LOADING')
+    manager.emit('LOADED_METADATA')
+    manager.state = 'PLAYING'
+    manager.stats = () => ({ width: 1920, height: 1080, streamBandwidth: 6.2e6, estimatedBandwidth: 4.1e7, droppedFrames: 0 })
+    manager.live = { end: 14.1 }
+    media.time = 10
+    Object.defineProperty(media.element, 'buffered', { configurable: true, get: () => ({ length: 1, start: () => 2, end: () => 18.4 }) })
+    const report = engine.report()
+    expect(report).toMatchObject({ engine: 'shaka', step: 'LOADED_METADATA', width: 1920, height: 1080, bitrate: 6.2e6, bandwidth: 4.1e7, dropped: 0 })
+    expect(report.buffered).toBeCloseTo(8.4)
+    expect(report.behindLive).toBeCloseTo(4.1)
+  })
+
+  it('says a stream ended or was stopped, not the step before', async () => {
+    const { manager, engine } = setup()
+    await engine.load({ ...STREAM, live: false })
+    manager.emit('PLAYER_LOADING')
+    manager.emit('LOADED_METADATA')
+    manager.emit('PLAYING')
+    manager.emit('MEDIA_FINISHED', { endedReason: 'END_OF_STREAM' })
+    expect(engine.report().step).toBe('ENDED')
+    await engine.load(STREAM)
+    manager.emit('PLAYER_LOADING')
+    manager.emit('MEDIA_FINISHED', { endedReason: 'STOPPED' })
+    expect(engine.report().step).toBe('STOPPED')
+  })
+
+  it('a recording is never behind live', async () => {
+    const { manager, engine } = setup()
+    await engine.load({ ...STREAM, live: false })
+    manager.emit('PLAYER_LOADING')
+    manager.emit('LOADED_METADATA')
+    manager.state = 'PLAYING'
+    manager.live = { end: 14.1 }
+    expect(engine.report().behindLive).toBeUndefined()
+  })
+
+  it('leaves out what is missing or nonsense', async () => {
+    const { manager, engine } = setup()
+    await engine.load(STREAM)
+    manager.emit('PLAYER_LOADING')
+    manager.emit('LOADED_METADATA')
+    manager.state = 'PLAYING'
+    manager.stats = () => ({ width: Number.NaN, height: -1, streamBandwidth: Number.POSITIVE_INFINITY, droppedFrames: 'none' })
+    media.element?.remove()
+    expect(engine.report()).toEqual({ engine: 'shaka', step: 'LOADED_METADATA' })
+    manager.stats = () => {
+      throw new Error('not yet')
+    }
+    expect(engine.report()).toEqual({ engine: 'shaka', step: 'LOADED_METADATA' })
   })
 })
 

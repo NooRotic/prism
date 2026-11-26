@@ -14,6 +14,7 @@ const SCREENS = [
   { to: '/admin/channels', label: 'Channels', end: false },
   { to: '/admin/playlist', label: 'Playlist', end: false },
   { to: '/admin/health', label: 'Health', end: false },
+  { to: '/admin/tv', label: 'TV', end: false },
 ]
 
 /** The admin layout: a menu down the left (a row above the screen on a narrow window) and the screen beside it. */

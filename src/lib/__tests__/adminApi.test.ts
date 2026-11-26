@@ -9,6 +9,7 @@ import {
   getTt,
   getUsage,
   removeChannel,
+  setTvQrStyle,
   unblockChannel,
 } from '../adminApi'
 
@@ -252,5 +253,20 @@ describe('the two actions', () => {
 
     fetchMock.mockReturnValueOnce(reply(500, { error: 'server' }))
     expect(await removeChannel('1')).toEqual({ kind: 'unavailable' })
+  })
+})
+
+describe('the TV setting', () => {
+  it('setTvQrStyle posts the style and reads the answer', async () => {
+    fetchMock.mockReturnValueOnce(reply(200, { ok: true, qrStyle: 'a' }))
+    expect(await setTvQrStyle('a')).toEqual({ kind: 'ok', data: { qrStyle: 'a' } })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://history.test/api/admin/tv')
+    expect(init).toMatchObject({ method: 'POST', body: '{"qrStyle":"a"}' })
+  })
+
+  it('takes an answer with an unknown style for a server that is not answering properly', async () => {
+    fetchMock.mockReturnValueOnce(reply(200, { ok: true, qrStyle: 'z' }))
+    expect(await setTvQrStyle('a')).toEqual({ kind: 'unavailable' })
   })
 })

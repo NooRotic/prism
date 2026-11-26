@@ -7,6 +7,7 @@ namespace Prism\History\Admin;
 use Prism\History\Api\ApiResponse;
 use Prism\History\Api\Request;
 use Prism\History\Store\StreamStore;
+use Prism\History\Tv\TvSettings;
 
 /**
  * Everything under /api/admin/. Each request is authorised first (the owner only), then routed. Answers are never
@@ -29,6 +30,7 @@ final class AdminController
         private ChannelAdmin $channelAdmin,
         private PlaylistAdmin $playlist,
         private CheckerAdmin $checker,
+        private TvSettings $tv,
     ) {
     }
 
@@ -105,8 +107,27 @@ final class AdminController
             '/api/admin/checker/apply' => $this->checkerAction($request, fn (): array => $this->checker->apply()),
             '/api/admin/checker/pause' => $this->checkerAction($request, fn (): array => $this->checker->setPaused(true)),
             '/api/admin/checker/resume' => $this->checkerAction($request, fn (): array => $this->checker->setPaused(false)),
+            '/api/admin/tv' => $this->tvAction($request),
             default => $this->error(404, 'not_found'),
         };
+    }
+
+    /** POST /api/admin/tv {"qrStyle":"a"|"b"|"c"}: the look of the QR code on the TV's share card. Exactly that body, nothing else. */
+    private function tvAction(Request $request): ApiResponse
+    {
+        if ($request->method !== 'POST') {
+            return $this->notAllowed('POST, OPTIONS');
+        }
+        if (strlen($request->body) > self::MAX_BODY_BYTES) {
+            return $this->error(413, 'too_large');
+        }
+        $data = json_decode($request->body, true);
+        $style = is_array($data) && !array_is_list($data) && array_keys($data) === ['qrStyle'] && is_string($data['qrStyle']) ? $data['qrStyle'] : null;
+        if ($style === null || !$this->tv->setQrStyle($style)) {
+            return $this->error(400, 'bad_request');
+        }
+
+        return ApiResponse::json(200, ['ok' => true, 'qrStyle' => $style], self::NO_STORE);
     }
 
     /**
