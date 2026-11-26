@@ -14,6 +14,7 @@ import {
   getSearchHistory,
   saveSearchEntry,
 } from '../../lib/searchHistory'
+import { trackEvent } from '../../lib/analytics'
 import { buildStreamPath } from '../../lib/routes'
 import { toStreamAddress } from '../../lib/streamSource'
 import { SearchSuggestions } from './SearchSuggestions'
@@ -118,8 +119,11 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
       if (!query) return
 
       const det = detectURLType(query)
+      const isText = det.type === 'unknown' && !hasUrlChars(query)
+      // What kind of thing it is, and never the thing itself.
+      trackEvent('Feature', 'paste', isText ? 'text' : det.type)
 
-      if (det.type === 'unknown' && !hasUrlChars(query)) {
+      if (isText) {
         if (query.includes(' ')) {
           // Multi-word text without URL chars = category/game name
           dispatch({ type: 'OPEN_CATEGORY_PANEL', category: query })
@@ -325,7 +329,9 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
   function dropdown(inFlow: boolean) {
     return (
       <div
-        className={`brushed-metal overflow-hidden rounded-lg border border-[var(--border)] shadow-lg shadow-black/40 ${
+        // `empty:hidden`: with no categories and no history there is nothing inside, and the empty box would still take
+        // its border and margin and push the page down.
+        className={`brushed-metal overflow-hidden rounded-lg border border-[var(--border)] shadow-lg shadow-black/40 empty:hidden ${
           inFlow ? 'my-1.5' : 'absolute top-full right-0 left-0 z-50 mt-1'
         }`}
       >

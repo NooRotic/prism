@@ -2,11 +2,13 @@ import { act, fireEvent, render, renderHook, screen } from '@testing-library/rea
 import { vi } from 'vitest'
 import { useYoutubeChatPopout } from '../useYoutubeChatPopout'
 import ChatHeader from '../ChatHeader'
+import { trackEvent } from '../../../lib/analytics'
 import { removeLink, saveLink } from '../../../lib/linkedAccounts'
 import { findYoutubeChatTarget } from '../../../lib/youtubeChatLookup'
 import type { YoutubeChatTarget } from '../../../lib/youtubeChatTarget'
 import { getTabId } from '../../../lib/chatPopout'
 
+vi.mock('../../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../../lib/analytics')>()), trackEvent: vi.fn() }))
 vi.mock('../../../lib/youtubeChatLookup', () => ({
   fastYoutubeChatTarget: vi.fn(() => null),
   findYoutubeChatTarget: vi.fn(),
@@ -188,5 +190,22 @@ describe('ChatHeader YouTube chat button', () => {
     expect(buttons.indexOf('Pop out YouTube chat')).toBe(buttons.indexOf('Pop out chat') + 1)
     fireEvent.click(screen.getByRole('button', { name: 'Pop out YouTube chat' }))
     expect(onClick).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('useYoutubeChatPopout: what is counted', () => {
+  const linking = () => vi.mocked(trackEvent).mock.calls.filter(([category]) => category === 'Linking')
+
+  it('a window that opened on the linked account, and not a blocked one', async () => {
+    vi.mocked(trackEvent).mockClear()
+    link('streamer', 'UC1', 'Streamer YT')
+    vi.mocked(findYoutubeChatTarget).mockResolvedValue({ kind: 'failed', reason: 'quota' })
+    openSpy.mockReturnValueOnce(null)
+    const { result } = renderHook(() => useYoutubeChatPopout('streamer'))
+    await act(async () => result.current.open())
+    expect(linking()).toEqual([])
+
+    await act(async () => result.current.open())
+    expect(linking()).toEqual([['Linking', 'followed', 'twitch/streamer <-> youtube/Streamer YT']])
   })
 })

@@ -236,3 +236,11 @@ describe('StreamStallNotice', () => {
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('StreamErrorCard: the address and link counting', () => {
+  it('keeps a pasted address, its site included, out of link counting', () => {
+    render(card({ url: 'https://h.test/a.m3u8?key=secret' }))
+
+    expect(screen.getByRole('link', { name: /open address/i })).toHaveClass('matomo_ignore')
+  })
+})

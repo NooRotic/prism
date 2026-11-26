@@ -129,4 +129,15 @@ describe('DashJSPlayer and the playback log', () => {
     expect(getPlaybackSnapshot().status).toBe('playing')
     expect(getPlaybackSnapshot().entries.at(-1)).toMatchObject({ level: 'ok', source: 'dashjs', message: 'playing' })
   })
+
+  it('tells the page it is playing when the video starts playing', async () => {
+    const onPlaying = vi.fn()
+    const { container } = render(<DashJSPlayer url={URL_OF} detection={detection} onPlaying={onPlaying} />)
+    await waitFor(() => expect(dash.player.initialize).toHaveBeenCalled())
+    expect(onPlaying).not.toHaveBeenCalled()
+
+    container.querySelector('video')!.dispatchEvent(new Event('playing'))
+
+    expect(onPlaying).toHaveBeenCalledTimes(1)
+  })
 })

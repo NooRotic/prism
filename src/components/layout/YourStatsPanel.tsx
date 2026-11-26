@@ -18,7 +18,7 @@ import {
 import { useApp } from '../../contexts/AppContext'
 import { useYourStats } from '../../hooks/useYourStats'
 import type { SectionState } from '../../hooks/useYourStats'
-import { useTwitchAuth } from '../../hooks/useTwitchAuth'
+import { useSessionExpiry } from '../../hooks/useSessionExpiry'
 import type {
   TwitchGoal,
   TwitchPoll,
@@ -494,7 +494,8 @@ function BitsBody({
 
 export default function YourStatsPanel() {
   const { state, dispatch } = useApp()
-  const { handleAuthError } = useTwitchAuth()
+  // A 401 signs the viewer out (and says why), so the panel shows Connect instead of a Retry that can never work.
+  const onSessionExpired = useSessionExpiry()
 
   const isOpen = state.navPanel.open === 'your-stats'
   const authUser = state.auth.user
@@ -505,13 +506,9 @@ export default function YourStatsPanel() {
     (authUser.broadcaster_type === 'affiliate' ||
       authUser.broadcaster_type === 'partner')
 
-  const handleAuthErrorCallback = useCallback(
-    () => handleAuthError(null),
-    [handleAuthError],
-  )
   const fetchOptions = useMemo(
-    () => ({ handleAuthError: handleAuthErrorCallback }),
-    [handleAuthErrorCallback],
+    () => ({ handleAuthError: onSessionExpired }),
+    [onSessionExpired],
   )
 
   const {

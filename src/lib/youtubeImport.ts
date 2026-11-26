@@ -15,9 +15,14 @@ export interface YoutubeImportSnapshot {
   importing: boolean
   /** +1 after each successful import, here or in another tab. */
   revision: number
+  /**
+   * Why the last import did not happen, until the next one starts or succeeds. Kept here, not in the component that
+   * started it: the header row that shows it can be replaced by another row while the import runs.
+   */
+  failure: string | null
 }
 
-let snapshot: YoutubeImportSnapshot = { importing: false, revision: 0 }
+let snapshot: YoutubeImportSnapshot = { importing: false, revision: 0, failure: null }
 const listeners = new Set<() => void>()
 
 function update(next: Partial<YoutubeImportSnapshot>): void {
@@ -73,7 +78,7 @@ export function importFailureMessage(err: unknown): string {
  */
 export async function importYoutubeSubscriptions(): Promise<ImportResult> {
   if (snapshot.importing) return { status: 'busy' }
-  update({ importing: true })
+  update({ importing: true, failure: null })
   try {
     const token = await requestYoutubeReadToken()
     const channels = await listSubscriptions(token)
@@ -88,7 +93,8 @@ export async function importYoutubeSubscriptions(): Promise<ImportResult> {
     update({ importing: false, revision: snapshot.revision + 1 })
     return { status: 'done' }
   } catch (err) {
-    update({ importing: false })
-    return { status: 'failed', message: importFailureMessage(err) }
+    const message = importFailureMessage(err)
+    update({ importing: false, failure: message })
+    return { status: 'failed', message }
   }
 }

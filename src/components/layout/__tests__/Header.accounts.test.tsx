@@ -190,6 +190,21 @@ describe('Accounts: YouTube', () => {
     expect(within(youtube()).getByRole('button', { name: 'Import' })).toBeEnabled()
   })
 
+  // Another row can replace Accounts while an import runs; the reason it failed must still be there when Accounts returns.
+  it('still shows why an import failed after another row replaced Accounts and it came back', async () => {
+    vi.mocked(requestYoutubeReadToken).mockRejectedValue(new GoogleAuthError('denied', 'denied'))
+    renderHeader({}, '/twitch')
+    await userEvent.click(pill())
+    await userEvent.click(within(youtube()).getByRole('button', { name: 'Import' }))
+    expect(await within(youtube()).findByText('Google did not allow the sign-in, so nothing was imported.')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /youtube tools/i }))
+    expect(screen.queryByRole('region', { name: 'YouTube' })).toBeNull()
+    await userEvent.click(pill())
+
+    expect(await within(youtube()).findByText('Google did not allow the sign-in, so nothing was imported.')).toBeInTheDocument()
+  })
+
   it('re-reads after a successful import from the row', async () => {
     vi.mocked(requestYoutubeReadToken).mockResolvedValue('tok')
     vi.mocked(listSubscriptions).mockResolvedValue(LIST(3))
@@ -248,6 +263,16 @@ describe('Accounts: the pill', () => {
 })
 
 describe('Accounts: the debug toggle', () => {
+  it.each(['/', '/twitch', '/youtube', '/youtube/catchup'])('is nowhere on %s, which has no player, at either width', async (path) => {
+    for (const wide of [true, false]) {
+      setWide(wide)
+      const { unmount } = renderHeader({}, path)
+      await userEvent.click(pill())
+      expect(screen.queryByLabelText('Toggle debug overlay')).toBeNull()
+      unmount()
+    }
+  })
+
   it('sits in the bar when wide, never twice', async () => {
     setWide(true)
     renderHeader()
@@ -268,5 +293,17 @@ describe('Accounts: the debug toggle', () => {
     expect(within(row()).getByText('Debug overlay')).toBeInTheDocument()
     await userEvent.click(toggle)
     expect(screen.getByTestId('debug-state')).toHaveTextContent('on')
+  })
+})
+
+describe('Accounts: what is counted', () => {
+  it('says what is counted, so it can be found on every page', async () => {
+    twitch(false)
+    renderHeader()
+    expect(screen.queryByText(/are counted by Matomo/)).not.toBeInTheDocument()
+
+    await userEvent.click(pill())
+
+    expect(screen.getByText(/^Visits, and what is played or linked, are counted by Matomo/)).toHaveClass('counted-note')
   })
 })

@@ -2,10 +2,12 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import LinkedAccounts from '../LinkedAccounts'
+import { trackEvent } from '../../../lib/analytics'
 import { fetchYoutubeChannel } from '../../../lib/youtubeChannelApi'
 import { dismissSuggestion, findByTwitch, isDismissed, saveLink } from '../../../lib/linkedAccounts'
 
 vi.mock('../../../lib/youtubeChannelApi', () => ({ fetchYoutubeChannel: vi.fn() }))
+vi.mock('../../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../../lib/analytics')>()), trackEvent: vi.fn() }))
 vi.mock('../../../lib/youtubeApi', () => ({ isYouTubeApiAvailable: () => true }))
 
 const channel = {
@@ -33,6 +35,7 @@ const save = () => fireEvent.click(within(dialog()).getByRole('button', { name: 
 beforeEach(() => {
   localStorage.clear()
   vi.mocked(fetchYoutubeChannel).mockReset()
+  vi.mocked(trackEvent).mockClear()
 })
 
 describe('LinkedAccounts', () => {
@@ -215,5 +218,78 @@ describe('LinkedAccounts: a same-name YouTube channel', () => {
     renderIt('no links', { suggest: true })
     await waitFor(() => expect(fetchYoutubeChannel).toHaveBeenCalled())
     expect(screen.queryByRole('button', { name: /Possibly/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('LinkedAccounts: what is counted', () => {
+  const PAIR = 'twitch/mrbeast <-> youtube/Mr Beast'
+  const counted = () => vi.mocked(trackEvent).mock.calls
+  const saved = (over = {}) =>
+    saveLink({ twitch: 'mrbeast', youtube: { channelId: channel.channelId, title: 'Mr Beast', handle: '@MrBeast' }, confirmed: true, linkedAt: 1, ...over })
+  const closed = () => waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+  it('a link the viewer saves, but not saving it again unchanged', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel })
+    renderIt()
+    openModal()
+    fill(/YouTube/, '@MrBeast')
+    save()
+    await closed()
+    expect(counted()).toEqual([['Linking', 'linked', PAIR]])
+
+    fireEvent.click(screen.getByRole('button', { name: /Edit links/ }))
+    save()
+    await closed()
+    expect(counted()).toHaveLength(1)
+  })
+
+  it('a Kick link added to it, by the whole set', async () => {
+    saved()
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'ok', channel })
+    renderIt()
+    fireEvent.click(screen.getByRole('button', { name: /Edit links/ }))
+    fill(/Kick/, 'kick.com/beast')
+    save()
+    await closed()
+
+    expect(counted()).toEqual([['Linking', 'linked', `${PAIR} + kick/beast`]])
+  })
+
+  it('removing the links, by what they were', () => {
+    saved()
+    renderIt()
+    fireEvent.click(screen.getByRole('button', { name: /Edit links/ }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Remove links' }))
+
+    expect(counted()).toEqual([['Linking', 'unlinked', PAIR]])
+  })
+
+  it('nothing when the check fails or the box is cancelled', async () => {
+    vi.mocked(fetchYoutubeChannel).mockResolvedValue({ status: 'notfound' })
+    renderIt()
+    openModal()
+    fill(/YouTube/, '@nobody')
+    save()
+    await within(dialog()).findByRole('alert')
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+
+    expect(counted()).toEqual([])
+  })
+
+  it('opening a linked account', () => {
+    saved({ kick: { slug: 'beast' } })
+    renderIt()
+    fireEvent.click(screen.getByRole('link', { name: 'YouTube' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Kick' }))
+
+    expect(counted()).toEqual([['Linking', 'followed', `${PAIR} + kick/beast`], ['Linking', 'followed', `${PAIR} + kick/beast`]])
+  })
+
+  it('tells the viewer so: the links stay here, and that they are counted is said to a counted visitor', () => {
+    renderIt()
+    openModal()
+
+    expect(within(dialog()).getByText('Links stay in this browser.')).toHaveClass('uncounted-note')
+    expect(within(dialog()).getByText('Links are kept in this browser. Which accounts are linked is counted, without your name.')).toHaveClass('counted-note')
   })
 })

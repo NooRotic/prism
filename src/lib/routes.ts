@@ -19,3 +19,8 @@ export function buildStreamPath(url: string, as?: StreamKind): string {
 export function isPlayerPagePath(pathname: string): boolean {
   return /^\/(twitch|youtube|hls-dash)\//.test(pathname) || pathname === '/hls-dash'
 }
+
+/** True where the debug toggle has something to show: the player pages, but not Catch up, which is a list. */
+export function hasDebugPanel(pathname: string): boolean {
+  return isPlayerPagePath(pathname) && !/^\/youtube\/catchup\/?$/.test(pathname)
+}

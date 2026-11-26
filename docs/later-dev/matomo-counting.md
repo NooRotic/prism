@@ -1,6 +1,7 @@
 # Count PRISM visits with Matomo (note from the ripTheAnalytics project, 2026-11-17)
 
-Status: **DONE, merged 2026-11-17 as NooRotic/prism#95 (option A below).** The rest of this
+Status: **DONE, merged 2026-11-17 as NooRotic/prism#95 (option A below); extended to every page and to events on 2026-11-24, see
+`docs/superpowers/specs/2026-11-24-usage-tracking-matomo-design.md`.** The rest of this
 note is the reasoning it came from. Written because the work was bigger than a one-line paste: PRISM is a React app with other
 branches in flight, it goes live by merging to `main`, and it already has its own usage counter.
 

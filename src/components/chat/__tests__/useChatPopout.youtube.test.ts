@@ -1,8 +1,11 @@
-import { renderHook } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { vi } from 'vitest'
 import { useChatPopout } from '../useChatPopout'
+import { trackEvent } from '../../../lib/analytics'
 import { getTabId } from '../../../lib/chatPopout'
 import { createFakePopoutBus } from '../../../test/fakePopoutBus'
+
+vi.mock('../../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../../lib/analytics')>()), trackEvent: vi.fn() }))
 
 describe('useChatPopout for the YouTube chat', () => {
   let tabId: string
@@ -30,6 +33,13 @@ describe('useChatPopout for the YouTube chat', () => {
       'prism-chat-popout-youtube',
       expect.stringContaining('popup=yes'),
     )
+  })
+
+  it('counts the window apart from the Twitch one, without what it shows', () => {
+    vi.mocked(trackEvent).mockClear()
+    const { result } = setup('looking')
+    act(() => void result.current.open('v:abcdefghijk'))
+    expect(vi.mocked(trackEvent).mock.calls).toEqual([['Feature', 'YouTube chat pop-out']])
   })
 
   it('ignores a click event passed straight from onClick (only a string overrides the channel)', () => {

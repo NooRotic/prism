@@ -100,6 +100,24 @@ describe('importYoutubeSubscriptions', () => {
   })
 })
 
+describe('the failure reason', () => {
+  it('is kept in the snapshot after a failed import, and cleared when the next one starts and when it succeeds', async () => {
+    vi.mocked(requestYoutubeReadToken).mockRejectedValueOnce(new GoogleAuthError('closed', 'closed'))
+    await importYoutubeSubscriptions()
+    expect(getYoutubeImportSnapshot().failure).toBe('The Google sign-in window was closed, so nothing was imported.')
+
+    let finish!: (t: string) => void
+    vi.mocked(requestYoutubeReadToken).mockReturnValueOnce(new Promise<string>((r) => (finish = r)))
+    vi.mocked(listSubscriptions).mockResolvedValue(LIST)
+    vi.mocked(getMyChannel).mockResolvedValue(null)
+    const second = importYoutubeSubscriptions()
+    expect(getYoutubeImportSnapshot().failure).toBeNull()
+    finish('tok')
+    await second
+    expect(getYoutubeImportSnapshot().failure).toBeNull()
+  })
+})
+
 describe('an import in another tab', () => {
   it('counts once, however many of its keys change', () => {
     vi.useFakeTimers()

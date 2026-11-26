@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <!-- ?v= changes with the icon: browsers keep a favicon for a long time. -->
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon.png?v=2" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg?v=2" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#050507" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -42,7 +45,8 @@
       // so a local build or any other host does nothing. A visitor who sends Do Not Track or Global Privacy Control is not counted
       // and no request is made. The part of the address after the # is never sent: it holds the Twitch sign-in token on the way back
       // from signing in, and the handed-over list on /import (Matomo sends it unless told not to). It adds the class "counted" to
-      // <html>, which shows the one-line note (.counted-note in index.css).
+      // <html>, which shows the one-line note (.counted-note in index.css). It only sets Matomo up: the app sends the page views and
+      // starts link tracking (src/hooks/usePageView.ts), because the browser's own address can hold a pasted stream.
       // Tests: src/lib/__tests__/matomoBlock.test.ts.
       (function () {
         var sites = { 'prism.nooroticx.tv': '4' };
@@ -54,8 +58,6 @@
         _paq.push(['disableCookies']);
         _paq.push(['setDoNotTrack', true]);
         _paq.push(['discardHashTag', true]);
-        _paq.push(['trackPageView']);
-        _paq.push(['enableLinkTracking']);
         var u = 'https://stats.pollardjr.com/';
         _paq.push(['setTrackerUrl', u + 'matomo.php']);
         _paq.push(['setSiteId', sites[location.hostname]]);

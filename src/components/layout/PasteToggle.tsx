@@ -12,7 +12,8 @@ interface PasteToggleProps {
 /**
  * The header's paste box, behind a link icon until it is wanted. The box stays mounted while closed (mounting it
  * replays the search history into state, which flips its order). From 640 px it opens beside the icon; on a phone it
- * takes the whole bar for the moment, covering the bar's own contents and never the page.
+ * takes the whole bar for the moment, covering the bar's own contents and never the page. Beside the icon it is up to
+ * 16 rem wide (20 rem from 1024 px) and shrinks, to 8 rem, before the tab strip does.
  */
 export function PasteToggle({ open, onOpenChange, listContainer }: PasteToggleProps) {
   const iconRef = useRef<HTMLButtonElement | null>(null)
@@ -24,12 +25,12 @@ export function PasteToggle({ open, onOpenChange, listContainer }: PasteTogglePr
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex min-w-0 items-center gap-1">
       <div
         data-paste-box
         className={
           open
-            ? 'flex items-center gap-2 max-sm:absolute max-sm:inset-x-2 max-sm:top-1/2 max-sm:z-10 max-sm:-translate-y-1/2 max-sm:bg-[var(--bg-sidebar)] sm:w-64 lg:w-80'
+            ? 'flex items-center gap-2 max-sm:absolute max-sm:inset-x-2 max-sm:top-1/2 max-sm:z-10 max-sm:-translate-y-1/2 max-sm:bg-[var(--bg-sidebar)] sm:w-64 sm:min-w-32 lg:w-80'
             : 'hidden'
         }
       >

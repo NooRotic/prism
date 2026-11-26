@@ -274,14 +274,19 @@ body {
   text-transform: uppercase;
 }
 
-/* The one line about what is counted (src/components/ui/CountedNote.tsx): in the page for everyone, shown only when the counting
-   block in index.html ran, which adds the class "counted" to <html>. */
+/* What is said about counting (src/components/ui/CountedNote.tsx and the link boxes). Both versions are in the page for everyone:
+   the first is shown only when the counting block in index.html ran, which adds the class "counted" to <html>, the second only
+   when it did not. */
 .counted-note {
   display: none;
 }
 
 html.counted .counted-note {
   display: block;
+}
+
+html.counted .uncounted-note {
+  display: none;
 }
 
 /* ─── Card hover lift ─── */
