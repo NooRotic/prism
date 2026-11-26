@@ -273,6 +273,9 @@ export function createCastSender(): CastSender {
     },
     stop() {
       if (!session || !context) return
+      // A TV being let go gets nothing more from this page.
+      if (joining) clearTimeout(joining.timer)
+      joining = null
       if (stopping) clearTimeout(stopping)
       stopping = setTimeout(() => {
         stopping = null

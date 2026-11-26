@@ -9,19 +9,18 @@ export default function TvClock() {
     const timer = setTimeout(() => setNow(new Date()), 60_000 - (now.getTime() % 60_000) + 50)
     return () => clearTimeout(timer)
   }, [now])
-  const { time, period } = useMemo(() => clockParts(now), [now])
+  const { time, period, hour, separator, minute } = useMemo(() => clockParts(now), [now])
   // The separator between hours and minutes fades slowly on and off.
-  const split = time.search(/\D/)
   return (
     <p data-testid="tv-clock" className="tv-clock">
-      {split === -1 ? (
-        time
-      ) : (
+      {hour && minute && separator ? (
         <>
-          {time.slice(0, split)}
-          <span className="tv-clock-colon">{time[split]}</span>
-          {time.slice(split + 1)}
+          {hour}
+          <span className="tv-clock-colon">{separator}</span>
+          {minute}
         </>
+      ) : (
+        time
       )}
       {period && <span className="tv-clock-period">{period}</span>}
     </p>

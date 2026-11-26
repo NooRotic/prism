@@ -67,8 +67,17 @@ export function debugLine({ state, sinceTuneMs, startedInMs, report, kind, live,
   return parts.filter((part): part is string => typeof part === 'string' && part !== '').join(' · ')
 }
 
+export interface ClockText {
+  time: string
+  period: string | null
+  /** The time's pieces, so the separator alone can fade: the locale's own digits are never mistaken for it. */
+  hour: string
+  separator: string
+  minute: string
+}
+
 /** The time as the device writes it: its own time zone and 12- or 24-hour habit, with AM / PM apart for a smaller font. */
-export function clockParts(date: Date, locale?: string, timeZone?: string): { time: string; period: string | null } {
+export function clockParts(date: Date, locale?: string, timeZone?: string): ClockText {
   // A 24-hour clock reads 02:47, as a set-top box shows it; a 12-hour one 2:47.
   const { hourCycle } = new Intl.DateTimeFormat(locale, { hour: 'numeric', timeZone }).resolvedOptions()
   const hour = hourCycle === 'h23' || hourCycle === 'h24' ? '2-digit' : 'numeric'
@@ -79,5 +88,14 @@ export function clockParts(date: Date, locale?: string, timeZone?: string): { ti
     .map((part) => part.value)
     .join('')
     .trim()
-  return { time, period }
+  const hourAt = parts.findIndex((part) => part.type === 'hour')
+  const minuteAt = parts.findIndex((part) => part.type === 'minute')
+  const between = hourAt !== -1 && minuteAt > hourAt ? parts.slice(hourAt + 1, minuteAt) : []
+  return {
+    time,
+    period,
+    hour: parts[hourAt]?.value ?? '',
+    separator: between.map((part) => part.value).join(''),
+    minute: parts[minuteAt]?.value ?? '',
+  }
 }
