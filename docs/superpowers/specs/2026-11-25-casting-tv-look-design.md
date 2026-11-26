@@ -34,6 +34,7 @@ The Cast app will be published soon, so the TV page and the help page will be se
 ## Non-goals
 
 - Twitch and YouTube rows in the guide (Following, Watch Later, ...). A separate project; it starts with a test on the Gen 5 of whether the TV page can play their embeds at all.
+- **The TV page as a set-top box in a TV's own browser** (the owner, 2026-11-25: its own project, next). The same page, guide and remote at `/tv/` in the Gen 5's browser, with PRISM's own player in place of Cast's (the player is already behind the `CastEngine` interface; PRISM's engine started streams faster on the Gen 5 in the race) and the browser's arrow, Enter and Back keys. This round only leaves `/tv/` ready for it.
 - A "Cast PRISM" button on the help page that opens PRISM's own TV app (possible once the app is published; the owner will decide then).
 - Anything new on the computer's side except the join rule (goal 8) and the admin choice (goal 7).
 - Counting shares in Matomo.
@@ -87,17 +88,10 @@ One line, monospace, `1.15rem` (18 px on the 720-line page). This is deliberatel
 - **Two addresses** (owner, 2026-11-25: "it makes it easier if I'm attempting to load PRISM via browser directly on a chromecast via remote"): the TV page moves to `https://prism-cast.nooroticx.tv/tv/` and the help page is `/`. Nothing has to guess which one a visitor wanted, and a browser on a TV (the Gen 5's browser already runs PRISM's site) can be sent to either.
 - **The owner changes the receiver address in the Cast console** to `https://prism-cast.nooroticx.tv/tv/` before the app is published. Until a device picks that up, `/` forwards a Cast device (user agent contains `CrKey`) to `/tv/` at once, from a small classic script in `<head>`, before anything else loads; Google's receiver script is only ever loaded by `/tv/`.
 - The cast build becomes two pages (`cast/index.html` for the help page, `cast/tv/index.html` for the TV page); the upload tool sends `index.html` files last, the TV page's before the help page's.
-- `/tv/` opened in a browser that is not a Cast device: see "Open question" below.
+- `/tv/` opened in a browser that is not a Cast device (a computer, or a TV's own browser): a short notice on the TV page's look, "This is PRISM's TV page. It runs when you cast PRISM to a TV", with a button to `/`. Google's receiver script is not loaded there. `?tv` still forces the real TV page in any browser, for testing against Google's framework on a computer, and `?dev` keeps the dev server's stand-in.
 - Same fonts and colours as the TV page, the ring round its panel, PRISM's mark. Buttons go to `https://prism.nooroticx.tv/twitch`, `/youtube`, `/hls-dash` in the same tab.
 - Works at phone width too (someone can type the address on a phone).
 - `noindex` stays.
-
-## Open question
-
-What `/tv/` does in a TV's own browser (the Gen 5's, with its remote). Today's TV page needs Google's receiver framework, which only runs on a Cast device; in a browser it would sit on its start screen. Two answers:
-
-- **The help page's directions** (the page sees it is not on a Cast device and shows a short notice with a link to `/`). Small.
-- **A working set-top box in the browser**: the same TV page with PRISM's own player in place of Cast's (the page's player is already behind the `CastEngine` interface, and PRISM's engine started streams faster on the Gen 5 in the race), and the browser's arrow, Enter and Back keys. A project of its own.
 
 ## Testing
 
