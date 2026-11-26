@@ -304,6 +304,23 @@ export default function HlsPage() {
     else clearEnded()
   }, [connected, stoppedOn, returnTo, returnUnknown, navigate, clearEnded])
 
+  // The page follows the TV: when the remote flips it to a channel the list has, and on the first word from the TV after this
+  // page connects (a phone that joins, a reload), the page moves to that channel in place. Nothing is sent to the TV. A late
+  // word about the channel before a pick made here is not a flip (it is not "tuning"), so it does not undo the pick.
+  const tvNow = cast.now
+  const firstWord = useRef(true)
+  useEffect(() => {
+    if (!connected) {
+      firstWord.current = true
+      return
+    }
+    if (tvNow === null || status === 'loading') return
+    const first = firstWord.current
+    firstWord.current = false
+    if (tvNow.id === null || tvNow.id === streamId || (!first && tvNow.state !== 'tuning')) return
+    if (resolveStreamSource(tvNow.id, NO_PARAMS) ?? resolveSnapshotStream(tvNow.id, real)) navigate(`/hls-dash/${tvNow.id}`, { replace: true })
+  }, [connected, tvNow, status, streamId, real, navigate])
+
   // Picking another card is a pick like a pasted address: it is acted on once the page is there, for the same reason.
   const choose = useCallback(
     (id: string) => {

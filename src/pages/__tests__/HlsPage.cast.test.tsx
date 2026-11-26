@@ -163,11 +163,10 @@ describe('while casting', () => {
     expect(asked.stop).toHaveBeenCalledTimes(1)
   })
 
-  it('follows the remote in the panel, not in the address', () => {
+  it('follows the TV in the panel and in the address, without tuning it', () => {
     renderAt('/hls-dash/aaa', CONNECTED)
-    setCast({ ...CONNECTED, now: { id: 'aaa', name: 'Alpha', state: 'playing' } })
-    expect(screen.getByTestId('cast-panel')).toHaveTextContent('Alpha')
-    expect(at.pathname).toBe('/hls-dash/aaa')
+    expect(screen.getByTestId('cast-panel')).toHaveTextContent('Beta')
+    expect(at.pathname).toBe('/hls-dash/bbb')
     expect(asked.tune).not.toHaveBeenCalled()
   })
 })
@@ -255,7 +254,7 @@ describe('when the cast ends', () => {
   })
 
   it('by Stop on a channel the list does not have, plays the page’s stream', () => {
-    renderAt('/hls-dash/aaa', CONNECTED)
+    renderAt('/hls-dash/aaa', { ...CONNECTED, now: { id: 'aaa', name: 'Alpha', state: 'playing' } })
     setCast({ available: true, stoppedOn: 'zzz' })
     expect(at.pathname).toBe('/hls-dash/aaa')
     expect(player()).toHaveAttribute('data-url', 'https://h.test/aaa.m3u8')

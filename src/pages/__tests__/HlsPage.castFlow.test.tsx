@@ -424,6 +424,80 @@ describe('a cast that ends by itself', () => {
   })
 })
 
+describe('following the TV', () => {
+  it('a remote flip takes the page to that channel, in place, without tuning anything', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    const entries = window.history.length
+    await act(async () => tell('bbb', 'Beta', 'tuning'))
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+    expect(window.history.length).toBe(entries)
+    expect(loaded()).toEqual(['aaa'])
+    expect(screen.getByTestId('cast-panel')).toHaveTextContent('Beta')
+  })
+
+  it('a phone that joins shows the channel the TV is on', async () => {
+    mount('/hls-dash/aaa')
+    ready()
+    await click(castButton())
+    await act(async () => fake.sessionStarted('Living room', { state: 'playing', id: 'ccc', name: 'Gamma' }))
+    expect(window.location.pathname).toBe('/hls-dash/ccc')
+    expect(loaded()).toEqual([])
+  })
+
+  it('a reload finds the TV again on the channel it is on', async () => {
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
+    mount('/hls-dash/aaa')
+    ready()
+    act(() => fake.sessionResumed('Living room'))
+    await act(async () => tell('bbb', 'Beta'))
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+    expect(loaded()).toEqual([])
+  })
+
+  it('a second cast in the same visit follows the TV again', async () => {
+    mount('/hls-dash/aaa')
+    ready()
+    await click(castButton())
+    await act(async () => fake.sessionStarted('Living room'))
+    await act(async () => fake.sessionEnded())
+    await click(castButton())
+    await act(async () => fake.sessionStarted('Living room', { state: 'playing', id: 'ccc', name: 'Gamma' }))
+    expect(window.location.pathname).toBe('/hls-dash/ccc')
+  })
+
+  it('a word from the TV before the list has come is kept until it does', async () => {
+    vi.mocked(useStreamSnapshot).mockReturnValue({ status: 'loading', snapshot: null } as unknown as ReturnType<typeof useStreamSnapshot>)
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
+    mount('/hls-dash/aaa')
+    ready()
+    act(() => fake.sessionResumed('Living room'))
+    await act(async () => tell('bbb', 'Beta'))
+    expect(window.location.pathname).toBe('/hls-dash/aaa')
+    vi.mocked(useStreamSnapshot).mockReturnValue({ status: 'ready', snapshot: LIST })
+    await act(async () => fake.castState('NO_DEVICES_AVAILABLE')) // the page looks again
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+  })
+
+  it('a late word about the old channel does not undo a card picked here', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    await click(card('Beta'))
+    expect(loaded()).toEqual(['aaa', 'bbb'])
+    await act(async () => tell('aaa', 'Alpha'))
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+  })
+
+  it('stays put for a channel the list does not have, or a pasted address', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    await act(async () => tell('zzz', 'Unknown', 'tuning'))
+    expect(window.location.pathname).toBe('/hls-dash/aaa')
+    await act(async () => fake.message({ v: 1, type: 'now', id: null, name: 'p.test', state: 'tuning' }))
+    expect(window.location.pathname).toBe('/hls-dash/aaa')
+  })
+})
+
 describe('the controls', () => {
   it('are there although the page’s own stream cannot be found', async () => {
     vi.mocked(useStreamSnapshot).mockReturnValue({ status: 'unavailable', snapshot: null } as unknown as ReturnType<typeof useStreamSnapshot>)

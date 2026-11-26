@@ -286,6 +286,12 @@ The screen draws the three styles with `shareUrl` of the server list's default c
 - [ ] **Step 4: Run** the tests → PASS; `vite build --config vite.cast.config.ts` → `dist-cast/index.html` and `dist-cast/tv/index.html` exist, and only `tv/index.html` names `cast-device.js` with `data-page="tv"`; `node tools/deploy-cast.mjs` (dry run) lists `PRISM/casting/tv/index.html` then `PRISM/casting/index.html` last. Look at both pages on the dev server (`/cast/index.html`, `/cast/tv/index.html?dev`, `/cast/tv/index.html`) in the browser pane.
 - [ ] **Step 5: Commit** `feat(cast): the help page at /, the TV page at /tv/`
 
+### Task 12 (added 2026-11-26 at the owner's request): the page follows the TV
+
+**Files:** Modify `src/pages/HlsPage.tsx`; Test `src/pages/__tests__/HlsPage.castFlow.test.tsx`, `HlsPage.cast.test.tsx`; spec goal 10.
+
+Rule: while connected, on the TV's first word after connecting and on every word whose state is `tuning`, a `now.id` that resolves (demo or list) and differs from the page's id moves the page with `navigate(..., { replace: true })`. Never tunes. Tests: a remote flip moves the page in place without tuning; a phone that joins shows the TV's channel; a reload follows; a late word about the old channel does not undo a card picked here; a channel not in the list or a pasted address leaves the page; a second cast in the same visit follows again; a word before the list arrives is kept until it does.
+
 ### Task 11: Whole-branch check, documents, PR and rollout
 
 - [ ] **Step 1:** Whole suite, `tsc -b`, eslint, both builds, the PHP suite. Expected: green except the known `adminAuth` case.
