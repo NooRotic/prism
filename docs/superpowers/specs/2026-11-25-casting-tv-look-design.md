@@ -107,3 +107,36 @@ Three pieces, each on the owner's go, plus the owner's change of the receiver ad
 ## Left to the builder
 
 Exact sizes and spacing beyond the comps; the order of fields in the debug line; the admin screen's layout beyond "three drawn styles, the current one, a choice"; how the rainbow text is animated, within the anti-goal.
+
+## As built (2026-11-26)
+
+Built natively from `docs/superpowers/plans/2026-11-26-casting-tv-look.md` (tasks 1-12; Task 12, the page follows the TV, was added at the owner's request during the build), with a fresh review after Task 6 and a final whole-branch review; every finding they raised that a person would notice was fixed with a test that failed first. Not yet seen on a device.
+
+**Rulings made during the build** (what was decided, and what it costs if wrong):
+
+- The TV's share card is for what is on: the context gained `onAir` (something tuned or playing). Cost: none.
+- A 24-hour clock pads the hour (02:47, as set-top boxes do); the device's hour cycle decides. Cost: none.
+- The banner's mark is PRISM's app icon (the bold prism on its tile, as in the approved comp), drawn inline by `PrismIcon`, which is also the QR code's middle. Cost: none.
+- The state words stay "Tuning…", "Buffering…", "Paused" (capitals by CSS), followed by the group ("Tuning… · Fun"); playing reads "Live · <group>", or "Playing" for a recording. Cost: none.
+- The big banner and the failure message step aside while the share card is up; the card itself says "Not available right now" for a channel that failed or finished. Cost: none.
+- A sender that joins treats Cast's player state IDLE as "ask the TV" (it may be between channels) and any other state as a channel on. Cost if Cast reports PLAYING for a dead channel's slate: the page's stream is not sent, and the person picks a card.
+- The join waits 4 s for the TV's word (the TV tells a new sender at once and again 1.5 s later) rather than asking it explicitly. Cost: a TV that says nothing waits 4 s for the page's stream.
+- `cast-device.js` keeps its name from build to build, so `.htaccess` marks it no-cache (after the one-year rule for `.js`, so it wins). Cost: one small revalidated request per page load.
+- The ring's CSS is `ring.css`, which `TvRing` brings, so the help page shares it. Cost: none.
+- `NotOnDevice` has a "failed" form for a Cast device whose receiver script did not load ("Cast PRISM to this TV again"); `cast-device.js` records what it decided in `window.prismCast.page`. Cost: none.
+- The help page's links are whole cards; each link's name is the section plus its one-line description. Cost: none.
+- The clock's separator fades (2 s, in and out), as this spec says, not the comp's on / off blink. Cost: none.
+- On the start screen, Down then Right tunes the previewed channel and opens its card (the flip-preview rule wins over "nothing with nothing on"). Cost: none seen.
+- A debug line that comes back on screen shows the last numbers asked for until the next ask (at most 1 s while playing); the player is asked only while a debug line is on screen. Cost: a second of old numbers for the same channel.
+- The page follows the TV in place (the address is replaced, never pushed), never tunes the TV, and acts on each word from the TV once: on the first word after the page opens or connects (after a join only for a channel that is on; after a reload whatever the TV says), and on every "tuning" word. A pick made on the page (a card, an address) holds the following until the TV names it, or for 10 s. A channel followed is not counted as "chosen" in Matomo. This reverses phase 1's "a flip changes the panel, not the page's address". Cost: a remote flip during the 10 s after a pick the TV never takes is not followed.
+- The QR read-back test runs in jsdom (the test setup needs `window`; resvg works there), not the plan's node environment. Cost: none.
+
+**Deferred minors** (seen, not fixed):
+
+- The clock's fading separator is the first character that is not an ASCII digit, so in Arabic and Persian digit locales a digit fades instead (fix: take the literal between hour and minute from `formatToParts`). Korean and Taiwanese clocks write AM / PM before the time; the TV puts it after.
+- The start screen still draws the site's thin `PrismMark` while the banner uses the app icon.
+- The help page's ring is sized once, at mount: a window resize can leave part of its edge without colour.
+- The start time is printed to 10 ms though measured to the 250 ms tick; `useQrStyle` can let an older answer overwrite a newer one; a long pause keeps the banner, clock and icon up (OLED); a pasted stream's host shows large on the card; the built-in demos are cast with no id, so their card has no code; `TvRing`'s ref callback is new each render; `behindLive` mixes Cast's live range with the video element's clock (a device check); `stop()` during the join wait does not clear it; clicking the highlighted card reloads the TV's channel.
+- Ideas: the Cast console's receiver address could carry `?cast` instead of the user-agent check; for a published app seen by strangers, style C (dark on light) scans on more cameras than B; `.help-small` is about 13.6 px on a phone.
+
+**First device checks:** the receiver script is now added by `cast-device.js` (asynchronously) and `main.tsx` waits for it: does the TV page start on the Gen 5? Then the Testing checklist above.
