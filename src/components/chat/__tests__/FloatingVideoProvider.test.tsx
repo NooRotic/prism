@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { act, render } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { AppProvider, useApp } from '../../../contexts/AppContext'
+import { trackEvent } from '../../../lib/analytics'
 import { detectURLType } from '../../../lib/urlDetection'
 import { STORAGE_KEYS } from '../../../config/storageKeys'
 import { isFloatingSupported, loadFloatSize } from '../../../lib/floatingVideo'
@@ -13,6 +14,7 @@ import FloatingVideoProvider from '../FloatingVideoProvider'
 import { useFloatingPageSource, useFloatingVideo } from '../floatingVideoContext'
 import type { FloatingVideoControls } from '../floatingVideoContext'
 
+vi.mock('../../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../../lib/analytics')>()), trackEvent: vi.fn() }))
 // The browser's window is the one thing replaced: opening it is what only Chrome can do.
 vi.mock('../../../lib/floatingWindow', () => ({ openFloatingWindow: vi.fn() }))
 vi.mock('../../../lib/floatingVideo', async (importOriginal) => ({
@@ -119,6 +121,7 @@ async function float() {
 
 beforeEach(() => {
   vi.mocked(openFloatingWindow).mockReset()
+  vi.mocked(trackEvent).mockClear()
   vi.mocked(isFloatingSupported).mockReturnValue(true)
   opening = null
   localStorage.clear()
@@ -501,5 +504,38 @@ describe('FloatingVideoProvider: a YouTube or HLS / DASH page', () => {
     act(() => probe.navigate('/twitch/streamer'))
     expect(lastOpening().session.close).toHaveBeenCalled()
     expect(probe.controls.isFloating).toBe(false)
+  })
+})
+
+describe('FloatingVideoProvider: what is counted', () => {
+  it('a window that opened', async () => {
+    armOpener()
+    renderProvider()
+    play(LIVE_URL)
+    act(() => probe.controls.open())
+    expect(trackEvent).not.toHaveBeenCalled()
+
+    await lastOpening().resolve()
+    expect(vi.mocked(trackEvent).mock.calls).toEqual([['Feature', 'video pop-out']])
+  })
+
+  it('not one the browser refused', async () => {
+    armOpener()
+    renderProvider()
+    play(LIVE_URL)
+    act(() => probe.controls.open())
+    await lastOpening().reject(new Error('refused'))
+
+    expect(trackEvent).not.toHaveBeenCalled()
+  })
+
+  it('not one that was closed before it was ready', async () => {
+    armOpener({ sessionClosed: true })
+    renderProvider()
+    play(LIVE_URL)
+    act(() => probe.controls.open())
+    await lastOpening().resolve()
+
+    expect(trackEvent).not.toHaveBeenCalled()
   })
 })

@@ -12,6 +12,7 @@ import {
   saveFloatSize,
 } from '../../lib/floatingVideo'
 import type { FramedSource } from '../../lib/floatingVideo'
+import { trackEvent } from '../../lib/analytics'
 import { openFloatingWindow } from '../../lib/floatingWindow'
 import type { FloatingSession } from '../../lib/floatingWindow'
 import { FloatingVideoContext } from './floatingVideoContext'
@@ -118,6 +119,7 @@ export default function FloatingVideoProvider({ children }: { children: ReactNod
         sessionRef.current = session
         setNotice(null)
         setIsFloating(true)
+        trackEvent('Feature', 'video pop-out')
       })
       .catch(() => {
         shownChannelRef.current = null

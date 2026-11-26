@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PrismLinkBar from '../PrismLinkBar'
+import { trackEvent } from '../../../lib/analytics'
 import { useApp } from '../../../contexts/AppContext'
 import { moreFromChannel } from '../../../lib/channelLatestApi'
 import { saveLink } from '../../../lib/linkedAccounts'
@@ -9,6 +10,7 @@ import type { TwitchVideo } from '../../../types/twitch'
 
 vi.mock('../../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../../lib/channelLatestApi', () => ({ moreFromChannel: vi.fn() }))
+vi.mock('../../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../../lib/analytics')>()), trackEvent: vi.fn() }))
 vi.mock('../../../lib/videoStats', () => ({ withStats: vi.fn(async (v: unknown[]) => v) }))
 
 const CHANNEL = 'UCX6OQ3DkcsbYNE6H8uQQuVA'
@@ -216,5 +218,22 @@ describe('PrismLinkBar', () => {
     fireEvent.click(bar())
     await waitFor(() => expect(within(screen.getByTestId('prism-bar')).getAllByTestId('combined-title').length).toBeGreaterThan(0))
     expect(moreFromChannel).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('PrismLinkBar: what is counted', () => {
+  it('opening the bar, each time, and not closing it', async () => {
+    vi.mocked(trackEvent).mockClear()
+    setup()
+    expect(trackEvent).not.toHaveBeenCalled()
+
+    fireEvent.click(bar())
+    await waitFor(() => expect(screen.getByTestId('combined-grid')).toBeInTheDocument())
+    expect(vi.mocked(trackEvent).mock.calls).toEqual([['Linking', 'videos together', 'twitch/mrbeast <-> youtube/Mr Beast']])
+
+    fireEvent.click(bar())
+    expect(trackEvent).toHaveBeenCalledTimes(1)
+    fireEvent.click(bar())
+    expect(trackEvent).toHaveBeenCalledTimes(2)
   })
 })

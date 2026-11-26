@@ -75,7 +75,7 @@ describe('HubPage', () => {
   it('ends with the one plain line about what is counted (hidden by CSS unless the page is counting)', () => {
     renderHub()
     const note = screen.getByText(
-      'Visits are counted by Matomo on my own server, with no cookies and shortened IP addresses.',
+      'Visits, and what is played or linked, are counted by Matomo on my own server, with no cookies and shortened IP addresses.',
     )
     expect(note.tagName).toBe('P')
     expect(note).toHaveClass('counted-note')

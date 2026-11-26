@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { isMutual } from '../lib/accountBios'
+import { linkName, trackEvent } from '../lib/analytics'
 import { dismissSuggestion, findByTwitch, isDismissed, saveLink } from '../lib/linkedAccounts'
 import { isYouTubeApiAvailable } from '../lib/youtubeApi'
 import { fetchYoutubeChannel, type YoutubeChannel } from '../lib/youtubeChannelApi'
@@ -35,6 +36,8 @@ export function useLinkSuggestion(login: string, description: string) {
       const c = result.channel
       if (isMutual({ twitchLogin: login, twitchDescription: description, youtube: { channelId: c.channelId, handle: c.handle, description: c.description } })) {
         saveLink({ twitch: login, youtube: { channelId: c.channelId, title: c.title, ...(c.handle ? { handle: c.handle } : {}) }, confirmed: true, linkedAt: Date.now() })
+        // Nobody asked for this link, so it is counted apart from those people make.
+        trackEvent('Linking', 'auto-linked', linkName({ twitch: login.toLowerCase(), youtube: c }))
         setStatus('idle')
         return
       }
@@ -49,6 +52,7 @@ export function useLinkSuggestion(login: string, description: string) {
   const accept = useCallback(() => {
     if (!channel) return
     saveLink({ twitch: login, youtube: { channelId: channel.channelId, title: channel.title, ...(channel.handle ? { handle: channel.handle } : {}) }, confirmed: false, linkedAt: Date.now() })
+    trackEvent('Linking', 'linked', linkName({ twitch: login.toLowerCase(), youtube: channel }))
     setStatus('idle')
   }, [channel, login])
 

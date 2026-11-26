@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLinkedAccount } from '../../hooks/useLinkedAccount'
+import { linkName, trackEvent } from '../../lib/analytics'
 import { fastYoutubeChatTarget, findYoutubeChatTarget, type LinkedYoutube } from '../../lib/youtubeChatLookup'
 import { decodeTarget, encodeTarget } from '../../lib/youtubeChatTarget'
 import { useChatPopout } from './useChatPopout'
@@ -62,11 +63,12 @@ export function useYoutubeChatPopout(twitchLogin: string | undefined) {
     const first = encodeTarget(fast ?? { kind: 'looking' })
     // A blocked pop-up has nowhere to show an answer, so it spends no lookup (the caller shows "Pop-up blocked").
     if (!openWindow(first)) return
+    trackEvent('Linking', 'followed', linkName({ twitch: login.toLowerCase(), youtube: forLink }))
     if (fast) {
       requestedRef.current = key
       setFound({ key, value: first })
     } else lookUp(key, forLink)
-  }, [channelId, title, key, openWindow, lookUp])
+  }, [login, channelId, title, key, openWindow, lookUp])
 
   // Follow the Twitch page while the window is open.
   useEffect(() => {

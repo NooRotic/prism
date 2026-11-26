@@ -3,6 +3,7 @@ import { useApp } from '../../contexts/AppContext'
 import { useTwitchAuth } from '../../hooks/useTwitchAuth'
 import { useYoutubeAccount } from '../../hooks/useYoutubeAccount'
 import { importYoutubeSubscriptions } from '../../lib/youtubeImport'
+import { CountedNote } from '../ui/CountedNote'
 
 const TEXT = { fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.03em' } as const
 const HISTORY_URL = 'https://www.youtube.com/feed/history'
@@ -20,6 +21,7 @@ function subscriptions(n: number): string {
  * YouTube: what the one-time import brought in and from which account, Import or Re-import, and a link to the
  * viewer's own YouTube history (watching here is recorded under whoever is signed in to youtube.com in this browser,
  * which PRISM cannot see). PRISM keeps no Google sign-in, so there is nothing to sign out of, and it never offers to.
+ * Last, what is counted: this row is the one place on every page a visitor can find it.
  */
 export function AccountsRow({ showDebugToggle }: { showDebugToggle: boolean }) {
   return (
@@ -27,6 +29,7 @@ export function AccountsRow({ showDebugToggle }: { showDebugToggle: boolean }) {
       <TwitchAccount />
       <YoutubeAccount />
       {showDebugToggle && <DebugToggle />}
+      <CountedNote className="w-full text-xs sm:text-right text-[var(--text-secondary)]" />
     </div>
   )
 }

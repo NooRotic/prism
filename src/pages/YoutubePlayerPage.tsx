@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReportLiveSighting } from '../hooks/useReportLiveSighting'
 import { useLocation, useParams } from 'react-router-dom'
 import { Tv } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
 import { detectURLType } from '../lib/urlDetection'
 import { getDemoById } from '../config/demoContent'
+import { trackEvent } from '../lib/analytics'
 import { isYouTubeApiAvailable } from '../lib/youtubeApi'
 import { recordWatched } from '../lib/catchupStore'
 import { currentYoutubeTime } from '../lib/floatingVideo'
 import type { FramedSource } from '../lib/floatingVideo'
 import { useRelatedVideos } from '../hooks/useRelatedVideos'
+import { useStayed } from '../hooks/useStayed'
 import { useVideoComments } from '../hooks/useVideoComments'
 import { useVideoContext } from '../hooks/useVideoContext'
 import { useVideoPage } from '../hooks/useVideoPage'
@@ -82,6 +84,18 @@ export default function YoutubePlayerPage() {
 
   const { data, status: pageStatus } = useVideoPage(videoId)
   useReportLiveSighting(data)
+
+  // What the owner's Matomo is told: whose video it is (known once the details arrive), once per video, and how long people
+  // stay. The channel's id tells apart two channels of the same name.
+  const channelName = data ? (data.channelId ? `${data.channelTitle} (${data.channelId})` : data.channelTitle) : null
+  const reportedVideo = useRef<string | null>(null)
+  useEffect(() => {
+    if (channelName === null || reportedVideo.current === videoId) return
+    reportedVideo.current = videoId
+    trackEvent('YouTube', 'opened', channelName)
+  }, [channelName, videoId])
+  useStayed(channelName, video.isFloating)
+
   const { result: comments } = useVideoComments(videoId)
   const context = useVideoContext(videoId, search)
   const related = useRelatedVideos(videoId)
