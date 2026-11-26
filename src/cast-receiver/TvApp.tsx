@@ -3,16 +3,24 @@ import { PrismMark } from '../components/brand/PrismMark'
 import { fromEntry, type CastStream, type ContextMessage, type NowMessage, type TvState } from '../lib/cast/messages'
 import { BACK_AGAIN_MS, REMOTE_START, remote, resolveGuide, type RemoteContext, type RemoteEvent, type RemoteState } from '../lib/cast/remote'
 import { guideGroups, surfList } from '../lib/cast/surf'
-import { createTuner, type CastEngine } from '../lib/cast/tuner'
+import { createTuner, type CastEngine, type EngineReport } from '../lib/cast/tuner'
 import TvBanner from './TvBanner'
+import TvClock from './TvClock'
 import TvGuide from './TvGuide'
+import TvShareCard from './TvShareCard'
+import { debugLine } from './tvText'
 import { useChannelList } from './useChannelList'
+import { useQrStyle } from './useQrStyle'
 
 const TICK_MS = 250
 const BANNER_MS = 4_000
 const NO_LIST_MS = 4_000
 
-const NOTES: Partial<Record<TvState, string>> = { tuning: 'Tuning…', buffering: 'Buffering…', paused: 'Paused' }
+const SHOWS_STATE: ReadonlySet<TvState> = new Set<TvState>(['tuning', 'buffering', 'paused'])
+/** The player is asked what it is doing every tick while a channel starts, and every fourth one after. */
+const SLOW_POLL_TICKS = 4
+
+const sameReport = (a: EngineReport, b: EngineReport) => (Object.keys({ ...a, ...b }) as (keyof EngineReport)[]).every((k) => a[k] === b[k])
 
 export interface TvAppProps {
   engine: CastEngine
@@ -23,7 +31,7 @@ export interface TvAppProps {
 
 /** Whether a tick changed anything that shows, so the page is not drawn again four times a second for nothing. */
 function sameToSee(a: RemoteState, b: RemoteState): boolean {
-  return a.pending === b.pending && a.guide?.key === b.guide?.key && a.guide?.id === b.guide?.id && a.guide?.group === b.guide?.group && a.guide?.row === b.guide?.row
+  return a.pending === b.pending && a.card === b.card && a.guide?.key === b.guide?.key && a.guide?.id === b.guide?.id && a.guide?.group === b.guide?.group && a.guide?.row === b.guide?.row
 }
 
 /** PRISM on the TV: the picture is Cast's player behind this; everything drawn over it, and the remote, is here. */
@@ -37,6 +45,11 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
   const [notice, setNotice] = useState<string | null>(null)
   /** The stream whose picture has just started: its name stays a moment. */
   const [fresh, setFresh] = useState<CastStream | null>(null)
+  /** When the current channel was tuned, and how long its picture took to start. */
+  const [timing, setTiming] = useState<{ tuneAt: number; startedInMs: number | null }>({ tuneAt: 0, startedInMs: null })
+  /** What the player said last, and when. */
+  const [player, setPlayer] = useState<{ report: EngineReport; at: number }>(() => ({ report: engine.report(), at: performance.now() }))
+  const qr = useQrStyle()
 
   const context = useMemo<RemoteContext>(
     () => ({
@@ -115,13 +128,27 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
   }, [handle])
 
   useEffect(() => {
+    let slow = 0
     const id = setInterval(() => {
       const now = performance.now()
       tuner.tick(now)
       handle({ type: 'tick' }, now)
+      const starting = tuner.view().state === 'tuning' || tuner.view().state === 'buffering'
+      slow = (slow + 1) % SLOW_POLL_TICKS
+      if (starting || slow === 0) {
+        const report = engine.report()
+        setPlayer((before) => (sameReport(before.report, report) && !starting ? before : { report, at: now }))
+      }
     }, TICK_MS)
     return () => clearInterval(id)
-  }, [tuner, handle])
+  }, [tuner, handle, engine])
+
+  // The card shows the style the owner chose in /admin: asked again each time it comes up.
+  const cardAt = hand.card?.at ?? null
+  const { ask } = qr
+  useEffect(() => {
+    if (cardAt !== null) ask()
+  }, [cardAt, ask])
 
   // What PRISM is told, and the moment a picture starts.
   useLayoutEffect(() => {
@@ -133,6 +160,9 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
       const before = last
       last = tuner.view()
       tell()
+      const at = performance.now()
+      if (last.stream !== before.stream) setTiming({ tuneAt: at, startedInMs: null })
+      else if (last.state === 'playing') setTiming((t) => (t.startedInMs === null ? { ...t, startedInMs: at - t.tuneAt } : t))
       if (last.state === 'playing' && (before.state === 'tuning' || before.state === 'failed')) {
         if (timer) clearTimeout(timer)
         setFresh(last.stream)
@@ -155,16 +185,29 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
   const preview = hand.pending?.entry ?? null
   // Placed again in the groups of this moment: the list can have changed since the last key.
   const guide = hand.guide && resolveGuide(hand.guide, context.groups)
-  const note = NOTES[state] ?? null
-  const named = preview ?? (stream && (note !== null || (state === 'playing' && fresh === stream)) ? stream : null)
+  const card = hand.card && stream
+  const named = preview ?? (stream && (SHOWS_STATE.has(state) || (state === 'playing' && fresh === stream)) ? stream : null)
   const message =
-    stream === null || preview !== null || guide !== null
+    stream === null || preview !== null || guide !== null || card
       ? null
       : state === 'failed'
         ? `${stream.name} is not available right now. Press Up or Down for another channel.`
         : state === 'ended'
           ? `${stream.name} has finished. Press Up or Down for another channel.`
           : null
+
+  const surfAt = stream === null ? -1 : context.surf.findIndex((s) => s.id === stream.id)
+  const debug = stream
+    ? debugLine({
+        state,
+        sinceTuneMs: player.at - timing.tuneAt,
+        startedInMs: timing.startedInMs,
+        report: player.report,
+        kind: stream.kind,
+        live: stream.live,
+        place: surfAt === -1 ? null : { at: surfAt + 1, of: context.surf.length },
+      }) || null
+    : null
 
   return (
     <div className="tv">
@@ -176,12 +219,27 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
         </div>
       )}
       {message && (
-        <p role="alert" className="tv-message">
-          {message}
-        </p>
+        <div className="tv-message">
+          <p role="alert">{message}</p>
+          {debug && <p className="tv-debug">{debug}</p>}
+        </div>
       )}
+      {(guide || (named && !card) || card) && <TvClock />}
       {guide && <TvGuide groups={context.groups} at={guide} playingId={context.playingId} />}
-      {named && !guide && <TvBanner name={named.name} entry={entryOf(named.id)} group={groupOf(named.id)} note={preview ? null : note} />}
+      {guide && stream && (
+        <TvBanner name={stream.name} entry={entryOf(stream.id)} group={groupOf(stream.id)} state={state} live={stream.live} debug={debug} compact />
+      )}
+      {named && !guide && !card && (
+        <TvBanner
+          name={named.name}
+          entry={entryOf(named.id)}
+          group={groupOf(named.id)}
+          state={preview ? null : state}
+          live={preview || !stream ? true : stream.live}
+          debug={preview ? null : debug}
+        />
+      )}
+      {card && <TvShareCard stream={card} entry={entryOf(card.id)} group={groupOf(card.id)} qrStyle={qr.style} />}
       {notice && (
         <p role="status" className="tv-notice">
           {notice}
