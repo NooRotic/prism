@@ -21,6 +21,11 @@ export async function devProps(): Promise<TvAppProps> {
     },
     stop: () => {},
     sample: () => (startedAt === 0 || performance.now() < startedAt ? null : { time: (performance.now() - startedAt) / 1000, paused: false, ended: false, stopped: false }),
+    // Made-up numbers, so the debug line can be looked at.
+    report: () =>
+      startedAt === 0 || performance.now() < startedAt
+        ? { engine: 'stand-in', step: startedAt === 0 ? null : 'PLAYER_LOADING' }
+        : { engine: 'stand-in', step: 'PLAYING', width: 1920, height: 1080, bitrate: 6.2e6, bandwidth: 4.1e7, buffered: 8.4, behindLive: 4.1, dropped: 0 },
     onError: () => () => {},
     onSenderLoad: (listener) => {
       senderLoad = listener

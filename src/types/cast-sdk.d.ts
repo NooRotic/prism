@@ -5,13 +5,15 @@ declare namespace cast.framework {
   // ── The receiver (the TV page) ─────────────────────────────────────────────
 
   class PlayerManager {
-    addEventListener(type: string, listener: (event: { endedReason?: string; detailedErrorCode?: number }) => void): void
+    addEventListener(type: string, listener: (event: { endedReason?: string; detailedErrorCode?: number; isBuffering?: boolean }) => void): void
     setMessageInterceptor<T>(type: string, interceptor: (data: T) => unknown): void
     load(request: messages.LoadRequestData): Promise<void>
     stop(): void
     seek(seconds: number): void
     getPlayerState(): string
     getLiveSeekableRange(): { start?: number; end?: number } | null
+    /** Cast's playback statistics; any field can be missing. */
+    getStats(): Partial<Record<'width' | 'height' | 'streamBandwidth' | 'estimatedBandwidth' | 'droppedFrames', unknown>>
   }
 
   class CastReceiverContext {
@@ -37,7 +39,7 @@ declare namespace cast.framework {
   }
 
   namespace events {
-    const EventType: { ERROR: string; PLAYER_LOADING: string; LOADED_METADATA: string; MEDIA_FINISHED: string }
+    const EventType: { ERROR: string; PLAYER_LOADING: string; LOADED_METADATA: string; MEDIA_FINISHED: string; BUFFERING: string; PLAYING: string; PAUSE: string }
     const EndedReason: { END_OF_STREAM: string; STOPPED: string; SENDER_STOPPED: string }
     const DetailedErrorCode: { IMAGE_ERROR: number; LOAD_INTERRUPTED: number; MEDIA_ERROR_MESSAGE: number }
   }

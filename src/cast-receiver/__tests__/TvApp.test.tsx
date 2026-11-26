@@ -1,6 +1,6 @@
 import { act, render, screen, within } from '@testing-library/react'
 import type { CastLoadData, CastStream, ContextMessage, NowMessage } from '../../lib/cast/messages'
-import type { CastEngine, EngineSample } from '../../lib/cast/tuner'
+import type { CastEngine, EngineReport, EngineSample } from '../../lib/cast/tuner'
 import { loadStreamSnapshot, refreshStreamSnapshot, type StreamEntry, type StreamSnapshot } from '../../lib/streamsApi'
 import TvApp from '../TvApp'
 
@@ -15,6 +15,7 @@ const SENT: CastStream = { id: 'news', name: 'News One', url: NEWS.url, kind: 'h
 const DATA: CastLoadData = { v: 1, id: 'news', kind: 'hls', live: true, favorites: ['news', 'films'], group: null }
 
 let sample: EngineSample | null
+let report: EngineReport
 let loads: CastStream[]
 let senderLoad: (stream: CastStream, data: CastLoadData | null) => void
 let sendContext: (message: ContextMessage) => void
@@ -29,6 +30,7 @@ const engine: CastEngine = {
   },
   stop: () => {},
   sample: () => sample,
+  report: () => report,
   onError: (l) => {
     engineError = l
     return () => {}
@@ -96,6 +98,7 @@ const highlighted = () => within(screen.getByRole('listbox')).getByRole('option'
 beforeEach(() => {
   vi.useFakeTimers()
   sample = null
+  report = { engine: 'shaka', step: null }
   loads = []
   sent = []
   leave.mockReset()
