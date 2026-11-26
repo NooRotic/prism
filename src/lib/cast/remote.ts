@@ -19,6 +19,8 @@ const STEP_MS = 100
 /** A flip with the guide closed is tuned this long after the last step: a start takes seconds, so none is wasted on the way. */
 const TUNE_AFTER_MS = 600
 const GUIDE_CLOSES_MS = 15_000
+/** The share card goes away by itself after this. */
+export const CARD_MS = 30_000
 export const BACK_AGAIN_MS = 3_000
 
 export interface RemoteContext {
@@ -27,6 +29,8 @@ export interface RemoteContext {
   playingId: string | null
   /** What is tuned is not working (it failed or ended): choosing it again is a way to try again. */
   retry: boolean
+  /** Something is tuned or playing: there is something for the share card to show. */
+  onAir: boolean
 }
 
 /** Where the guide stands: what it is, and where that was last seen (the list can change under an open guide). */
@@ -47,9 +51,11 @@ export interface RemoteState {
   lastInputAt: number
   /** Keys whose press was claimed and whose release has not been seen. */
   down: readonly string[]
+  /** The share card (what is on, with its QR code), and when it came up. */
+  card: { at: number } | null
 }
 
-export const REMOTE_START: RemoteState = { guide: null, pending: null, lastKey: null, lastStepAt: -Infinity, backArmedAt: null, lastInputAt: 0, down: [] }
+export const REMOTE_START: RemoteState = { guide: null, pending: null, lastKey: null, lastStepAt: -Infinity, backArmedAt: null, lastInputAt: 0, down: [], card: null }
 
 export type RemoteEvent =
   | { type: 'keydown' | 'keyup'; key: string }
@@ -101,11 +107,13 @@ export function remote(previous: RemoteState, event: RemoteEvent, now: number, c
 
   if (event.type === 'taken') {
     state.pending = null
+    state.card = null
     return done(false)
   }
 
   if (event.type === 'tick') {
     if (state.guide && now - state.lastInputAt >= GUIDE_CLOSES_MS) state.guide = null
+    if (state.card && now - state.card.at >= CARD_MS) state.card = null
     if (state.pending && now - state.pending.at >= TUNE_AFTER_MS) {
       const { entry } = state.pending
       state.pending = null
@@ -136,7 +144,11 @@ export function remote(previous: RemoteState, event: RemoteEvent, now: number, c
 
   if (back) {
     if (held) return done(true)
-    if (state.guide) {
+    if (state.card) {
+      // Closing the card is all it does: it is not the first of two presses that leave.
+      state.card = null
+      state.backArmedAt = null
+    } else if (state.guide) {
       state.guide = null
     } else if (state.backArmedAt !== null && now - state.backArmedAt <= BACK_AGAIN_MS) {
       state.backArmedAt = null
@@ -150,6 +162,7 @@ export function remote(previous: RemoteState, event: RemoteEvent, now: number, c
 
   if (ok) {
     if (held) return done(true)
+    state.card = null
     if (state.guide) {
       const chosen = ctx.groups[state.guide.group].streams[state.guide.row]
       state.guide = null
@@ -163,8 +176,22 @@ export function remote(previous: RemoteState, event: RemoteEvent, now: number, c
     return done(true)
   }
 
-  // Nothing with the guide closed, but not Cast's either: it would move about in the stream with nothing on screen to say so.
-  if (sideways !== 0 && !state.guide) return done(true)
+  // With the guide closed, Left and Right are the share card's, never Cast's: it would move about in the stream with nothing on
+  // screen to say so. A flip that waits is tuned at once, so the card shows what will be on.
+  if (sideways !== 0 && !state.guide) {
+    if (held) return done(true)
+    if (state.card) {
+      state.card = null
+    } else if (ctx.onAir || state.pending) {
+      if (state.pending) {
+        effects.push({ type: 'tune', entry: state.pending.entry })
+        state.pending = null
+      }
+      state.card = { at: now }
+    }
+    return done(true)
+  }
+  if (vertical !== 0) state.card = null
 
   const sinceStep = now - state.lastStepAt
   if (sinceStep >= 0 && sinceStep < STEP_MS) return done(true)

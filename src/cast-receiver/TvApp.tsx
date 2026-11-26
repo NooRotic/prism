@@ -44,6 +44,7 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
       groups: guideGroups(list, favorites),
       playingId: view.stream?.id ?? null,
       retry: view.state === 'failed' || view.state === 'ended',
+      onAir: view.stream !== null,
     }),
     [list, favorites, group, view],
   )

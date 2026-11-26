@@ -1,6 +1,6 @@
 import type { StreamEntry } from '../../streamsApi'
 import type { GuideGroup } from '../surf'
-import { REMOTE_START, remote, resolveGuide, type RemoteContext, type RemoteEffect, type RemoteEvent, type RemoteState } from '../remote'
+import { CARD_MS, REMOTE_START, remote, resolveGuide, type RemoteContext, type RemoteEffect, type RemoteEvent, type RemoteState } from '../remote'
 
 const entry = (id: string): StreamEntry => ({ id, name: id.toUpperCase(), groups: [0], country: null, logo: null, kind: 'hls', pinned: false, state: 'working', url: `https://h.test/${id}.m3u8` })
 const [A, B, C, N] = ['a', 'b', 'c', 'n'].map(entry)
@@ -9,7 +9,7 @@ const GROUPS: GuideGroup[] = [
   { key: 'all', label: 'All', streams: [A, B, C] },
 ]
 const ALL_ONLY: GuideGroup[] = [{ key: 'all', label: 'All', streams: [A, B, C] }]
-const CTX: RemoteContext = { surf: [A, B, C], groups: GROUPS, playingId: 'b', retry: false }
+const CTX: RemoteContext = { surf: [A, B, C], groups: GROUPS, playingId: 'b', retry: false, onAir: true }
 
 /** A remote in someone's hand: keeps the state, collects the effects. */
 function hand(ctx: RemoteContext = CTX) {
@@ -88,7 +88,7 @@ describe('OK', () => {
   })
 
   it('says there is no list instead of opening an empty guide', () => {
-    const r = hand({ surf: [], groups: [], playingId: null, retry: false })
+    const r = hand({ surf: [], groups: [], playingId: null, retry: false, onAir: false })
     r.press('Enter', 0)
     expect(r.state.guide).toBeNull()
     expect(r.of('noList')).toHaveLength(1)
@@ -148,13 +148,13 @@ describe('Up and Down with the guide closed', () => {
   })
 
   it('says there is no list', () => {
-    const r = hand({ surf: [], groups: [], playingId: 'b', retry: false })
+    const r = hand({ surf: [], groups: [], playingId: 'b', retry: false, onAir: true })
     expect(r.press('ArrowUp', 0).claimed).toBe(true)
     expect(r.of('noList')).toHaveLength(1)
   })
 
   it('asks for the list again when there is none, once per press however long it is held', () => {
-    const r = hand({ surf: [], groups: [], playingId: 'b', retry: true })
+    const r = hand({ surf: [], groups: [], playingId: 'b', retry: true, onAir: true })
     r.press('ArrowDown', 0)
     r.press('ArrowDown', 400)
     r.press('ArrowDown', 600)
@@ -227,9 +227,9 @@ describe('a list that changes under an open guide', () => {
   it('never points outside a list that shrank', () => {
     const r = hand({ ...CTX, playingId: 'c' })
     r.press('Enter', 0)
-    r.press('ArrowDown', 500, { surf: [A], groups: [{ key: 'all', label: 'All', streams: [A] }], playingId: null, retry: false })
+    r.press('ArrowDown', 500, { surf: [A], groups: [{ key: 'all', label: 'All', streams: [A] }], playingId: null, retry: false, onAir: false })
     expect(r.at).toEqual({ group: 0, row: 0 })
-    r.tick(600, { surf: [], groups: [], playingId: null, retry: false })
+    r.tick(600, { surf: [], groups: [], playingId: null, retry: false, onAir: false })
     expect(r.state.guide).toBeNull()
   })
 
@@ -242,13 +242,88 @@ describe('a list that changes under an open guide', () => {
   })
 })
 
-describe('Left and Right with the guide closed', () => {
-  it('do nothing, and are kept from Cast, which would seek', () => {
+describe('the share card (Left and Right with the guide closed)', () => {
+  it('Left or Right opens it for what is on, and closes it; both are kept from Cast, which would seek', () => {
     const r = hand()
-    expect(r.press('ArrowLeft', 0).claimed).toBe(true)
-    expect(r.press('ArrowRight', 500).claimed).toBe(true)
+    const opened = r.press('ArrowRight', 0)
+    expect(opened.claimed).toBe(true)
+    expect(r.state.card).toEqual({ at: 0 })
+    expect(r.press('ArrowLeft', 1000).claimed).toBe(true)
+    expect(r.state.card).toBeNull()
     expect(r.effects).toHaveLength(0)
     expect(r.state.guide).toBeNull()
+  })
+
+  it('does nothing with nothing on', () => {
+    const r = hand({ ...CTX, playingId: null, onAir: false })
+    expect(r.press('ArrowRight', 0).claimed).toBe(true)
+    expect(r.state.card).toBeNull()
+  })
+
+  it('during a flip preview tunes that channel at once and opens its card', () => {
+    const r = hand()
+    r.press('ArrowDown', 0)
+    r.press('ArrowRight', 100)
+    expect(r.of('tune')).toEqual([{ type: 'tune', entry: C }])
+    expect(r.state.pending).toBeNull()
+    expect(r.state.card).toEqual({ at: 100 })
+    r.tick(1000)
+    expect(r.of('tune')).toHaveLength(1)
+  })
+
+  it('Up or Down closes it and flips', () => {
+    const r = hand()
+    r.press('ArrowRight', 0)
+    r.press('ArrowDown', 1000)
+    expect(r.state.card).toBeNull()
+    expect(r.state.pending?.entry).toBe(C)
+  })
+
+  it('OK closes it and opens the guide', () => {
+    const r = hand()
+    r.press('ArrowRight', 0)
+    r.press('Enter', 1000)
+    expect(r.state.card).toBeNull()
+    expect(r.state.guide).not.toBeNull()
+    expect(r.of('refreshList')).toHaveLength(1)
+  })
+
+  it('Back closes it and does not arm leaving', () => {
+    const r = hand()
+    r.press('ArrowRight', 0)
+    expect(r.press('BrowserBack', 1000).claimed).toBe(true)
+    expect(r.state.card).toBeNull()
+    expect(r.state.backArmedAt).toBeNull()
+    expect(r.of('backHint')).toHaveLength(0)
+    r.press('BrowserBack', 2000)
+    expect(r.of('leave')).toHaveLength(0)
+    expect(r.of('backHint')).toHaveLength(1)
+  })
+
+  it('closes by itself after 30 s, and when the computer tunes the TV', () => {
+    const r = hand()
+    r.press('ArrowRight', 0)
+    r.tick(CARD_MS - 1)
+    expect(r.state.card).not.toBeNull()
+    r.tick(CARD_MS)
+    expect(r.state.card).toBeNull()
+    r.press('ArrowLeft', 40_000)
+    r.taken(41_000)
+    expect(r.state.card).toBeNull()
+  })
+
+  it('a held Right opens it once', () => {
+    const r = hand()
+    r.hold('ArrowRight', 0, 1000)
+    expect(r.state.card).toEqual({ at: 0 })
+  })
+
+  it('stays out of the guide: there Left and Right change the group', () => {
+    const r = hand()
+    r.press('Enter', 0)
+    r.press('ArrowRight', 500)
+    expect(r.state.card).toBeNull()
+    expect(r.state.guide?.group).toBe(1)
   })
 })
 
