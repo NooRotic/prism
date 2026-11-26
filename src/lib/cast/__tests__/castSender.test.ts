@@ -276,6 +276,16 @@ describe('joining a TV that is already on', () => {
     expect(fake.loadMedia).toHaveBeenCalledTimes(1)
   })
 
+  it('Stop while it waits sends nothing to the TV that is being let go', async () => {
+    vi.useFakeTimers()
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', 'silent')
+    sender.stop()
+    vi.advanceTimersByTime(10_000)
+    expect(fake.loadMedia).not.toHaveBeenCalled()
+  })
+
   it('sends a pick made while connecting even to a playing TV', () => {
     const sender = ready()
     sender.start(STREAM, null)

@@ -17,7 +17,14 @@ export default function TvRing({ as: Tag = 'div', className, children, ...rest }
   const [side, setSide] = useState(0)
   useLayoutEffect(() => {
     const element = panel.current
-    if (element) setSide(Math.ceil(Math.hypot(element.offsetWidth, element.offsetHeight)))
+    if (!element) return
+    const measure = () => setSide(Math.ceil(Math.hypot(element.offsetWidth, element.offsetHeight)))
+    measure()
+    // Again when the panel changes size (the help page follows the window; fonts can arrive after the first draw).
+    if (typeof ResizeObserver === 'undefined') return
+    const watch = new ResizeObserver(measure)
+    watch.observe(element)
+    return () => watch.disconnect()
   }, [])
   return (
     <Tag ref={(element: HTMLElement | null) => void (panel.current = element)} className={`tv-ring ${className}`} {...rest}>

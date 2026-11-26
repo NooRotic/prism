@@ -56,19 +56,30 @@ describe('the clock', () => {
   const at = new Date('2026-11-26T02:47:00Z')
 
   it('keeps the device’s own 12-hour habit and time zone', () => {
-    expect(clockParts(at, 'en-US', 'America/New_York')).toEqual({ time: '9:47', period: 'PM' })
+    expect(clockParts(at, 'en-US', 'America/New_York')).toMatchObject({ time: '9:47', period: 'PM' })
   })
 
   it('and its 24-hour one', () => {
-    expect(clockParts(at, 'en-GB', 'Europe/London')).toEqual({ time: '02:47', period: null })
+    expect(clockParts(at, 'en-GB', 'Europe/London')).toMatchObject({ time: '02:47', period: null })
   })
 
   it('midnight on a 24-hour clock is 00:00', () => {
-    expect(clockParts(new Date('2026-11-26T00:00:00Z'), 'en-GB', 'Europe/London')).toEqual({ time: '00:00', period: null })
+    expect(clockParts(new Date('2026-11-26T00:00:00Z'), 'en-GB', 'Europe/London')).toMatchObject({ time: '00:00', period: null })
   })
 
   it('midnight is 12, in the morning', () => {
-    expect(clockParts(new Date('2026-11-26T05:00:00Z'), 'en-US', 'America/New_York')).toEqual({ time: '12:00', period: 'AM' })
+    expect(clockParts(new Date('2026-11-26T05:00:00Z'), 'en-US', 'America/New_York')).toMatchObject({ time: '12:00', period: 'AM' })
+  })
+
+  it('gives the hour, the separator and the minutes apart, whatever digits the locale writes', () => {
+    expect(clockParts(at, 'en-US', 'America/New_York')).toMatchObject({ hour: '9', separator: ':', minute: '47' })
+    for (const locale of ['ar-EG', 'fa-IR', 'fr-CA']) {
+      const { hour, separator, minute, time } = clockParts(at, locale, 'UTC')
+      expect(separator).not.toMatch(/\p{Nd}/u)
+      expect(hour).toMatch(/^\p{Nd}+$/u)
+      expect(minute).toMatch(/^\p{Nd}+$/u)
+      expect(time).toContain(`${hour}${separator}${minute}`)
+    }
   })
 
   it('works with no locale or zone given', () => {
