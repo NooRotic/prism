@@ -11,7 +11,8 @@ declare global {
   interface Window {
     /** Set by cast-device.js, the page's first script: true once Google's receiver script has loaded on a Cast device. */
     prismCastReady?: Promise<boolean>
-    prismCast?: { isDevice(userAgent: string): boolean }
+    /** Set by cast-device.js: 'tv' on a Cast device (or with ?tv), 'browser' anywhere else. */
+    prismCast?: { isDevice(userAgent: string): boolean; page: string }
   }
 }
 
@@ -26,7 +27,7 @@ function draw(props: TvAppProps): void {
 
 /** Not on a Cast device (or Google's script did not load there): say what this page is instead. */
 function notOnDevice(): void {
-  const onDevice = window.prismCast?.isDevice(navigator.userAgent) ?? false
+  const onDevice = window.prismCast?.page === 'tv'
   createRoot(document.getElementById('root') as HTMLElement).render(<NotOnDevice failed={onDevice} />)
 }
 

@@ -46,8 +46,11 @@ const FRAMEWORK_WAIT_MS = 100
 const REJOIN_MS = 5_000
 /** A Stop that has not ended the session by now did not work (Google's SDK says nothing about it). */
 const STOP_MS = 10_000
-/** How long a page that joins a TV waits for it to say what it is doing; a TV that says nothing is taken as having nothing on. */
-export const JOIN_WAIT_MS = 2_000
+/**
+ * How long a page that joins a TV waits for it to say what it is doing; a TV that says nothing is taken as having nothing on.
+ * The TV says it as a sender connects and again 1.5 s later (the first can be missed); this leaves room for a slow second.
+ */
+export const JOIN_WAIT_MS = 4_000
 /** What the TV says while a channel is on: a page that joins then leaves it alone. */
 const ON_THE_TV: ReadonlySet<TvState> = new Set<TvState>(['tuning', 'playing', 'buffering', 'paused'])
 

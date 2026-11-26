@@ -9,6 +9,7 @@ import CastProvider from '../../components/cast/CastProvider'
 import { FloatingVideoContext, type FloatingVideoControls } from '../../components/chat/floatingVideoContext'
 import { STORAGE_KEYS } from '../../config/storageKeys'
 import { useStreamSnapshot } from '../../hooks/useStreamSnapshot'
+import { trackEvent } from '../../lib/analytics'
 import { createCastSender } from '../../lib/cast/castSender'
 import { installFakeCast, type FakeCast } from '../../lib/cast/__tests__/fakeCast'
 import { resetFavoritesCache } from '../../lib/favorites'
@@ -25,6 +26,7 @@ vi.mock('../../components/player/PlayerHost', () => ({
   },
 }))
 vi.mock('../../components/layout/DebugPanel', () => ({ default: () => null }))
+vi.mock('../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../lib/analytics')>()), trackEvent: vi.fn() }))
 vi.mock('../../contexts/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../hooks/useStreamSnapshot', () => ({ useStreamSnapshot: vi.fn() }))
 vi.mock('../../components/streams/StreamGrid', () => ({
@@ -76,6 +78,8 @@ const card = (name: string) => screen.getByTitle(name)
 const player = () => screen.queryByTestId('player-host')
 const tell = (id: string, name: string, state = 'playing') => act(() => fake.message({ v: 1, type: 'now', id, name, state }))
 const loaded = () => fake.loadMedia.mock.calls.map(([request]) => request.media.contentId)
+const pastedOnTv = () => fake.message({ v: 1, type: 'now', id: null, name: 'p.test', state: 'tuning' })
+const where = () => window.location.pathname + window.location.search
 
 async function casting(path = '/hls-dash/aaa') {
   const utils = mount(path)
@@ -476,6 +480,130 @@ describe('following the TV', () => {
     expect(window.location.pathname).toBe('/hls-dash/aaa')
     vi.mocked(useStreamSnapshot).mockReturnValue({ status: 'ready', snapshot: LIST })
     await act(async () => fake.castState('NO_DEVICES_AVAILABLE')) // the page looks again
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+  })
+
+  it('a card picked while the TV still tunes the last flip stays picked', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    await act(async () => tell('bbb', 'Beta', 'tuning'))
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+    await click(card('Gamma'))
+    expect(loaded()).toEqual(['aaa', 'ccc'])
+    expect(window.location.pathname).toBe('/hls-dash/ccc')
+    await act(async () => tell('ccc', 'Gamma', 'tuning'))
+    expect(window.location.pathname).toBe('/hls-dash/ccc')
+  })
+
+  it('an address pasted while the TV still tunes the last flip stays on the page', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    await act(async () => tell('bbb', 'Beta', 'tuning'))
+    await click(screen.getByText('paste hls'))
+    expect(loaded()).toEqual(['aaa', 'pasted'])
+    await act(async () => pastedOnTv())
+    expect(where()).toBe(buildStreamPath('https://p.test/x.m3u8'))
+  })
+
+  it('an address pasted while connecting to a TV that plays stays on the page', async () => {
+    mount('/hls-dash/aaa')
+    ready()
+    await click(castButton())
+    await click(screen.getByText('paste hls'))
+    await act(async () => fake.sessionStarted('Living room', { state: 'playing', id: 'ccc', name: 'Gamma' }))
+    expect(loaded()).toEqual(['pasted'])
+    await act(async () => pastedOnTv())
+    expect(where()).toBe(buildStreamPath('https://p.test/x.m3u8'))
+  })
+
+  it('an address pasted on another page while casting stays on the page it opens', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    await click(screen.getByText('to twitch'))
+    tell('ccc', 'Gamma', 'tuning')
+    tell('ccc', 'Gamma', 'playing')
+    await click(screen.getByText('paste hls'))
+    expect(loaded()).toEqual(['aaa', 'pasted'])
+    await act(async () => pastedOnTv())
+    expect(where()).toBe(buildStreamPath('https://p.test/x.m3u8'))
+  })
+
+  it('a phone joining a TV whose channel failed keeps its own, which the TV is told to play', async () => {
+    mount('/hls-dash/aaa')
+    ready()
+    await click(castButton())
+    await act(async () => fake.sessionStarted('Living room', { state: 'failed', id: 'ccc', name: 'Gamma' }))
+    expect(loaded()).toEqual(['aaa'])
+    expect(window.location.pathname).toBe('/hls-dash/aaa')
+  })
+
+  it('a reload follows the TV whatever it is doing, even a channel that failed', async () => {
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_CASTING, '1')
+    mount('/hls-dash/aaa')
+    ready()
+    act(() => fake.sessionResumed('Living room'))
+    await act(async () => tell('ccc', 'Gamma', 'failed'))
+    expect(window.location.pathname).toBe('/hls-dash/ccc')
+  })
+
+  it('a channel the page follows is not counted as one somebody chose', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    vi.mocked(trackEvent).mockClear()
+    await act(async () => tell('bbb', 'Beta', 'tuning'))
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+    expect(vi.mocked(trackEvent).mock.calls.filter(([, action]) => action === 'chosen')).toEqual([])
+  })
+
+  it('never reads an old word again when the page moves for another reason', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    await act(async () => tell('bbb', 'Beta', 'tuning'))
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+    await click(screen.getByText('to alpha')) // a link, not a pick: nothing goes to the TV
+    expect(window.location.pathname).toBe('/hls-dash/aaa')
+    expect(loaded()).toEqual(['aaa'])
+  })
+
+  it('follows the remote again as soon as the TV has the pick made here', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    await click(card('Gamma'))
+    await act(async () => tell('ccc', 'Gamma', 'tuning'))
+    await act(async () => tell('bbb', 'Beta', 'tuning')) // then the remote
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+  })
+
+  it('follows again after 10 s when the TV never takes the pick', async () => {
+    vi.useFakeTimers()
+    await casting()
+    tell('aaa', 'Alpha')
+    await click(card('Gamma'))
+    act(() => vi.advanceTimersByTime(9_000))
+    await act(async () => tell('bbb', 'Beta', 'tuning'))
+    expect(window.location.pathname).toBe('/hls-dash/ccc')
+    act(() => vi.advanceTimersByTime(1_000))
+    await act(async () => tell('aaa', 'Alpha', 'tuning'))
+    expect(window.location.pathname).toBe('/hls-dash/aaa')
+  })
+
+  it('a flip right after the hold has run out is followed', async () => {
+    vi.useFakeTimers()
+    await casting()
+    tell('aaa', 'Alpha')
+    await click(card('Gamma'))
+    act(() => vi.advanceTimersByTime(10_000))
+    await act(async () => tell('bbb', 'Beta', 'tuning'))
+    expect(window.location.pathname).toBe('/hls-dash/bbb')
+  })
+
+  it('a pick does not outlive the cast it was made in', async () => {
+    await casting()
+    tell('aaa', 'Alpha')
+    await click(card('Gamma')) // the TV never names it
+    await act(async () => fake.sessionEnded())
+    await click(castButton())
+    await act(async () => fake.sessionStarted('Living room', { state: 'playing', id: 'bbb', name: 'Beta' }))
     expect(window.location.pathname).toBe('/hls-dash/bbb')
   })
 

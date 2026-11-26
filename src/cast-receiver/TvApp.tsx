@@ -166,8 +166,9 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
       const at = performance.now()
       if (last.stream !== before.stream) {
         setTiming({ tuneAt: at, startedInMs: null })
-        // The new channel's own first words, never the last one's.
-        setPlayer({ report: engine.report(), at })
+        // The new channel's own first words, never the last one's: a tune made here is announced before the engine has started
+        // it, so the engine would still answer for the channel before.
+        setPlayer({ report: { engine: engine.report().engine, step: null }, at })
       }
       else if (last.state === 'playing') setTiming((t) => (t.startedInMs === null ? { ...t, startedInMs: at - t.tuneAt } : t))
       if (last.state === 'playing' && (before.state === 'tuning' || before.state === 'failed')) {

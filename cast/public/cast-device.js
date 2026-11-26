@@ -43,6 +43,7 @@
   if (typeof module !== 'undefined') module.exports = api
   if (typeof window !== 'undefined' && document.currentScript) {
     var page = document.currentScript.getAttribute('data-page')
-    if (page) start(page, window)
+    // What it decided ('tv', 'browser', 'help', 'forwarded'), for the page: a device whose player did not load is not a browser.
+    if (page) window.prismCast = { isDevice: isDevice, page: start(page, window) }
   }
 })()

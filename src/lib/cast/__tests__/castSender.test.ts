@@ -204,15 +204,26 @@ describe('joining a TV that is already on', () => {
     expect(fake.loadMedia.mock.calls[0][0].media).toMatchObject({ contentId: 'abc' })
   })
 
-  it('sends it after 2 s to a TV that says nothing', () => {
+  it('sends it after 4 s to a TV that says nothing', () => {
     vi.useFakeTimers()
     const sender = ready()
     sender.start(STREAM, null)
     fake.sessionStarted('TV', 'silent')
-    vi.advanceTimersByTime(1_999)
+    vi.advanceTimersByTime(3_999)
     expect(fake.loadMedia).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect(fake.loadMedia).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits for the TV’s second telling, which comes 1.5 s after it is joined, with room to spare', () => {
+    vi.useFakeTimers()
+    const sender = ready()
+    sender.start(STREAM, null)
+    fake.sessionStarted('TV', 'silent') // the first word was lost
+    vi.advanceTimersByTime(3_000) // a slow second telling
+    fake.message({ v: 1, type: 'now', id: 'b', name: 'Beta', state: 'playing' })
+    vi.advanceTimersByTime(5_000)
+    expect(fake.loadMedia).not.toHaveBeenCalled()
   })
 
   it('believes Cast’s own media session at once', () => {
@@ -249,7 +260,7 @@ describe('joining a TV that is already on', () => {
     vi.advanceTimersByTime(500)
     fake.sessionEnded()
     fake.sessionStarted('TV', 'silent') // started again from Chrome's menu, on a page that offers nothing
-    vi.advanceTimersByTime(5_000)
+    vi.advanceTimersByTime(10_000)
     expect(fake.loadMedia).not.toHaveBeenCalled()
   })
 
@@ -261,7 +272,7 @@ describe('joining a TV that is already on', () => {
     sender.tune(PICK, 'News')
     expect(fake.loadMedia).toHaveBeenCalledTimes(1)
     expect(fake.loadMedia.mock.calls[0][0].media).toMatchObject({ contentId: 'pick' })
-    vi.advanceTimersByTime(5_000)
+    vi.advanceTimersByTime(10_000)
     expect(fake.loadMedia).toHaveBeenCalledTimes(1)
   })
 

@@ -21,6 +21,22 @@ function fakeWindow(userAgent: string, search = '') {
   return { navigator: { userAgent }, location: { search, replace: vi.fn() }, document: doc, prismCastReady: undefined as Promise<boolean> | undefined }
 }
 
+it('run as the page runs it, says what it decided, so the TV page can tell a device whose player failed from a browser', () => {
+  const script = document.createElement('script')
+  script.setAttribute('data-page', 'tv')
+  Object.defineProperty(document, 'currentScript', { configurable: true, get: () => script })
+  Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => GEN5 })
+  try {
+    new Function('module', deviceSource)({ exports: {} })
+    const w = window as unknown as { prismCast?: { isDevice(ua: string): boolean; page: string } }
+    expect(w.prismCast?.page).toBe('tv')
+    expect(w.prismCast?.isDevice(GEN5)).toBe(true)
+  } finally {
+    Object.defineProperty(document, 'currentScript', { configurable: true, get: () => null })
+    document.head.querySelectorAll('script[src*="cast_receiver"]').forEach((s) => s.remove())
+  }
+})
+
 it('knows a Cast device by CrKey in its user agent', () => {
   expect(device.isDevice(GEN5)).toBe(true)
   expect(device.isDevice(DESKTOP)).toBe(false)

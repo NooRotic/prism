@@ -482,6 +482,15 @@ describe('the debug line', () => {
     expect(banner()).not.toHaveTextContent('PLAYING')
   })
 
+  it('a channel tuned on the TV itself never shows the last one’s step either', async () => {
+    report = { engine: 'shaka', step: 'PLAYING' }
+    await playing()
+    press('Enter')
+    press('ArrowDown')
+    key('Enter') // OK in the guide: tuned here, not by the computer
+    expect(banner()).not.toHaveTextContent('PLAYING')
+  })
+
   it('asks the player nothing while none of its words are on screen', async () => {
     await playing()
     plays(6000)

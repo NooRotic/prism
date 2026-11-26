@@ -33,7 +33,7 @@ export default function HelpPage() {
           ))}
         </nav>
         <p className="help-cast">To watch on your TV, open HLS / DASH in Chrome and press the Cast button</p>
-        <p className="help-small">This address is the page PRISM shows on a TV while it is cast.</p>
+        <p className="help-small">When you cast PRISM, your TV opens its own page by itself, with a guide and the remote.</p>
       </TvRing>
     </main>
   )

@@ -17,6 +17,11 @@ it('says what PRISM is and links to its three sections, each in its platform col
   }
 })
 
+it('does not call itself the TV page', () => {
+  render(<HelpPage />)
+  expect(document.body.textContent).not.toMatch(/page PRISM shows on a TV/)
+})
+
 it('tells a TV viewer where the Cast button is', () => {
   render(<HelpPage />)
   expect(screen.getByText('To watch on your TV, open HLS / DASH in Chrome and press the Cast button')).toBeInTheDocument()
