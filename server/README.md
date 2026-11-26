@@ -186,6 +186,16 @@ column**. The browser keeps the visitor's own set in localStorage and tells the 
 - The count is a popularity signal, not a poll: a script can still push a number up, slowly. Clearing a browser's storage and starring
   again adds another +1. If gaming ever shows up, the next step is a salted, daily-rotating hash per visitor (which would be visitor data).
 
+## The TV page's settings
+
+What the owner sets for PRISM's TV page (`prism-cast.nooroticx.tv`, `tools/deploy-cast.mjs`) in `/admin/tv`, kept in the key-value
+table (`job_state`, key `tv_qr_style`; no migration). The TV page's origin must be in `allowed_origins`.
+
+- `GET /api/tv` -> `{"v":1,"qrStyle":"a"|"b"|"c"}` (public, `Cache-Control: public, max-age=300`; the TV asks with `no-cache`). Unset means
+  `b`.
+- `POST /api/admin/tv` `{"qrStyle":"a"|"b"|"c"}` (owner only): exactly that body, anything else is a 400; `{"ok":true,"qrStyle":...}`.
+  Every change is written to the admin audit (`tv_qr_style`, `b -> c`).
+
 ## IONOS host notes
 
 - **Which PHP.** The scripts in `bin/` are command line only (they exit unless `PHP_SAPI` is `cli`). On this host the

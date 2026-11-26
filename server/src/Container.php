@@ -44,6 +44,7 @@ use Prism\History\Tracker\SystemSleeper;
 use Prism\History\Tracker\TrackerClient;
 use Prism\History\Tracker\TtGate;
 use Prism\History\Twitch\TokenValidator;
+use Prism\History\Tv\TvSettings;
 use Prism\History\Twitch\TwitchClient;
 use Prism\History\Usage\FavoriteRecorder;
 use Prism\History\Usage\HitRecorder;
@@ -117,6 +118,7 @@ final class Container
         );
 
         $favoriteStore = new FavoriteStore($pdo, $s['clock']);
+        $tv = new TvSettings($s['state'], $audit);
 
         return new Router(
             $config,
@@ -125,10 +127,11 @@ final class Container
             $s['payload'],
             $s['logger'],
             $hits,
-            new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit), $playlistAdmin, $checkerAdmin),
+            new AdminController($guard, $reports, new ChannelAdmin($pdo, $s['channels'], $audit), $playlistAdmin, $checkerAdmin, $tv),
             new StreamsController($config->playlistDataDir()),
             new FavoriteRecorder($favoriteStore, $streams, $cap),
             $favoriteStore,
+            $tv,
         );
     }
 

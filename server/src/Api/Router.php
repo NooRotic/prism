@@ -10,6 +10,7 @@ use Prism\History\Config;
 use Prism\History\Logger;
 use Prism\History\Store\ChannelStore;
 use Prism\History\Store\FavoriteStore;
+use Prism\History\Tv\TvSettings;
 use Prism\History\Usage\FavoriteRecorder;
 use Prism\History\Usage\HitRecorder;
 use Prism\History\VisitResult;
@@ -17,7 +18,8 @@ use Prism\History\VisitService;
 use Throwable;
 
 /**
- * The whole HTTP API: POST /api/visit, GET /api/channel, POST /api/hit, GET /api/streams and the admin routes, plus the CORS preflight.
+ * The whole HTTP API: POST /api/visit, GET /api/channel, POST /api/hit, GET /api/streams, GET /api/tv and the admin routes, plus the
+ * CORS preflight.
  *
  * A request that carries an Origin which is not in the allow-list is refused. That only stops other websites'
  * browsers (anything can forge the header); the real protection is the Twitch check and the caps. A request
@@ -40,6 +42,7 @@ final class Router
         private StreamsController $streams,
         private FavoriteRecorder $favoriteRecorder,
         private FavoriteStore $favorites,
+        private TvSettings $tv,
     ) {
     }
 
@@ -84,6 +87,7 @@ final class Router
             '/api/streams' => $this->streams->handle($request), // answers its own 405: GET and OPTIONS only
             '/api/favorite' => $request->method === 'POST' ? $this->favorite($request) : $this->notAllowed('POST, OPTIONS'),
             '/api/favorites' => $request->method === 'GET' ? $this->favoriteCounts() : $this->notAllowed('GET, OPTIONS'),
+            '/api/tv' => $request->method === 'GET' ? $this->tvSettings() : $this->notAllowed('GET, OPTIONS'),
             default => ApiResponse::json(404, ['error' => 'not_found'], self::NO_STORE),
         });
     }
@@ -179,6 +183,12 @@ final class Router
         }
 
         return ApiResponse::json(200, $this->payload->build((string) $row['twitch_id'], $days), ['Cache-Control' => 'public, max-age=300']);
+    }
+
+    /** GET /api/tv: what the TV page shows as the owner set it. A TV may keep the answer five minutes. */
+    private function tvSettings(): ApiResponse
+    {
+        return ApiResponse::json(200, ['v' => 1, 'qrStyle' => $this->tv->qrStyle()], ['Cache-Control' => 'public, max-age=300']);
     }
 
     private function notAllowed(string $allow): ApiResponse
