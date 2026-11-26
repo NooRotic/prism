@@ -16,17 +16,22 @@ function assertShippable(path) {
   if (bad) throw new Error(`will not upload ${path}`)
 }
 
-/** Folders parents first, then the files with index.html last: it names the others, so it goes when they are all there. */
+const PAGES = ['tv/index.html', 'index.html']
+
+/**
+ * Folders parents first, then the files, with the two pages last (the TV page, then the help page): a page names the other
+ * files, so it goes up when they are all there.
+ */
 export function planCastUpload(files, remoteDir = REMOTE_DIR) {
   const paths = files.map((file) => file.split('\\').join('/'))
   paths.forEach(assertShippable)
-  if (!paths.includes('index.html')) throw new Error('the build has no index.html')
+  for (const page of PAGES) if (!paths.includes(page)) throw new Error(`the build has no ${page}`)
   const dirs = new Set()
   for (const path of paths) {
     for (let dir = posix.dirname(path); dir !== '.'; dir = posix.dirname(dir)) dirs.add(posix.join(remoteDir, dir))
   }
   const depth = (dir) => dir.split('/').length
-  const ordered = [...paths.filter((path) => path !== 'index.html').sort(), 'index.html']
+  const ordered = [...paths.filter((path) => !PAGES.includes(path)).sort(), ...PAGES]
   return {
     dirs: [...dirs].sort((a, b) => depth(a) - depth(b) || a.localeCompare(b)),
     files: ordered.map((path) => ({ local: path, remote: posix.join(remoteDir, path) })),

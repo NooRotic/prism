@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>PRISM on TV</title>
+    <meta name="description" content="PRISM's TV page. PRISM plays Twitch, YouTube and HLS / DASH streams in one place." />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <!-- First: a Cast device goes on to the TV page at /tv/ (see the file). -->
+    <script src="/cast-device.js" data-page="help"></script>
   </head>
   <body>
-    <!-- Cast's player; also what makes the device send the remote's keys to the page. -->
-    <cast-media-player></cast-media-player>
     <div id="root"></div>
-    <script type="module" src="/src/cast-receiver/main.tsx"></script>
+    <script type="module" src="/src/cast-receiver/help/main.tsx"></script>
   </body>
 </html>

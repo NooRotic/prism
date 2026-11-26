@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
+import './ring.css'
 
 interface TvRingProps extends HTMLAttributes<HTMLElement> {
   as?: 'div' | 'aside'

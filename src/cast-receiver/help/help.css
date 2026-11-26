@@ -1,0 +1,122 @@
+/* The help page at prism-cast.nooroticx.tv: a phone, a computer, or a TV showing a mirrored tab. PRISM's colours, the TV page's
+   fonts, no Tailwind. Built for Chrome 87 like the TV page. */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=JetBrains+Mono:wght@400&display=swap');
+
+:root {
+  --bg: #050507;
+  --panel: rgba(12, 12, 18, 0.92);
+  --text-primary: #eeeef0;
+  --text-secondary: #c4c4d4;
+  --text-dim: #8a8aa0;
+}
+
+html {
+  font-size: clamp(16px, 1.35vw, 26px);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: 'Roboto', system-ui, sans-serif;
+}
+
+p,
+h1 {
+  margin: 0;
+}
+
+.help {
+  display: flex;
+  min-height: 100vh;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.help-panel {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 56rem;
+  box-sizing: border-box;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 2rem;
+  border-radius: 1rem;
+  background: var(--panel);
+}
+
+.help-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.help-mark {
+  width: 4rem;
+  height: 4rem;
+  flex-shrink: 0;
+}
+
+.help-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 2.5rem;
+  letter-spacing: 0.2em;
+  background: linear-gradient(90deg, var(--rainbow));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.help-lead {
+  font-size: 1.25rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.help-links {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.help-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem 1.25rem;
+  border: 2px solid;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  text-decoration: none;
+}
+
+.help-link:hover,
+.help-link:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.help-link-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.35rem;
+}
+
+.help-link-about {
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.help-cast {
+  font-size: 1.15rem;
+  color: var(--text-primary);
+}
+
+.help-small {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}

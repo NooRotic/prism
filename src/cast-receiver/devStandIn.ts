@@ -1,4 +1,4 @@
-// The TV page without a TV, on the dev server only (`/cast/index.html?dev`): a pretend player whose clock simply runs. Channels
+// The TV page without a TV, on the dev server only (`/cast/tv/index.html?dev`): a pretend player whose clock simply runs. Channels
 // whose name has a digit fail at once, so every screen can be seen. Never part of the built page.
 import type { CastLoadData, CastStream } from '../lib/cast/messages'
 import { fromEntry } from '../lib/cast/messages'

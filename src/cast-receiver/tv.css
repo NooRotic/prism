@@ -12,7 +12,6 @@
   --text-secondary: #c4c4d4;
   --text-dim: #8a8aa0;
   --accent-hls: #3b82f6;
-  --rainbow: #9146ff, #3b82f6, #22d3ee, #39ff14, #ffc832, #ff6b35, #ff0000, #9146ff;
   --font-heading: 'Orbitron', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -78,6 +77,16 @@ ul {
   height: 12rem;
 }
 
+.tv-start-mark-icon {
+  width: 9rem;
+  height: 9rem;
+}
+
+.tv-start-link {
+  font-size: 1.5rem;
+  color: var(--accent-hls);
+}
+
 .tv-start-name {
   font-family: var(--font-heading);
   font-size: 4rem;
@@ -88,39 +97,7 @@ ul {
   color: transparent;
 }
 
-/* ── The rainbow ring: a wheel of colour that only turns, cut to a 2px edge of its panel ── */
-.tv-ring {
-  isolation: isolate;
-}
-
-.tv-ring-edge {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  padding: 2px;
-  border-radius: inherit;
-  overflow: hidden;
-  opacity: 0.55;
-  pointer-events: none;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-}
-
-.tv-ring-wheel {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  background: conic-gradient(var(--rainbow));
-  transform: translate(-50%, -50%) rotate(0deg);
-  animation: tv-turn 90s linear infinite;
-}
-
-@keyframes tv-turn {
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
-}
+/* The rainbow ring is in ring.css (shared with the help page). */
 
 /* ── The clock, top right, only while PRISM has something on screen ── */
 .tv-clock {

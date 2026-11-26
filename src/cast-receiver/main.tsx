@@ -3,8 +3,17 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { CAST_NAMESPACE, parseContext, type ContextMessage, type NowMessage } from '../lib/cast/messages'
 import { createCastEngine } from './castEngine'
+import NotOnDevice from './NotOnDevice'
 import { quietCast } from './quietCast'
 import TvApp, { type TvAppProps } from './TvApp'
+
+declare global {
+  interface Window {
+    /** Set by cast-device.js, the page's first script: true once Google's receiver script has loaded on a Cast device. */
+    prismCastReady?: Promise<boolean>
+    prismCast?: { isDevice(userAgent: string): boolean }
+  }
+}
 
 /** A sender that comes back after a reload may start listening a moment after it is announced, so it is told twice. */
 const TELL_AGAIN_MS = 1_500
@@ -13,6 +22,12 @@ function draw(props: TvAppProps): void {
   const root = createRoot(document.getElementById('root') as HTMLElement)
   // At once, so the page is listening before Cast can hand it anything.
   flushSync(() => root.render(<TvApp {...props} />))
+}
+
+/** Not on a Cast device (or Google's script did not load there): say what this page is instead. */
+function notOnDevice(): void {
+  const onDevice = window.prismCast?.isDevice(navigator.userAgent) ?? false
+  createRoot(document.getElementById('root') as HTMLElement).render(<NotOnDevice failed={onDevice} />)
 }
 
 function startOnTv(): void {
@@ -70,5 +85,5 @@ if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('dev'
   // On the dev server only: the page with a pretend player, driven by the keyboard.
   void import('./devStandIn').then(({ devProps }) => devProps().then(draw))
 } else {
-  startOnTv()
+  void (window.prismCastReady ?? Promise.resolve(false)).then((ready) => (ready ? startOnTv() : notOnDevice()))
 }
