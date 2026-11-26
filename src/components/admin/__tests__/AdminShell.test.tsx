@@ -27,6 +27,7 @@ describe('AdminShell', () => {
       ['Channels', '/admin/channels'],
       ['Playlist', '/admin/playlist'],
       ['Health', '/admin/health'],
+      ['TV', '/admin/tv'],
     ])
   })
 

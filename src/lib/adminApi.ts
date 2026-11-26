@@ -1,4 +1,5 @@
 import { HISTORY_API_URL, HISTORY_ENABLED } from '../config/historyServer'
+import { isQrStyle, type QrStyle } from './cast/qrCode'
 import { getAdminToken } from './adminAuth'
 import { USAGE_SECTIONS, type UsageSection } from './usageSections'
 
@@ -578,6 +579,18 @@ const parsePaused = (json: unknown): { paused: boolean } => {
 }
 
 /** The kill switch: a paused checker does nothing until resumed. */
+// ---- The TV page (the TV screen)
+
+const parseTvStyle = (json: unknown): { qrStyle: QrStyle } => {
+  const o = rec(json)
+  if (o.ok !== true || !isQrStyle(o.qrStyle)) throw new ShapeError()
+  return { qrStyle: o.qrStyle }
+}
+
+/** Sets the look of the QR code on the TV's share card; the answer is the style the server now has. */
+export const setTvQrStyle = (qrStyle: QrStyle, signal?: AbortSignal) =>
+  request('/api/admin/tv', parseTvStyle, { method: 'POST', body: { qrStyle }, signal }) as Promise<AdminResult<{ qrStyle: QrStyle }>>
+
 export const setCheckerPaused = (paused: boolean, signal?: AbortSignal) =>
   request(`/api/admin/checker/${paused ? 'pause' : 'resume'}`, parsePaused, { method: 'POST', body: {}, signal }) as Promise<AdminResult<{ paused: boolean }>>
 
