@@ -49,10 +49,21 @@ export default function YouTubePlayer({
   onPause,
   onEnded,
 }: PlayerProps) {
-  // The viewer's saved volume. A change is saved only once playback has begun, so an early report of the element's
-  // default volume cannot overwrite it.
-  const [savedVolume] = useState(readSavedVolume)
+  // The viewer's volume: the saved one at first, then what they set with the player's own controls. react-player sets the
+  // volume it is given on every render, so a constant here put the old volume back whenever the page drew again. A change
+  // is saved only once playback has begun, so an early report of the element's default volume cannot overwrite it.
+  const [volume, setVolume] = useState(readSavedVolume)
   const playedRef = useRef(false)
+
+  // Whether the video should play: what the viewer last did with the player's own controls. react-player plays a paused
+  // video after every render while it is told `playing`, so a constant `true` here started the video again each time the
+  // viewer paused it (the pause itself redraws this component). A new video starts playing by itself again.
+  const [wantPlaying, setWantPlaying] = useState(true)
+  const [wantedFor, setWantedFor] = useState(url)
+  if (wantedFor !== url) {
+    setWantedFor(url)
+    setWantPlaying(true)
+  }
 
   // Mute is state, not a constant. The player is told `muted` on every render, so a constant `true` re-muted the viewer
   // whenever the page re-rendered after they unmuted (about a third of the time). Now it starts as the browser allows,
@@ -72,6 +83,8 @@ export default function YouTubePlayer({
       if (!playedRef.current) {
         setMuted(true)
         setBrowserMuted(true)
+        // A refused sound start can come back as a pause: the muted start is still a start.
+        setWantPlaying(true)
       }
     }, SOUND_AUTOPLAY_GRACE_MS)
     return () => clearTimeout(timer)
@@ -97,13 +110,14 @@ export default function YouTubePlayer({
     <div className="relative w-full h-full" style={{ minHeight: 300 }}>
       <ReactPlayer
         src={url}
-        playing
+        playing={wantPlaying}
         controls
         // Muted only when the browser needs it (see above); the viewer's own mute and unmute are followed.
         muted={muted}
-        volume={savedVolume ?? undefined}
+        volume={volume ?? undefined}
         onVolumeChange={(event) => {
           if (!playedRef.current) return
+          setVolume(event.currentTarget.volume)
           saveVolume(event.currentTarget.volume)
           const reported = event.currentTarget.muted
           if (typeof reported === 'boolean') {
@@ -128,16 +142,21 @@ export default function YouTubePlayer({
         }}
         onPlay={() => {
           playedRef.current = true
+          setWantPlaying(true)
           setPlaying(true)
           emitState({ paused: false, muted })
           onPlay?.()
         }}
         onPause={() => {
+          // The viewer paused (or the video stopped): it stays paused until they play it again.
+          setWantPlaying(false)
           setPlaying(false)
           emitState({ paused: true, muted })
           onPause?.()
         }}
         onEnded={() => {
+          // Told to play on, react-player would start a finished video over.
+          setWantPlaying(false)
           setPlaying(false)
           emitState({ paused: true, muted })
           onEnded?.()
