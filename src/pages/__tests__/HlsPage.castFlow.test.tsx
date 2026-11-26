@@ -171,6 +171,16 @@ describe('starting', () => {
     expect(screen.getByTestId('cast-panel')).toHaveTextContent('Only HLS and DASH streams can be cast')
   })
 
+  it('a phone pressing Cast while the TV plays sees the TV’s channel and changes nothing', async () => {
+    mount('/hls-dash/aaa')
+    ready()
+    await click(castButton())
+    act(() => fake.sessionStarted('Living room', { state: 'playing', id: 'bbb', name: 'Beta' }))
+    await act(async () => {})
+    expect(loaded()).toEqual([])
+    expect(screen.getByTestId('cast-panel')).toHaveTextContent('Beta')
+  })
+
   it('from Chrome’s own Cast menu on another page waits for a choice', async () => {
     mount('/hls-dash/bbb')
     ready()

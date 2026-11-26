@@ -96,6 +96,8 @@ declare namespace cast.framework {
     addMessageListener(namespace: string, listener: (namespace: string, message: string) => void): void
     sendMessage(namespace: string, data: unknown): Promise<unknown>
     loadMedia(request: chrome.cast.media.LoadRequest): Promise<unknown>
+    /** The media the receiver is playing, when it is (a sender that joins a running TV gets it). */
+    getMediaSession(): { playerState: string } | null
   }
 
   class RemotePlayer {}

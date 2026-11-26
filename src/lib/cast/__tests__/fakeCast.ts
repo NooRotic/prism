@@ -20,10 +20,16 @@ export interface FakeCast {
   castState(state: string): void
   /** The picker was closed without a choice. */
   cancelPicker(): void
-  sessionStarted(device: string): void
+  /**
+   * A session starts. The TV page answers a new sender with what it is doing: by default nothing (a TV that has just started
+   * PRISM); `'silent'` sends nothing.
+   */
+  sessionStarted(device: string, tv?: { state: string; id?: string; name?: string } | 'silent'): void
   sessionResumed(device: string): void
   sessionEnded(): void
   message(data: unknown): void
+  /** What Cast's own media session says for the next session: a player state, or null for none. */
+  mediaSession(state: string | null): void
 }
 
 export function installFakeCast(): FakeCast {
@@ -31,6 +37,7 @@ export function installFakeCast(): FakeCast {
   let asking: { resolve: () => void; reject: (why: string) => void } | null = null
   let device = ''
   let current: { listeners: ((namespace: string, text: string) => void)[] } | null = null
+  let media: { playerState: string } | null = null
 
   const emit = (type: string, event: unknown) => contextListeners.get(type)?.forEach((l) => l(event as never))
   const newSession = () => {
@@ -40,6 +47,7 @@ export function installFakeCast(): FakeCast {
       getCastDevice: () => ({ friendlyName: device }),
       addMessageListener: (_namespace: string, l: (namespace: string, text: string) => void) => listeners.push(l),
       loadMedia: (request: never) => fake.loadMedia(request),
+      getMediaSession: () => media,
       sendMessage: (namespace: string, data: unknown) => fake.sendMessage(namespace, data),
     }
   }
@@ -134,13 +142,19 @@ export function installFakeCast(): FakeCast {
       asking?.reject('cancel')
       asking = null
     },
-    sessionStarted: begin('STARTED'),
+    sessionStarted: (name, tv = { state: 'idle' }) => {
+      begin('STARTED')(name)
+      if (tv !== 'silent') fake.message({ v: 1, type: 'now', id: tv.id ?? null, name: tv.name ?? '', state: tv.state })
+    },
     sessionResumed: begin('RESUMED'),
     sessionEnded: () => {
       current = null
       emit('session', { sessionState: 'ENDED' })
     },
     message: (data) => current?.listeners.forEach((l) => l('ns', JSON.stringify(data))),
+    mediaSession: (state) => {
+      media = state === null ? null : { playerState: state }
+    },
   }
   return fake
 }
