@@ -184,7 +184,9 @@ export function remote(previous: RemoteState, event: RemoteEvent, now: number, c
       state.card = null
     } else if (ctx.onAir || state.pending) {
       if (state.pending) {
-        effects.push({ type: 'tune', entry: state.pending.entry })
+        // As the tick would: a preview that came back to the channel that plays is not tuned again.
+        const { entry } = state.pending
+        if (entry.id !== ctx.playingId || ctx.retry) effects.push({ type: 'tune', entry })
         state.pending = null
       }
       state.card = { at: now }

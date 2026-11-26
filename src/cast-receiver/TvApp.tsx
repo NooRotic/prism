@@ -127,12 +127,15 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
     }
   }, [handle])
 
+  // The player is asked only while a debug line is on screen: nothing is drawn again for words nobody can see.
+  const debugShown = useRef(false)
   useEffect(() => {
     let slow = 0
     const id = setInterval(() => {
       const now = performance.now()
       tuner.tick(now)
       handle({ type: 'tick' }, now)
+      if (!debugShown.current) return
       const starting = tuner.view().state === 'tuning' || tuner.view().state === 'buffering'
       slow = (slow + 1) % SLOW_POLL_TICKS
       if (starting || slow === 0) {
@@ -161,7 +164,11 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
       last = tuner.view()
       tell()
       const at = performance.now()
-      if (last.stream !== before.stream) setTiming({ tuneAt: at, startedInMs: null })
+      if (last.stream !== before.stream) {
+        setTiming({ tuneAt: at, startedInMs: null })
+        // The new channel's own first words, never the last one's.
+        setPlayer({ report: engine.report(), at })
+      }
       else if (last.state === 'playing') setTiming((t) => (t.startedInMs === null ? { ...t, startedInMs: at - t.tuneAt } : t))
       if (last.state === 'playing' && (before.state === 'tuning' || before.state === 'failed')) {
         if (timer) clearTimeout(timer)
@@ -173,7 +180,7 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
       off()
       if (timer) clearTimeout(timer)
     }
-  }, [tuner, sendNow])
+  }, [tuner, sendNow, engine])
 
   const { stream, state } = view
   const entryOf = (id: string | null) => (id === null ? null : (list?.streams.find((s) => s.id === id) ?? null))
@@ -209,6 +216,11 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
       }) || null
     : null
 
+  const showsDebug = Boolean(debug) && (Boolean(guide && stream) || Boolean(named && !guide && !card && !preview) || Boolean(message))
+  useLayoutEffect(() => {
+    debugShown.current = showsDebug
+  })
+
   return (
     <div className="tv">
       {stream === null && (
@@ -239,7 +251,9 @@ export default function TvApp({ engine, sendNow, leave, onContext }: TvAppProps)
           debug={preview ? null : debug}
         />
       )}
-      {card && <TvShareCard stream={card} entry={entryOf(card.id)} group={groupOf(card.id)} qrStyle={qr.style} />}
+      {card && (
+        <TvShareCard stream={card} entry={entryOf(card.id)} group={groupOf(card.id)} qrStyle={qr.style} notWorking={state === 'failed' || state === 'ended'} />
+      )}
       {notice && (
         <p role="status" className="tv-notice">
           {notice}

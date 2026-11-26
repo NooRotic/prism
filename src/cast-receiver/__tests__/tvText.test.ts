@@ -35,6 +35,14 @@ describe('the debug line', () => {
     }
   })
 
+  it('a slow connection keeps its decimal, and a bandwidth of 0 is not yet known', () => {
+    const at = (report: object) => debugLine({ ...base, state: 'playing', report: { engine: 'shaka', step: 'PLAYING', bitrate: 8e5, ...report }, startedInMs: null })
+    expect(at({ bandwidth: 4e5 })).toBe('PLAYING · 0.8 of 0.4 Mb/s')
+    expect(at({ bandwidth: 0 })).toBe('PLAYING · 0.8 Mb/s')
+    expect(at({ bitrate: 0, bandwidth: 0 })).toBe('PLAYING')
+    expect(at({ bitrate: 6.2e6, bandwidth: 4.1e7 })).toBe('PLAYING · 6.2 of 41 Mb/s')
+  })
+
   it('a recording is never "behind live"', () => {
     expect(debugLine({ ...base, state: 'playing', live: false, report: PLAYING, startedInMs: 2310 })).not.toContain('behind live')
   })
@@ -53,6 +61,10 @@ describe('the clock', () => {
 
   it('and its 24-hour one', () => {
     expect(clockParts(at, 'en-GB', 'Europe/London')).toEqual({ time: '02:47', period: null })
+  })
+
+  it('midnight on a 24-hour clock is 00:00', () => {
+    expect(clockParts(new Date('2026-11-26T00:00:00Z'), 'en-GB', 'Europe/London')).toEqual({ time: '00:00', period: null })
   })
 
   it('midnight is 12, in the morning', () => {

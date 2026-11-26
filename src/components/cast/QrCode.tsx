@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react'
+import { memo, useId, useMemo } from 'react'
 import { QR_LOOKS, qrModel, type QrStyle } from '../../lib/cast/qrCode'
 import { PrismIconDrawing } from './PrismIcon'
 
@@ -8,8 +8,11 @@ interface QrCodeProps {
   className?: string
 }
 
-/** A QR code in one of PRISM's looks: round dots, coloured corner squares, the mark in the middle. */
-export default function QrCode({ text, styleName, className }: QrCodeProps) {
+/**
+ * A QR code in one of PRISM's looks: round dots, coloured corner squares, the mark in the middle. Memoised: it is hundreds of
+ * dots, and its props are plain strings, so a TV page that draws again for other reasons does not draw it again.
+ */
+export default memo(function QrCode({ text, styleName, className }: QrCodeProps) {
   const model = useMemo(() => qrModel(text), [text])
   const look = QR_LOOKS[styleName]
   // An id of its own, for two codes on one page; React's ids hold characters a url(#...) reference does not take.
@@ -47,4 +50,4 @@ export default function QrCode({ text, styleName, className }: QrCodeProps) {
       </g>
     </svg>
   )
-}
+})

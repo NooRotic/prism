@@ -29,10 +29,14 @@ function picture({ width, height }: EngineReport): string | null {
   return real(width) && real(height) && width > 0 && height > 0 ? `${width}×${height}` : null
 }
 
+/** Megabits: one decimal under 10, whole above. */
+const mbits = (bits: number) => (bits < 1e7 ? (bits / 1e6).toFixed(1) : String(Math.round(bits / 1e6)))
+
+/** A rate of 0 is one the player has not measured yet: left out, like a missing one. */
 function rate({ bitrate, bandwidth }: EngineReport): string | null {
-  if (!real(bitrate)) return null
+  if (!real(bitrate) || bitrate === 0) return null
   const playing = (bitrate / 1e6).toFixed(1)
-  return real(bandwidth) ? `${playing} of ${Math.round(bandwidth / 1e6)} Mb/s` : `${playing} Mb/s`
+  return real(bandwidth) && bandwidth > 0 ? `${playing} of ${mbits(bandwidth)} Mb/s` : `${playing} Mb/s`
 }
 
 /**

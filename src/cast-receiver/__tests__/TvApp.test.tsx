@@ -1,4 +1,7 @@
+import { Resvg } from '@resvg/resvg-js'
 import { act, render, screen, within } from '@testing-library/react'
+import jsQR from 'jsqr'
+import { shareUrl } from '../../lib/cast/qrCode'
 import type { CastLoadData, CastStream, ContextMessage, NowMessage } from '../../lib/cast/messages'
 import type { CastEngine, EngineReport, EngineSample } from '../../lib/cast/tuner'
 import { loadStreamSnapshot, refreshStreamSnapshot, type StreamEntry, type StreamSnapshot } from '../../lib/streamsApi'
@@ -18,6 +21,7 @@ const DATA: CastLoadData = { v: 1, id: 'news', kind: 'hls', live: true, favorite
 
 let sample: EngineSample | null
 let report: EngineReport
+let reportCalls: number
 let loads: CastStream[]
 let senderLoad: (stream: CastStream, data: CastLoadData | null) => void
 let sendContext: (message: ContextMessage) => void
@@ -32,7 +36,10 @@ const engine: CastEngine = {
   },
   stop: () => {},
   sample: () => sample,
-  report: () => report,
+  report: () => {
+    reportCalls += 1
+    return report
+  },
   onError: (l) => {
     engineError = l
     return () => {}
@@ -105,6 +112,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   sample = null
   report = { engine: 'shaka', step: null }
+  reportCalls = 0
   vi.mocked(fetchTvSettings).mockReset().mockResolvedValue(null)
   loads = []
   sent = []
@@ -348,6 +356,34 @@ describe('when it does not play', () => {
 })
 
 describe('the share card', () => {
+  it('its code opens the channel’s page in PRISM', async () => {
+    await playing()
+    press('ArrowRight')
+    const svg = card()?.querySelector('svg')?.outerHTML ?? ''
+    const image = new Resvg(svg, { fitTo: { mode: 'width', value: 400 }, background: '#6a7a8a' }).render()
+    expect(jsQR(new Uint8ClampedArray(image.pixels), image.width, image.height, { inversionAttempts: 'attemptBoth' })?.data).toBe(shareUrl('news'))
+  })
+
+  it('names the country, and shows the picture the computer sent when there is no list', async () => {
+    await playing()
+    press('ArrowRight')
+    expect(card()?.querySelector('img[src*="us"]')).not.toBeNull()
+    press('ArrowLeft')
+    await open(null)
+    act(() => senderLoad({ ...SENT, id: 'abc123def456', logo: 'https://d.test/pic.png' }, { ...DATA, id: 'abc123def456' }))
+    plays(1000)
+    press('ArrowRight')
+    expect(screen.getAllByTestId('tv-card').at(-1)?.querySelector('img[src="https://d.test/pic.png"]')).not.toBeNull()
+  })
+
+  it('says a channel that is not working is not working', async () => {
+    await playing()
+    sample = null
+    act(() => engineError())
+    press('ArrowRight')
+    expect(card()).toHaveTextContent('Not available right now')
+  })
+
   it('Right shows it with the channel’s code, Left takes it away', async () => {
     await playing()
     press('ArrowRight')
@@ -435,18 +471,42 @@ describe('the debug line', () => {
     sample = null
     act(() => engineError())
     wait(1000)
-    expect(screen.getByText(/ERROR 905/)).toBeInTheDocument()
+    expect(document.querySelector('.tv-message')).toHaveTextContent(/ERROR 905/)
+  })
+
+  it('a new channel’s banner never shows the last one’s step', async () => {
+    report = { engine: 'shaka', step: 'PLAYING' }
+    await playing()
+    report = { engine: 'shaka', step: null }
+    act(() => senderLoad({ ...SENT, id: 'sports', name: 'Sports Live' }, { ...DATA, id: 'sports' }))
+    expect(banner()).not.toHaveTextContent('PLAYING')
+  })
+
+  it('asks the player nothing while none of its words are on screen', async () => {
+    await playing()
+    plays(6000)
+    expect(banner()).toBeNull()
+    reportCalls = 0
+    plays(5000)
+    expect(reportCalls).toBe(0)
+    press('ArrowRight') // the share card shows no debug line
+    reportCalls = 0
+    plays(5000)
+    expect(reportCalls).toBe(0)
+    press('Enter') // the guide's now card does
+    plays(2000)
+    expect(reportCalls).toBeGreaterThan(0)
   })
 })
 
 describe('the screen', () => {
-  it('never shows a stream’s address', async () => {
+  it('never shows a stream’s address, in its text or its markup', async () => {
     await playing()
-    expect(document.body.textContent).not.toMatch(/secret-host|hunter2/)
+    expect(document.body.innerHTML).not.toMatch(/secret-host|hunter2/)
     press('ArrowRight')
-    expect(document.body.textContent).not.toMatch(/secret-host|hunter2/)
+    expect(document.body.innerHTML).not.toMatch(/secret-host|hunter2/)
     press('Enter')
-    expect(document.body.textContent).not.toMatch(/secret-host|hunter2/)
+    expect(document.body.innerHTML).not.toMatch(/secret-host|hunter2/)
   })
 })
 

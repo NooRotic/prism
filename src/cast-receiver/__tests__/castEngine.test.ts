@@ -342,6 +342,20 @@ describe('report', () => {
     expect(report.behindLive).toBeCloseTo(4.1)
   })
 
+  it('says a stream ended or was stopped, not the step before', async () => {
+    const { manager, engine } = setup()
+    await engine.load({ ...STREAM, live: false })
+    manager.emit('PLAYER_LOADING')
+    manager.emit('LOADED_METADATA')
+    manager.emit('PLAYING')
+    manager.emit('MEDIA_FINISHED', { endedReason: 'END_OF_STREAM' })
+    expect(engine.report().step).toBe('ENDED')
+    await engine.load(STREAM)
+    manager.emit('PLAYER_LOADING')
+    manager.emit('MEDIA_FINISHED', { endedReason: 'STOPPED' })
+    expect(engine.report().step).toBe('STOPPED')
+  })
+
   it('a recording is never behind live', async () => {
     const { manager, engine } = setup()
     await engine.load({ ...STREAM, live: false })

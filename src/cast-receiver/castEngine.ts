@@ -113,6 +113,7 @@ export function createCastEngine(manager: cast.framework.PlayerManager): CastEng
     const { END_OF_STREAM, STOPPED, SENDER_STOPPED } = events.EndedReason
     if (event.endedReason === END_OF_STREAM) finished = 'ended'
     if (event.endedReason === STOPPED || event.endedReason === SENDER_STOPPED) finished = 'stopped'
+    if (finished) step = finished.toUpperCase()
   })
 
   manager.setMessageInterceptor<cast.framework.messages.LoadRequestData>(messages.MessageType.LOAD, (request) => {

@@ -271,6 +271,28 @@ describe('the share card (Left and Right with the guide closed)', () => {
     expect(r.of('tune')).toHaveLength(1)
   })
 
+  it('never reloads the channel that is on: a preview back on it, or a list of one, just opens the card', () => {
+    const back = hand()
+    back.press('ArrowDown', 0)
+    back.press('ArrowUp', 200) // over and back to B, which plays
+    back.press('ArrowRight', 300)
+    expect(back.of('tune')).toHaveLength(0)
+    expect(back.state.pending).toBeNull()
+    expect(back.state.card).toEqual({ at: 300 })
+    const one = hand({ ...CTX, surf: [B] })
+    one.press('ArrowDown', 0)
+    one.press('ArrowRight', 100)
+    expect(one.of('tune')).toHaveLength(0)
+    expect(one.state.card).not.toBeNull()
+  })
+
+  it('but tunes it again when it is not working', () => {
+    const r = hand({ ...CTX, surf: [B], retry: true })
+    r.press('ArrowDown', 0)
+    r.press('ArrowRight', 100)
+    expect(r.of('tune')).toEqual([{ type: 'tune', entry: B }])
+  })
+
   it('Up or Down closes it and flips', () => {
     const r = hand()
     r.press('ArrowRight', 0)
