@@ -3,6 +3,8 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { act } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import YoutubePlayerPage from '../YoutubePlayerPage'
+import { CastContext, type CastApi } from '../../components/cast/castContext'
+import { NO_CAST } from '../../lib/cast/castSender'
 import { useApp } from '../../contexts/AppContext'
 import { FloatingVideoContext } from '../../components/chat/floatingVideoContext'
 import type { FloatingVideoControls } from '../../components/chat/floatingVideoContext'
@@ -102,6 +104,26 @@ const live = (over: Partial<VideoPageData> = {}) =>
     status: 'ready',
     data: data({ channelId: 'UC1', live: { state: 'live', viewerCount: 5, startedAt: null }, ...over }),
   })
+
+const CASTING = { ...NO_CAST, connected: true, device: 'TV', now: { id: 'a', name: 'News One', state: 'playing' }, load: () => {}, start: () => {}, tune: () => {}, togglePause: () => {}, stop: () => {}, clearEnded: () => {}, offer: () => {} } satisfies CastApi
+
+describe('YoutubePlayerPage while casting', () => {
+  it.each([true, false])('says above the player that YouTube comes later (live: %s)', (isLive) => {
+    if (isLive) live()
+    render(
+      <CastContext value={CASTING}>
+        <MemoryRouter initialEntries={['/youtube/abcdefghijk']}>
+          <Routes>
+            <Route path="/youtube/:videoId" element={<YoutubePlayerPage />} />
+          </Routes>
+        </MemoryRouter>
+      </CastContext>,
+    )
+    const line = screen.getByText('Casting YouTube is coming soon. Your TV keeps playing News One.')
+    expect(before(line, screen.getByTestId('player'))).toBe(true)
+    expect(line.closest('[data-testid="chat-dock"], .aspect-video')).toBeNull()
+  })
+})
 
 describe('YoutubePlayerPage on a live video', () => {
   it('docks the chat beside the player, the player inside the dock, and drops the pop-out bar', () => {

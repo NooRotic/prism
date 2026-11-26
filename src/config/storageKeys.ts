@@ -88,6 +88,8 @@ export const STORAGE_KEYS = {
   SESSION_ENTRY_REFERRER: 'prism_entry_referrer',
   /** Set once the rail's automatic "Check live" has run in this tab's visit. */
   SESSION_YOUTUBE_LIVE_AUTO: 'prism_youtube_live_auto',
+  /** This tab is casting to a TV, so a reload takes the session up again. */
+  SESSION_CASTING: 'prism_casting',
   /** The owner's admin token (identity only, no permissions). Never the viewer token, and gone when the tab closes. */
   SESSION_ADMIN_TOKEN: 'prism_admin_token',
   /** OAuth state nonce for the admin sign-in round trip (always starts with `admin.`). */

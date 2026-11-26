@@ -15,7 +15,7 @@ return [
         'client_secret' => '',
     ],
     // Only these origins may call the API from a browser.
-    'allowed_origins' => ['https://prism.nooroticx.tv', 'http://localhost:5000'],
+    'allowed_origins' => ['https://prism.nooroticx.tv', 'https://prism-cast.nooroticx.tv', 'http://localhost:5000'],
     'tt' => [
         'enabled' => true,
         // Names PRISM and a public contact address, as TwitchTracker's API guidance asks. The server refuses to start

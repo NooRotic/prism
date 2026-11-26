@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:cast": "vite build --config vite.cast.config.ts",
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",

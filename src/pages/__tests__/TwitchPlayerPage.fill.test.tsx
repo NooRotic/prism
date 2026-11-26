@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
+import { CastContext, type CastApi } from '../../components/cast/castContext'
+import { NO_CAST } from '../../lib/cast/castSender'
 import TwitchPlayerPage from '../TwitchPlayerPage'
 
 // Fill mode hides everything outside the dock row with a CSS class, so each
@@ -78,4 +80,23 @@ describe('TwitchPlayerPage in fill mode', () => {
   it('does not hide the dock itself', () => {
     expect(screen.getByTestId('chat-dock').closest('.fill-hide')).toBeNull()
   })
+})
+
+const CASTING = { ...NO_CAST, connected: true, device: 'TV', now: { id: 'a', name: 'News One', state: 'playing' }, load: () => {}, start: () => {}, tune: () => {}, togglePause: () => {}, stop: () => {}, clearEnded: () => {}, offer: () => {} } satisfies CastApi
+
+it('says above the dock, while casting, that Twitch comes later', () => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  render(
+    <CastContext value={CASTING}>
+      <MemoryRouter initialEntries={['/twitch/streamer']}>
+        <Routes>
+          <Route path="/twitch/:channel" element={<TwitchPlayerPage />} />
+        </Routes>
+      </MemoryRouter>
+    </CastContext>,
+  )
+  const line = screen.getByText('Casting Twitch is coming soon. Your TV keeps playing News One.')
+  const dock = screen.getByTestId('chat-dock')
+  expect(Boolean(line.compareDocumentPosition(dock) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+  expect(dock.contains(line)).toBe(false)
 })

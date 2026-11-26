@@ -1,0 +1,246 @@
+/* The TV page. Drawn for 1280x720 and scaled with the screen: 1rem is 16px there, so 1.5rem is the smallest text, 24px.
+   Nothing stands closer to an edge than 5% (a TV may cut that off). PRISM's colours; no Tailwind, so it stays small. */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg: #050507;
+  --panel: rgba(8, 8, 12, 0.92);
+  --border-accent: #2a2a3a;
+  --text-primary: #eeeef0;
+  --text-secondary: #c4c4d4;
+  --accent-green: #39ff14;
+  --accent-hls: #3b82f6;
+  --font-heading: 'Orbitron', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html {
+  font-size: calc(100vh / 45);
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: 'Roboto', system-ui, sans-serif;
+}
+
+cast-media-player {
+  position: fixed;
+  inset: 0;
+  --background: #050507;
+  --background-image: none;
+  --splash-image: none;
+  --logo-image: none;
+  --watermark-image: none;
+}
+
+/* Google's layer for touch devices; faded for the same reason as its overlay (see quietCast). */
+touch-controls {
+  opacity: 0;
+}
+
+p,
+ul {
+  margin: 0;
+  padding: 0;
+}
+
+.tv {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+
+.tv-small {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.tv-start {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: var(--bg);
+}
+
+.tv-start-mark {
+  width: 24rem;
+  height: 12rem;
+}
+
+.tv-start-name {
+  font-family: var(--font-heading);
+  font-size: 4rem;
+  letter-spacing: 0.2em;
+  color: var(--accent-green);
+}
+
+.tv-message,
+.tv-notice {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 70%;
+  padding: 1rem 2rem;
+  border: 2px solid var(--border-accent);
+  border-radius: 0.75rem;
+  background: var(--panel);
+  font-size: 1.75rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.tv-message {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.tv-notice {
+  top: 8%;
+  border-color: var(--accent-green);
+}
+
+.tv-banner {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  bottom: 6%;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  border-left: 0.4rem solid var(--accent-hls);
+  border-radius: 0.5rem;
+  background: var(--panel);
+}
+
+.tv-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.tv-banner-name,
+.tv-row-name,
+.tv-guide-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-banner-name {
+  font-size: 2.25rem;
+  font-weight: 700;
+}
+
+.tv-banner-note {
+  flex-shrink: 0;
+  font-size: 1.75rem;
+  color: var(--accent-green);
+}
+
+.tv-guide {
+  position: absolute;
+  left: 5%;
+  top: 6%;
+  bottom: 6%;
+  width: 42%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  box-sizing: border-box;
+  border: 2px solid var(--border-accent);
+  border-radius: 0.75rem;
+  background: var(--panel);
+}
+
+.tv-guide-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  color: var(--accent-green);
+}
+
+.tv-guide-label {
+  flex: 1;
+  text-align: center;
+}
+
+.tv-heart {
+  font-family: sans-serif;
+}
+
+.tv-rows {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+.tv-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.4rem 0.75rem;
+  border: 3px solid transparent;
+  border-radius: 0.5rem;
+  font-size: 1.6rem;
+}
+
+.tv-row[aria-selected='true'] {
+  border-color: var(--accent-green);
+  background: #16301a;
+}
+
+.tv-row-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.tv-row-playing {
+  color: var(--accent-green);
+}
+
+.tv-guide-foot {
+  text-align: center;
+}
+
+/* The few utility classes of the parts shared with PRISM (ChannelPicture, CountryFlag), which are Tailwind's there. */
+.flex {
+  display: flex;
+}
+.inline-block {
+  display: inline-block;
+}
+.shrink-0 {
+  flex-shrink: 0;
+}
+.items-center {
+  align-items: center;
+}
+.justify-center {
+  justify-content: center;
+}
+.rounded-md {
+  border-radius: 0.375rem;
+}
+.object-contain {
+  object-fit: contain;
+}
+.object-cover {
+  object-fit: cover;
+}
+.font-semibold {
+  font-weight: 600;
+}

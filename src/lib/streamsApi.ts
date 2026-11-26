@@ -174,6 +174,19 @@ export function loadStreamSnapshot(signal?: AbortSignal): Promise<SnapshotResult
   })
 }
 
+/**
+ * Asks for the list again although one is remembered: for a page that stays open for hours (the TV). A good answer replaces
+ * the remembered one; a bad one leaves it, and answers with it.
+ */
+export async function refreshStreamSnapshot(): Promise<SnapshotResult> {
+  if (!HISTORY_ENABLED) return UNAVAILABLE
+  const mine = generation
+  const result = await request()
+  if (mine !== generation) return result
+  if (result.kind === 'ready') cached = result
+  return cached ?? result
+}
+
 /** The address of PRISM's own copy of a channel picture, only for the file names the server writes; otherwise null. */
 export function logoUrl(file: string): string | null {
   if (!HISTORY_ENABLED || !LOGO_FILE.test(file)) return null

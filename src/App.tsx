@@ -17,6 +17,7 @@ import { usePageView } from './hooks/usePageView'
 import { STORAGE_KEYS } from './config/storageKeys'
 import { isPlayerPagePath } from './lib/routes'
 
+import CastProvider from './components/cast/CastProvider'
 import AppRoutes from './AppRoutes'
 
 const ONBOARDING_SEEN_KEY = STORAGE_KEYS.LOCAL_ONBOARDING_SEEN
@@ -73,6 +74,7 @@ function AppLayout() {
   const rainSpeed = isPlayerPage ? 0.5 : 1
 
   return (
+    <CastProvider>
     <FloatingVideoProvider>
       <div className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)]">
         {/* Frozen on player pages: an animating full-viewport canvas stops
@@ -109,6 +111,7 @@ function AppLayout() {
         </RailGutter>
       </div>
     </FloatingVideoProvider>
+    </CastProvider>
   )
 }
 

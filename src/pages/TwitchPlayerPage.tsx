@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { Tv } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
+import CastComingSoon from '../components/cast/CastComingSoon'
 import { useChannelData } from '../hooks/useChannelData'
 import { useChannelLive } from '../hooks/useChannelLive'
 import { useOfflineLayout } from '../hooks/useOfflineLayout'
@@ -141,6 +142,7 @@ export default function TwitchPlayerPage() {
 
   return (
     <div className="flex flex-col gap-4 w-full px-4 md:px-6 lg:px-8 pt-4 pb-8">
+      <CastComingSoon platform="Twitch" />
       {layout.offline ? (
         <OfflineLayout
           channel={channel ?? ''}

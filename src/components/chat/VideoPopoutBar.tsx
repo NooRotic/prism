@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { STRIP_BUTTON_LOOK } from './ChatTab'
 import { useFloatingVideo } from './floatingVideoContext'
 import VideoPopoutButton from './VideoPopoutButton'
@@ -5,6 +6,8 @@ import VideoPopoutButton from './VideoPopoutButton'
 interface VideoPopoutBarProps {
   /** Where a YouTube video continues from, read at the click. Nothing to read means it starts from the beginning. */
   getStartSec?: () => number | undefined
+  /** Another button for the row (the HLS / DASH page's Cast button): there with or without a pop-out. */
+  extra?: ReactNode
 }
 
 /**
@@ -12,9 +15,10 @@ interface VideoPopoutBarProps {
  * would not open or could not start. It sits beside the player, never over it, and is absent where the browser
  * cannot float a video.
  */
-export default function VideoPopoutBar({ getStartSec }: VideoPopoutBarProps) {
+export default function VideoPopoutBar({ getStartSec, extra }: VideoPopoutBarProps) {
   const video = useFloatingVideo()
-  if (!video.isFloating && !video.canOpen) return null
+  const canFloat = video.isFloating || video.canOpen
+  if (!canFloat && !extra) return null
   const notice = video.failed
     ? "The video couldn't start in the floating window, so it was closed. Click the button to try again."
     : video.blocked
@@ -27,12 +31,15 @@ export default function VideoPopoutBar({ getStartSec }: VideoPopoutBarProps) {
           {notice}
         </p>
       )}
-      <VideoPopoutButton
-        floating={video.isFloating}
-        onClick={video.isFloating ? video.close : () => video.open({ startSec: getStartSec?.() })}
-        className={`${STRIP_BUTTON_LOOK} h-9 w-9`}
-        size={16}
-      />
+      {extra}
+      {canFloat && (
+        <VideoPopoutButton
+          floating={video.isFloating}
+          onClick={video.isFloating ? video.close : () => video.open({ startSec: getStartSec?.() })}
+          className={`${STRIP_BUTTON_LOOK} h-9 w-9`}
+          size={16}
+        />
+      )}
     </div>
   )
 }
