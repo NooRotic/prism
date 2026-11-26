@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
-import { afterEach } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import StreamPlayerPanel from '../StreamPlayerPanel'
 import { endPlayback, getPlaybackSnapshot, logPlayback, setPlaybackSoundBlocked } from '../../../lib/playbackLog'
 import { resolveStreamSource } from '../../../lib/streamSource'
@@ -11,7 +11,7 @@ import { resolveStreamSource } from '../../../lib/streamSource'
 // When `logOnRender` is set it also writes one line to the playback log from an effect, as a real engine would.
 const mocks = vi.hoisted(() => ({ failWith: null as string | null, logOnRender: false, withVideo: false }))
 vi.mock('../PlayerHost', () => ({
-  default: function MockPlayerHost({ renderError }: { renderError?: (error: string | null) => React.ReactNode }) {
+  default: function MockPlayerHost({ renderError, onPlaying }: { renderError?: (error: string | null) => React.ReactNode; onPlaying?: () => void }) {
     useEffect(() => {
       if (mocks.logOnRender) logPlayback('info', 'test', 'player rendered')
     }, [])
@@ -19,6 +19,9 @@ vi.mock('../PlayerHost', () => ({
       <div data-testid="player-host">
         {mocks.failWith !== null && renderError ? renderError(mocks.failWith) : null}
         {mocks.withVideo && <video data-testid="video" />}
+        <button type="button" onClick={onPlaying}>
+          playing
+        </button>
       </div>
     )
   },
@@ -82,6 +85,48 @@ describe('StreamPlayerPanel', () => {
     const { container } = renderPanel({ className: 'my-column' })
 
     expect(container.firstElementChild?.className).toBe('my-column')
+  })
+})
+
+describe('StreamPlayerPanel: telling the page', () => {
+  it('says once that the stream started, however often the player reports playing (a rebuffer, a retry)', async () => {
+    mocks.failWith = 'boom'
+    const onStarted = vi.fn()
+    renderPanel({ onStarted })
+    expect(onStarted).not.toHaveBeenCalled()
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'playing' }))
+    await user.click(screen.getByRole('button', { name: 'playing' }))
+    await user.click(screen.getByRole('button', { name: 'retry' }))
+    await user.click(screen.getByRole('button', { name: 'playing' }))
+
+    expect(onStarted).toHaveBeenCalledTimes(1)
+  })
+
+  it('says once that the stream failed, also after a retry that fails again', async () => {
+    mocks.failWith = 'boom'
+    const onFailed = vi.fn()
+    renderPanel({ onFailed })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'retry' }))
+
+    expect(onFailed).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not count a page that hands over new callbacks on every render as another start or failure', () => {
+    mocks.failWith = 'boom'
+    const calls: string[] = []
+    const props = () => ({ onFailed: () => calls.push('failed') })
+    const view = renderPanel(props())
+    view.rerender(
+      <MemoryRouter>
+        <StreamPlayerPanel source={source} {...props()} />
+        <Where />
+      </MemoryRouter>,
+    )
+
+    expect(calls).toEqual(['failed'])
+    expect(getPlaybackSnapshot().entries.filter((entry) => entry.message.startsWith('playback failed'))).toHaveLength(1)
   })
 })
 

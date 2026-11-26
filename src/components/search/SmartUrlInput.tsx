@@ -14,6 +14,7 @@ import {
   getSearchHistory,
   saveSearchEntry,
 } from '../../lib/searchHistory'
+import { trackEvent } from '../../lib/analytics'
 import { buildStreamPath } from '../../lib/routes'
 import { toStreamAddress } from '../../lib/streamSource'
 import { SearchSuggestions } from './SearchSuggestions'
@@ -118,8 +119,11 @@ export function SmartUrlInput({ listContainer, active, onDone }: SmartUrlInputPr
       if (!query) return
 
       const det = detectURLType(query)
+      const isText = det.type === 'unknown' && !hasUrlChars(query)
+      // What kind of thing it is, and never the thing itself.
+      trackEvent('Feature', 'paste', isText ? 'text' : det.type)
 
-      if (det.type === 'unknown' && !hasUrlChars(query)) {
+      if (isText) {
         if (query.includes(' ')) {
           // Multi-word text without URL chars = category/game name
           dispatch({ type: 'OPEN_CATEGORY_PANEL', category: query })

@@ -6,6 +6,12 @@
     <script>
       // GitHub Pages SPA redirect — preserves the path for React Router.
       // Encodes the path as a query param and redirects to index.html.
+      // The redirect makes PRISM its own referrer, so another site's is kept for the first page view (src/hooks/usePageView.ts).
+      try {
+        if (document.referrer && new URL(document.referrer).host !== window.location.host) {
+          sessionStorage.setItem('prism_entry_referrer', document.referrer);
+        }
+      } catch (e) { /* storage blocked, or no address: nothing is kept */ }
       var pathSegmentsToKeep = 0;
       var l = window.location;
       l.replace(

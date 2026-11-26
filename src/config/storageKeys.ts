@@ -84,6 +84,8 @@ export const STORAGE_KEYS = {
   LOCAL_FAVORITE_STREAMS: 'prism_favorite_streams',
   /** Id of this browser tab, so a chat pop-out knows which tab owns it. Survives a reload. */
   SESSION_TAB_ID: 'prism_tab_id',
+  /** The other site a deep link came from, kept by public/404.html across its redirect; the first page view takes it. */
+  SESSION_ENTRY_REFERRER: 'prism_entry_referrer',
   /** Set once the rail's automatic "Check live" has run in this tab's visit. */
   SESSION_YOUTUBE_LIVE_AUTO: 'prism_youtube_live_auto',
   /** This tab is casting to a TV, so a reload takes the session up again. */

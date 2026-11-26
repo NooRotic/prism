@@ -4,6 +4,7 @@ import { beginPlayback, endPlayback, logPlayback, setPlaybackSoundBlocked, setPl
 import { getSourceColor, getURLTypeDisplayName, type StreamKind } from '../../lib/urlDetection'
 import { buildStreamPath } from '../../lib/routes'
 import type { StreamSource } from '../../lib/streamSource'
+import { useCallbackRefs } from '../../hooks/useCallbackRefs'
 import PlayerHost from './PlayerHost'
 import SoundNotice from './SoundNotice'
 import { StreamErrorCard, StreamStallNotice } from './StreamStatus'
@@ -28,6 +29,13 @@ interface StreamPlayerPanelProps {
    * owner's Playlist preview) passes its own handler, which is called instead and nothing is navigated.
    */
   onTryAs?: (kind: StreamKind) => void
+  /**
+   * The stream is playing. Called once per mount, however often it rebuffers or is retried; the page that mounts the panel
+   * again (a popped-out video brought back) knows whether it is the same stream.
+   */
+  onStarted?: () => void
+  /** No engine could play the stream. Called once per mount, also when a retry fails again. */
+  onFailed?: () => void
 }
 
 const DEFAULT_WRAPPER = 'flex flex-col gap-4 w-full max-w-5xl mx-auto px-4 md:px-6 pt-4 pb-8'
@@ -37,13 +45,16 @@ const DEFAULT_WRAPPER = 'flex flex-col gap-4 w-full max-w-5xl mx-auto px-4 md:px
  * and the debug panel. A retry remounts the player; a stall notice belongs to one attempt at one address, so the caller
  * remounts this component (a key) whenever the address or type changes.
  */
-export default function StreamPlayerPanel({ source, heading = true, className, onTryAs }: StreamPlayerPanelProps) {
+export default function StreamPlayerPanel({ source, heading = true, className, onTryAs, onStarted, onFailed }: StreamPlayerPanelProps) {
   const navigate = useNavigate()
   const { url, detection, kind, guessedKind } = source
   const [attempt, setAttempt] = useState(0)
   const [stalled, setStalled] = useState(false)
   // Once the player has given up, the error card already says what the stall notice would.
   const [failed, setFailed] = useState(false)
+  // What the page has been told about this stream, and how to tell it (a page's new callback is not another event).
+  const told = useRef({ started: false, failed: false })
+  const tell = useCallbackRefs({ onStarted, onFailed })
 
   // One playback session per stream, for the status and the debug output. It begins in a layout effect, which runs before
   // the effects of the engines below (they write to it), and ends when the panel goes away.
@@ -64,12 +75,20 @@ export default function StreamPlayerPanel({ source, heading = true, className, o
     [navigate, url, onTryAs],
   )
   const onStall = useCallback(() => setStalled(true), [])
-  const onPlaying = useCallback(() => setStalled(false), [])
+  const onPlaying = useCallback(() => {
+    setStalled(false)
+    if (told.current.started) return
+    told.current.started = true
+    tell.current.onStarted?.()
+  }, [tell])
   const markFailed = useCallback(() => {
     logPlayback('error', 'panel', 'playback failed: no engine could play it')
     setPlaybackStatus('failed')
     setFailed(true)
-  }, [])
+    if (told.current.failed) return
+    told.current.failed = true
+    tell.current.onFailed?.()
+  }, [tell])
   const renderError = useCallback(
     (error: string | null) => (
       <>

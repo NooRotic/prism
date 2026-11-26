@@ -1,10 +1,13 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AlsoOnTwitch from '../AlsoOnTwitch'
 import VideoMeta from '../VideoMeta'
+import { trackEvent } from '../../../lib/analytics'
 import { removeLink, saveLink } from '../../../lib/linkedAccounts'
 import type { VideoPageData } from '../../../lib/videoPageApi'
+
+vi.mock('../../../lib/analytics', async (original) => ({ ...(await original<typeof import('../../../lib/analytics')>()), trackEvent: vi.fn() }))
 
 const CHANNEL = 'UCX6OQ3DkcsbYNE6H8uQQuVA'
 const link = (confirmed: boolean) => ({ twitch: 'jwonggg', youtube: { channelId: CHANNEL, title: 'Justin Wong', handle: '@jwonggg' }, confirmed, linkedAt: 1 })
@@ -59,4 +62,14 @@ describe('AlsoOnTwitch', () => {
     const name = screen.getByText('Justin Wong')
     expect(name.parentElement!.contains(screen.getByRole('link', { name: /Twitch/ }))).toBe(true)
   })
+})
+
+it('counts opening the linked Twitch channel', () => {
+  vi.mocked(trackEvent).mockClear()
+  saveLink(link(true))
+  renderIt(<AlsoOnTwitch channelId={CHANNEL} />)
+  expect(trackEvent).not.toHaveBeenCalled()
+
+  fireEvent.click(screen.getByRole('link', { name: /Twitch/ }))
+  expect(vi.mocked(trackEvent).mock.calls).toEqual([['Linking', 'followed', 'twitch/jwonggg <-> youtube/Justin Wong']])
 })

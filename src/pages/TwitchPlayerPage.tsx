@@ -7,12 +7,16 @@ import { useChannelData } from '../hooks/useChannelData'
 import { useChannelLive } from '../hooks/useChannelLive'
 import { useOfflineLayout } from '../hooks/useOfflineLayout'
 import { useSessionExpiry } from '../hooks/useSessionExpiry'
+import { useStayed } from '../hooks/useStayed'
 import { useTwitchAuth } from '../hooks/useTwitchAuth'
+import { trackEvent } from '../lib/analytics'
+import { LOGIN } from '../lib/analyticsPage'
 import { lastStreamedAt } from '../lib/offlineLayout'
 import { detectURLType } from '../lib/urlDetection'
 import type { TwitchVideo } from '../types/twitch'
 import PlayerHost from '../components/player/PlayerHost'
 import ChatDock from '../components/chat/ChatDock'
+import { useFloatingVideo } from '../components/chat/floatingVideoContext'
 import ChannelBody from '../components/channel/ChannelBody'
 import OfflineLayout from '../components/channel/OfflineLayout'
 import OfflineStrip from '../components/channel/OfflineStrip'
@@ -79,6 +83,14 @@ export default function TwitchPlayerPage() {
     const url = `https://twitch.tv/${channel}`
     dispatch({ type: 'PLAY_URL', url, detection: detectURLType(url) })
   }
+
+  // What the owner's Matomo is told: the channel, and how long people stay with it. Text that cannot be a login is nobody's
+  // channel. Whether it exists is not checked (a signed-out visitor has no way to), so a mistyped name can be counted.
+  const login = channel && LOGIN.test(channel) ? channel.toLowerCase() : null
+  useEffect(() => {
+    if (login !== null) trackEvent('Twitch', 'opened', login)
+  }, [login])
+  useStayed(login, useFloatingVideo().isFloating)
 
   // Set player URL from route param
   useEffect(() => {
